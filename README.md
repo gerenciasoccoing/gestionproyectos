@@ -87,6 +87,40 @@ La SPA queda disponible en `http://localhost:5173`. La variable `VITE_API_URL` e
 6. **Administración**: gestionar usuarios (asignación a proyectos), roles y permisos por
    módulo/acción, parámetros laborales y datos de la empresa (logo para el PDF de cotización).
 
+## Despliegue en producción (AWS Lightsail)
+
+El repo incluye todo lo necesario para desplegar backend + frontend + PostgreSQL con Docker
+Compose en una sola instancia (`docker-compose.yml`, `backend/Dockerfile`,
+`frontend/Dockerfile` + `frontend/nginx.conf`). El frontend se sirve como estático desde Nginx,
+que además hace de proxy reverso de `/api` hacia el backend, por lo que todo queda bajo el
+mismo origen (sin necesidad de configurar CORS en producción).
+
+Pasos (instancia Ubuntu nueva, ej. AWS Lightsail):
+
+```bash
+# 1. Una sola vez, al crear el servidor: instalar Docker
+scp deploy/setup-instance.sh ubuntu@<IP>:~
+ssh ubuntu@<IP> './setup-instance.sh'
+
+# 2. Copiar el código al servidor (o `git clone` si el repo es accesible desde ahí)
+rsync -avz --exclude node_modules --exclude uploads --exclude .git ./ ubuntu@<IP>:~/app/
+
+# 3. En el servidor: crear el .env con secretos reales y levantar todo
+ssh ubuntu@<IP>
+cd ~/app
+cp .env.example .env && nano .env   # completar POSTGRES_PASSWORD, JWT_SECRET, SEED_ADMIN_*
+docker compose up -d --build
+```
+
+La app queda disponible en `http://<IP-pública>`. El primer arranque del backend corre el
+seed automáticamente (roles, permisos, usuario admin, parámetros laborales). Los datos de
+Postgres y los archivos subidos persisten en volúmenes Docker (`db_data`, `uploads_data`)
+entre reinicios/redeploys.
+
+Para agregar dominio propio y HTTPS más adelante: apuntar un registro A del dominio a la IP
+de la instancia y agregar Certbot (Let's Encrypt) al contenedor Nginx o correrlo en el host
+delante de él.
+
 ## Notas de diseño
 
 - El control de acceso se valida tanto en la UI (se ocultan acciones sin permiso) como en el

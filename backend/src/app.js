@@ -11,7 +11,9 @@ const { UPLOAD_ROOT } = require('./middleware/upload');
 
 const app = express();
 
-const corsOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()) : '*';
+const corsOrigins = !process.env.CORS_ORIGIN || process.env.CORS_ORIGIN === '*'
+  ? '*'
+  : process.env.CORS_ORIGIN.split(',').map((o) => o.trim());
 app.use(cors({ origin: corsOrigins }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
