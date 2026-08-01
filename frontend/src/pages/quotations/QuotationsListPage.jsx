@@ -35,14 +35,14 @@ export default function QuotationsListPage() {
       </Can>
     }>
       {showForm && (
-        <form onSubmit={submit} className="grid grid-cols-2 gap-3 mb-4">
+        <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
           <Input label="Cliente" value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })} required />
           <Input label="Nombre del proyecto propuesto" value={form.projectNameProposed} onChange={(e) => setForm({ ...form, projectNameProposed: e.target.value })} required />
           <Input label="Fecha" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
           <Input label="Validez (días)" type="number" min="1" value={form.validityDays} onChange={(e) => setForm({ ...form, validityDays: e.target.value })} />
-          <TextArea label="Condiciones de pago" value={form.paymentTerms} onChange={(e) => setForm({ ...form, paymentTerms: e.target.value })} className="col-span-2" />
-          <Button type="submit" className="col-span-2">Crear cotización</Button>
-          <div className="col-span-2"><ErrorText>{error}</ErrorText></div>
+          <TextArea label="Condiciones de pago" value={form.paymentTerms} onChange={(e) => setForm({ ...form, paymentTerms: e.target.value })} className="col-span-full" />
+          <Button type="submit" className="col-span-full">Crear cotización</Button>
+          <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}
       <Table columns={['Cliente', 'Proyecto propuesto', 'Fecha', 'Estado', '']}>

@@ -47,11 +47,11 @@ export default function MilestonesPage() {
       </Can>
     }>
       {showForm && (
-        <form onSubmit={submit} className="grid grid-cols-3 gap-3 mb-4">
+        <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
           <Input label="Nombre del hito" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           <Input label="Fecha planeada" type="date" value={form.plannedDate} onChange={(e) => setForm({ ...form, plannedDate: e.target.value })} required />
           <Button type="submit">Guardar</Button>
-          <div className="col-span-3"><ErrorText>{error}</ErrorText></div>
+          <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}
       <Table columns={['Nombre', 'Planeada', 'Real', 'Estado', '']}>

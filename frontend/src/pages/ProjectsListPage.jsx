@@ -43,7 +43,7 @@ export default function ProjectsListPage() {
 
       {showForm && (
         <Card title="Crear proyecto manual">
-          <form onSubmit={handleCreate} className="grid grid-cols-3 gap-3 items-end">
+          <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end">
             <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
             <Input label="Cliente" value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} />
             <Input label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />

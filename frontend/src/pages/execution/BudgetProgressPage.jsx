@@ -54,7 +54,7 @@ export default function BudgetProgressPage() {
         </Can>
       }>
         {showItemForm && (
-          <form onSubmit={submitItem} className="grid grid-cols-3 gap-3 mb-4">
+          <form onSubmit={submitItem} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
             <Select label="APU (opcional)" value={itemForm.apuId} onChange={(e) => onApuChange(e.target.value)}>
               <option value="">-- Ítem manual (sin APU) --</option>
               {apus.map((a) => <option key={a.id} value={a.id}>{a.name} ({money(a.unitCost)}/{a.unit})</option>)}
@@ -64,7 +64,7 @@ export default function BudgetProgressPage() {
             <Input label="Cantidad presupuestada" type="number" min="0" step="0.01" value={itemForm.quantity} onChange={(e) => setItemForm({ ...itemForm, quantity: e.target.value })} required />
             <Input label="Valor unitario" type="number" min="0" step="0.01" value={itemForm.unitCost} onChange={(e) => setItemForm({ ...itemForm, unitCost: e.target.value })} disabled={!!itemForm.apuId} required />
             <Button type="submit">Guardar ítem</Button>
-            <div className="col-span-3"><ErrorText>{error}</ErrorText></div>
+            <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
           </form>
         )}
 
@@ -141,13 +141,13 @@ function ItemProgressPanel({ projectId, itemId, onChange }) {
   return (
     <Card title="Registros de avance">
       <Can module="ejecucion" action="create">
-        <form onSubmit={submit} className="grid grid-cols-4 gap-3 mb-4">
+        <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
           <Input label="Fecha" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
           <Input label="Cantidad ejecutada" type="number" min="0" step="0.01" value={form.quantityExecuted} onChange={(e) => setForm({ ...form, quantityExecuted: e.target.value })} required />
           <Input label="Notas" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           <Input label="Fotos" type="file" accept="image/*" multiple onChange={(e) => setFiles(e.target.files)} />
-          <Button type="submit" className="col-span-4">Registrar avance</Button>
-          <div className="col-span-4">
+          <Button type="submit" className="col-span-full">Registrar avance</Button>
+          <div className="col-span-full">
             <ErrorText>{error}</ErrorText>
             {warning && <p className="text-sm text-yellow-600 mt-1">⚠ {warning}</p>}
           </div>

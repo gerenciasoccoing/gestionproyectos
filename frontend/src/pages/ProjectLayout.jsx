@@ -27,7 +27,7 @@ export default function ProjectLayout() {
     <div>
       <div className="mb-4">
         <Link to="/" className="text-sm text-blue-600 hover:underline">&larr; Volver a proyectos</Link>
-        <div className="flex items-center gap-3 mt-1">
+        <div className="flex items-center flex-wrap gap-2 mt-1">
           <h1 className="text-xl font-bold text-gray-900">{project.name}</h1>
           <Badge color={project.status === 'activo' ? 'green' : project.status === 'suspendido' ? 'yellow' : 'gray'}>
             {project.status}
@@ -37,13 +37,13 @@ export default function ProjectLayout() {
         <p className="text-sm text-gray-500">Cliente: {project.client || '-'}</p>
       </div>
 
-      <nav className="flex gap-1 border-b border-gray-300 mb-4">
+      <nav className="flex gap-1 border-b border-gray-300 mb-4 overflow-x-auto whitespace-nowrap -mx-3 px-3 sm:mx-0 sm:px-0">
         {TABS.map((t) => (
           <NavLink
             key={t.to}
             to={t.to}
             className={({ isActive }) =>
-              `px-4 py-2 text-sm font-medium border-b-2 ${isActive ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-600 hover:text-gray-900'}`
+              `shrink-0 px-4 py-2 text-sm font-medium border-b-2 ${isActive ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-600 hover:text-gray-900'}`
             }
           >
             {t.label}

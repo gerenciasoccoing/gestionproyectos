@@ -60,14 +60,14 @@ function ContractsSection({ projectId, contracts, onChange }) {
       </Can>
     }>
       {showForm && (
-        <form onSubmit={submit} className="grid grid-cols-2 gap-3 mb-4">
-          <Input label="Objeto del contrato" value={form.object} onChange={(e) => setForm({ ...form, object: e.target.value })} required className="col-span-2" />
+        <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          <Input label="Objeto del contrato" value={form.object} onChange={(e) => setForm({ ...form, object: e.target.value })} required className="col-span-full" />
           <Input label="Valor" type="number" min="0" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} required />
           <Input label="Archivo (PDF/Word)" type="file" onChange={(e) => setFile(e.target.files[0])} />
           <Input label="Fecha de firma" type="date" value={form.signedDate} onChange={(e) => setForm({ ...form, signedDate: e.target.value })} required />
           <Input label="Fecha de terminación" type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} required />
-          <Button type="submit" className="col-span-2">Guardar contrato</Button>
-          <div className="col-span-2"><ErrorText>{error}</ErrorText></div>
+          <Button type="submit" className="col-span-full">Guardar contrato</Button>
+          <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}
       <Table columns={['Objeto', 'Valor', 'Firma', 'Terminación', 'Archivo', '']}>
@@ -125,14 +125,14 @@ function PoliciesSection({ projectId, policies, onChange }) {
       </Can>
     }>
       {showForm && (
-        <form onSubmit={submit} className="grid grid-cols-2 gap-3 mb-4">
+        <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
           <Input label="Tipo de garantía" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} required />
           <Input label="Valor" type="number" min="0" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} required />
           <Input label="Inicio de cobertura" type="date" value={form.coverageStart} onChange={(e) => setForm({ ...form, coverageStart: e.target.value })} required />
           <Input label="Fin de cobertura" type="date" value={form.coverageEnd} onChange={(e) => setForm({ ...form, coverageEnd: e.target.value })} required />
           <Input label="Archivo" type="file" onChange={(e) => setFile(e.target.files[0])} />
-          <Button type="submit" className="col-span-2">Guardar póliza</Button>
-          <div className="col-span-2"><ErrorText>{error}</ErrorText></div>
+          <Button type="submit" className="col-span-full">Guardar póliza</Button>
+          <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}
       <Table columns={['Tipo', 'Valor', 'Inicio', 'Fin', 'Archivo', '']}>

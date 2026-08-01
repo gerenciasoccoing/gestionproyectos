@@ -28,7 +28,7 @@ export default function ReportsPage() {
         </a>
       }>
         {evm && (
-          <div className="grid grid-cols-4 gap-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
             <Metric label="PV (Planeado)" value={money(evm.PV)} />
             <Metric label="EV (Ganado)" value={money(evm.EV)} />
             <Metric label="AC (Costo real)" value={money(evm.AC)} />
@@ -56,7 +56,7 @@ export default function ReportsPage() {
       </Card>
 
       {mm && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Card title="Resumen de Hitos">
             <Table columns={['Hito', 'Planeado', 'Real', 'Estado']}>
               {mm.milestones.map((m) => (
@@ -154,8 +154,8 @@ function RisksSection({ projectId }) {
       </Can>
     }>
       {showForm && (
-        <form onSubmit={submit} className="grid grid-cols-3 gap-3 mb-4">
-          <TextArea label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required className="col-span-3" />
+        <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+          <TextArea label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required className="col-span-full" />
           <Select label="Impacto" value={form.impact} onChange={(e) => setForm({ ...form, impact: e.target.value })}>
             <option value="alto">Alto</option><option value="medio">Medio</option><option value="bajo">Bajo</option>
           </Select>
@@ -163,7 +163,7 @@ function RisksSection({ projectId }) {
             <option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option>
           </Select>
           <Button type="submit">Guardar</Button>
-          <div className="col-span-3"><ErrorText>{error}</ErrorText></div>
+          <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}
       <Table columns={['Descripción', 'Impacto', 'Probabilidad', 'Estado', '']}>

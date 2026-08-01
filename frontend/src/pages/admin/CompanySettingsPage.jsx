@@ -36,7 +36,7 @@ export default function CompanySettingsPage() {
 
   return (
     <Card title="Datos de la Empresa (branding para PDF de cotización)">
-      <form onSubmit={submit} className="grid grid-cols-2 gap-3">
+      <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Input label="Nombre de la empresa" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} required />
         <Input label="NIT" value={form.nit} onChange={(e) => setForm({ ...form, nit: e.target.value })} />
         <Input label="Dirección" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
@@ -45,8 +45,8 @@ export default function CompanySettingsPage() {
           <Input label="Logo" type="file" accept="image/*" onChange={(e) => setLogo(e.target.files[0])} />
           {settings.logoPath && <img src={fileUrl(settings.logoPath)} alt="logo" className="h-16 mt-2" />}
         </div>
-        <Button type="submit" className="col-span-2 w-fit">Guardar</Button>
-        <div className="col-span-2">
+        <Button type="submit" className="col-span-full w-fit">Guardar</Button>
+        <div className="col-span-full">
           <ErrorText>{error}</ErrorText>
           {ok && <p className="text-sm text-green-600">Guardado correctamente.</p>}
         </div>

@@ -35,7 +35,7 @@ export default function PersonnelListPage() {
 
   return (
     <Card title={showHistory ? 'Personal retirado (histórico)' : 'Personal activo'} actions={
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button variant="secondary" onClick={() => setShowHistory((s) => !s)}>
           {showHistory ? 'Ver activos' : 'Ver histórico de retirados'}
         </Button>
@@ -47,15 +47,15 @@ export default function PersonnelListPage() {
       </div>
     }>
       {showForm && (
-        <form onSubmit={submit} className="grid grid-cols-3 gap-3 mb-4">
+        <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
           <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           <Input label="Rol/Cargo" value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} required />
           <Input label="Fecha de ingreso" type="date" value={form.entryDate} onChange={(e) => setForm({ ...form, entryDate: e.target.value })} required />
           <Input label="Dedicación (horas)" type="number" min="0" value={form.dedicationHours} onChange={(e) => setForm({ ...form, dedicationHours: e.target.value })} />
           <Input label="Salario mensual" type="number" min="0" value={form.salaryValue} onChange={(e) => setForm({ ...form, salaryValue: e.target.value })} required />
           <Input label="Contrato laboral (archivo)" type="file" onChange={(e) => setFile(e.target.files[0])} />
-          <Button type="submit" className="col-span-3">Guardar</Button>
-          <div className="col-span-3"><ErrorText>{error}</ErrorText></div>
+          <Button type="submit" className="col-span-full">Guardar</Button>
+          <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}
       <Table columns={['Nombre', 'Cargo', 'Ingreso', 'Salida', 'Salario', 'Estado', '']}>

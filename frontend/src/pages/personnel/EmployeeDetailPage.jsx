@@ -24,7 +24,7 @@ export default function EmployeeDetailPage() {
       </div>
 
       <Card title="Datos básicos">
-        <div className="grid grid-cols-4 gap-2 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm">
           <div><span className="text-gray-500">Cargo:</span> {employee.position}</div>
           <div><span className="text-gray-500">Ingreso:</span> {employee.entryDate}</div>
           <div><span className="text-gray-500">Salida:</span> {employee.exitDate || '-'}</div>
@@ -70,7 +70,7 @@ function SocialSecuritySection({ projectId, employee, onChange }) {
   return (
     <Card title="Seguridad Social (Salud, ARL, Pensión)">
       <Can module="personal" action="edit">
-        <form onSubmit={submit} className="flex gap-3 items-end mb-3">
+        <form onSubmit={submit} className="flex flex-wrap gap-3 items-end mb-3">
           <Select label="Tipo" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
             <option value="salud">Salud</option>
             <option value="arl">ARL</option>
@@ -123,12 +123,12 @@ function PaymentsSection({ projectId, employee, onChange }) {
   return (
     <Card title="Comprobantes de Pago (Nómina)">
       <Can module="personal" action="edit">
-        <form onSubmit={submit} className="grid grid-cols-4 gap-3 mb-3 items-end">
+        <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3 items-end">
           <Input label="Fecha" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
           <Input label="Periodo" placeholder="Ej: Julio 2026" value={form.periodLabel} onChange={(e) => setForm({ ...form, periodLabel: e.target.value })} required />
           <Input label="Monto" type="number" min="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
           <Input label="Comprobante" type="file" onChange={(e) => setFile(e.target.files[0])} required />
-          <Button type="submit" className="col-span-4">Adjuntar comprobante</Button>
+          <Button type="submit" className="col-span-full">Adjuntar comprobante</Button>
         </form>
         <ErrorText>{error}</ErrorText>
       </Can>
@@ -198,7 +198,7 @@ function SeveranceSection({ projectId, employee, onChange }) {
   return (
     <Card title="Retiro y Liquidación de Prestaciones Sociales">
       <Can module="personal" action="edit">
-        <form onSubmit={doPreview} className="grid grid-cols-3 gap-3 mb-3 items-end">
+        <form onSubmit={doPreview} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3 items-end">
           <Input label="Fecha de retiro" type="date" value={form.exitDate} onChange={(e) => setForm({ ...form, exitDate: e.target.value })} required />
           <Select label="Causal" value={form.cause} onChange={(e) => setForm({ ...form, cause: e.target.value })}>
             <option value="renuncia">Renuncia voluntaria</option>

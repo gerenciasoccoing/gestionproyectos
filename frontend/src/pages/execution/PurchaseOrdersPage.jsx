@@ -60,7 +60,7 @@ export default function PurchaseOrdersPage() {
   return (
     <div>
       <Card title="Órdenes de Compra" actions={
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={loadReport}>Reporte de compras</Button>
           <Can module="ordenes_compra" action="create">
             <Button onClick={() => setShowForm((s) => !s)}>{showForm ? 'Cancelar' : '+ Nueva orden'}</Button>
@@ -69,13 +69,13 @@ export default function PurchaseOrdersPage() {
       }>
         {showForm && (
           <form onSubmit={submit} className="mb-4">
-            <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <Input label="Proveedor" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} required />
               <Input label="Fecha" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
             </div>
             <p className="text-sm font-medium text-gray-600 mb-2">Ítems</p>
             {form.items.map((it, idx) => (
-              <div key={idx} className="grid grid-cols-6 gap-2 mb-2 items-end">
+              <div key={idx} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-2 items-end">
                 <Input label="Nombre" value={it.name} onChange={(e) => updateItemRow(idx, 'name', e.target.value)} required />
                 <Input label="Unidad" value={it.unit} onChange={(e) => updateItemRow(idx, 'unit', e.target.value)} required />
                 <Input label="Cant. ordenada" type="number" min="0" step="0.01" value={it.quantityOrdered} onChange={(e) => updateItemRow(idx, 'quantityOrdered', e.target.value)} required />
@@ -188,7 +188,7 @@ function OrderDetail({ projectId, orderId, onChange }) {
             <td className="py-2 pr-3">
               <Can module="ordenes_compra" action="edit">
                 {canClose && (
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Input type="date" value={receiptForms[it.id]?.date || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], date: e.target.value } }))} />
                     <Input type="number" min="0" step="0.01" placeholder="Cant." value={receiptForms[it.id]?.quantityReceived || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], quantityReceived: e.target.value } }))} />
                     <Button onClick={() => submitReceipt(it.id)}>Registrar</Button>
@@ -208,7 +208,7 @@ function OrderDetail({ projectId, orderId, onChange }) {
             {fullyDelivered ? (
               <Button onClick={() => close(false)}>Cerrar orden (entrega completa)</Button>
             ) : (
-              <div className="flex gap-2 items-end">
+              <div className="flex flex-wrap gap-2 items-end">
                 <Input label="Motivo de faltantes (obligatorio)" value={closureReason} onChange={(e) => setClosureReason(e.target.value)} className="w-96" />
                 <Button variant="danger" onClick={() => close(true)}>Cerrar con faltantes justificados</Button>
               </div>

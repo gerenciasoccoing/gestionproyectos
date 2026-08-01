@@ -6,9 +6,9 @@ export function Card({ title, actions, children, className = '' }) {
   return (
     <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4 ${className}`}>
       {(title || actions) && (
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center flex-wrap justify-between gap-2 mb-3">
           {title && <h3 className="font-semibold text-gray-800">{title}</h3>}
-          <div className="flex gap-2">{actions}</div>
+          <div className="flex flex-wrap gap-2">{actions}</div>
         </div>
       )}
       {children}

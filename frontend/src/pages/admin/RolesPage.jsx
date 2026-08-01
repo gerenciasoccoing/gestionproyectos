@@ -52,11 +52,11 @@ export default function RolesPage() {
   return (
     <Card title="Roles y Permisos" actions={<Button onClick={() => setShowForm((s) => !s)}>{showForm ? 'Cancelar' : '+ Nuevo rol'}</Button>}>
       {showForm && (
-        <form onSubmit={submit} className="grid grid-cols-3 gap-3 mb-4">
+        <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
           <Input label="Nombre del rol" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           <Input label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           <Button type="submit">Guardar</Button>
-          <div className="col-span-3"><ErrorText>{error}</ErrorText></div>
+          <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}
       {roles.map((role) => (

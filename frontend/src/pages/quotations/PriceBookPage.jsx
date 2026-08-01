@@ -49,7 +49,7 @@ export default function PriceBookPage() {
       </Can>
     }>
       {showForm && (
-        <form onSubmit={submit} className="grid grid-cols-4 gap-3 mb-4">
+        <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
           <Select label="Tipo" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
             <option value="material">Material</option>
             <option value="mano_obra">Mano de obra</option>
@@ -58,8 +58,8 @@ export default function PriceBookPage() {
           <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           <Input label="Unidad" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} required />
           <Input label="Valor" type="number" min="0" value={form.currentValue} onChange={(e) => setForm({ ...form, currentValue: e.target.value })} required />
-          <Button type="submit" className="col-span-4">Guardar</Button>
-          <div className="col-span-4"><ErrorText>{error}</ErrorText></div>
+          <Button type="submit" className="col-span-full">Guardar</Button>
+          <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}
       <Table columns={['Tipo', 'Nombre', 'Unidad', 'Valor actual', 'Actualizar valor', '']}>
@@ -71,7 +71,7 @@ export default function PriceBookPage() {
             <td className="py-1 pr-3">{money(it.currentValue)}</td>
             <td className="py-1 pr-3">
               <Can module="cotizaciones" action="edit">
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Input type="number" min="0" placeholder="Nuevo valor" value={editing[it.id] || ''} onChange={(e) => setEditing((s) => ({ ...s, [it.id]: e.target.value }))} />
                   <Button onClick={() => updateValue(it.id)}>Actualizar</Button>
                 </div>

@@ -67,7 +67,7 @@ export default function QuotationDetailPage() {
       </div>
 
       <Card title="Datos de la cotización">
-        <div className="grid grid-cols-4 gap-2 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm">
           <div><span className="text-gray-500">Cliente:</span> {quotation.clientName}</div>
           <div><span className="text-gray-500">Fecha:</span> {quotation.date}</div>
           <div><span className="text-gray-500">Validez:</span> {quotation.validityDays} días</div>
@@ -83,7 +83,7 @@ export default function QuotationDetailPage() {
         )
       }>
         {showForm && (
-          <form onSubmit={submitItem} className="grid grid-cols-4 gap-3 mb-4">
+          <form onSubmit={submitItem} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             <Select label="APU" value={form.apuId} onChange={(e) => onApuChange(e.target.value)}>
               <option value="">-- ítem manual --</option>
               {apus.map((a) => <option key={a.id} value={a.id}>{a.name} ({money(a.unitCost)}/{a.unit})</option>)}
@@ -91,8 +91,8 @@ export default function QuotationDetailPage() {
             <Input label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required />
             <Input label="Unidad" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} required />
             <Input label="Cantidad" type="number" min="0" step="0.01" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} required />
-            <Button type="submit" className="col-span-4">Agregar</Button>
-            <div className="col-span-4"><ErrorText>{error}</ErrorText></div>
+            <Button type="submit" className="col-span-full">Agregar</Button>
+            <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
           </form>
         )}
         <Table columns={['Descripción', 'Unidad', 'Cantidad', 'Vr. Unit.', 'Vr. Total', '']}>
@@ -115,7 +115,7 @@ export default function QuotationDetailPage() {
         <p className="text-right font-bold mt-2">Total: {money(total)}</p>
       </Card>
 
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         <a href={quotationsApi.pdfUrl(id)} target="_blank" rel="noreferrer">
           <Button variant="secondary">Generar PDF de propuesta</Button>
         </a>

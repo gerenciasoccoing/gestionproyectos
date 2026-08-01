@@ -34,7 +34,7 @@ export default function ExecutionDashboardPage() {
 
   return (
     <div>
-      <div className="grid grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
         <Card title="% de Avance Físico">
           <div className="flex flex-col items-center py-4">
             <div className="relative w-32 h-32">
@@ -64,7 +64,7 @@ export default function ExecutionDashboardPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card title="Comparativo Ejecutado vs Presupuestado">
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={executedVsBudget}>

@@ -49,15 +49,15 @@ export default function ApuPage() {
     }>
       {showForm && (
         <form onSubmit={submit} className="mb-4">
-          <div className="grid grid-cols-3 gap-3 mb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
             <Input label="Nombre del ítem/actividad" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
             <Input label="Unidad" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} required />
             <Input label="AIU (%)" type="number" min="0" value={form.aiuPercent} onChange={(e) => setForm({ ...form, aiuPercent: e.target.value })} required />
           </div>
           <p className="text-sm font-medium text-gray-600 mb-2">Componentes (materiales, mano de obra, equipo)</p>
           {components.map((c, idx) => (
-            <div key={idx} className="grid grid-cols-4 gap-2 mb-2 items-end">
-              <Select label="Insumo (base de precios)" value={c.priceItemId} onChange={(e) => updateRow(idx, 'priceItemId', e.target.value)} className="col-span-2">
+            <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-2 items-end">
+              <Select label="Insumo (base de precios)" value={c.priceItemId} onChange={(e) => updateRow(idx, 'priceItemId', e.target.value)} className="col-span-full">
                 <option value="">-- seleccionar --</option>
                 {priceItems.map((p) => <option key={p.id} value={p.id}>{p.name} ({money(p.currentValue)}/{p.unit})</option>)}
               </Select>

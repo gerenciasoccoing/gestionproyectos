@@ -50,11 +50,11 @@ export default function UsersPage() {
   return (
     <Card title="Usuarios" actions={<Button onClick={() => setShowForm((s) => !s)}>{showForm ? 'Cancelar' : '+ Nuevo usuario'}</Button>}>
       {showForm && (
-        <form onSubmit={submit} className="grid grid-cols-3 gap-3 mb-4">
+        <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
           <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           <Input label="Correo" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
           <Input label="Contraseña" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
-          <div className="col-span-3">
+          <div className="col-span-full">
             <p className="text-sm text-gray-600 mb-1">Roles</p>
             <div className="flex gap-3 flex-wrap">
               {roles.map((r) => (
@@ -65,8 +65,8 @@ export default function UsersPage() {
               ))}
             </div>
           </div>
-          <Button type="submit" className="col-span-3">Guardar</Button>
-          <div className="col-span-3"><ErrorText>{error}</ErrorText></div>
+          <Button type="submit" className="col-span-full">Guardar</Button>
+          <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}
       <Table columns={['Nombre', 'Correo', 'Roles', 'Proyectos asignados', 'Activo']}>

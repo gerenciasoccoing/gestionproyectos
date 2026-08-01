@@ -50,14 +50,14 @@ export default function MinutesPage() {
       </Can>
     }>
       {showForm && (
-        <form onSubmit={submit} className="grid grid-cols-3 gap-3 mb-4">
+        <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
           <Select label="Tipo de acta" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
             {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
           </Select>
           <Input label="Fecha" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
           <Input label="Documento (PDF)" type="file" accept=".pdf" onChange={(e) => setFile(e.target.files[0])} required />
-          <Button type="submit" className="col-span-3">Guardar acta</Button>
-          <div className="col-span-3"><ErrorText>{error}</ErrorText></div>
+          <Button type="submit" className="col-span-full">Guardar acta</Button>
+          <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}
       <Table columns={['Tipo', 'Fecha', 'Documento', '']}>

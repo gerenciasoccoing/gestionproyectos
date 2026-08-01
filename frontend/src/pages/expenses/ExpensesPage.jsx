@@ -74,7 +74,7 @@ export default function ExpensesPage() {
           </Table>
           <p className="text-sm font-semibold mt-2">Total: {money(summary.totals.budgetedAmount)} presupuestado / {money(summary.totals.spent)} gastado</p>
           <Can module="gastos" action="edit">
-            <form onSubmit={submitBudget} className="flex gap-2 items-end mt-3 border-t pt-3">
+            <form onSubmit={submitBudget} className="flex flex-wrap gap-2 items-end mt-3 border-t pt-3">
               <Select label="Categoría" value={budgetForm.category} onChange={(e) => setBudgetForm({ ...budgetForm, category: e.target.value })}>
                 {CATEGORIES.map((c) => <option key={c} value={c}>{LABELS[c]}</option>)}
               </Select>
@@ -91,16 +91,16 @@ export default function ExpensesPage() {
         </Can>
       }>
         {showForm && (
-          <form onSubmit={submit} className="grid grid-cols-4 gap-3 mb-4">
+          <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             <Select label="Categoría" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
               {CATEGORIES.map((c) => <option key={c} value={c}>{LABELS[c]}</option>)}
             </Select>
             <Input label="Valor" type="number" min="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
             <Input label="Fecha" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
             <Input label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-            <Input label="Soporte (archivo)" type="file" onChange={(e) => setFile(e.target.files[0])} className="col-span-2" />
-            <Button type="submit" className="col-span-2">Guardar gasto</Button>
-            <div className="col-span-4"><ErrorText>{error}</ErrorText></div>
+            <Input label="Soporte (archivo)" type="file" onChange={(e) => setFile(e.target.files[0])} className="col-span-full" />
+            <Button type="submit" className="col-span-full">Guardar gasto</Button>
+            <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
           </form>
         )}
         <Table columns={['Fecha', 'Categoría', 'Descripción', 'Valor', 'Origen', 'Soporte', '']}>
