@@ -140,6 +140,12 @@ export const priceItemsApi = {
   update: (id, data) => client.put(`/price-items/${id}`, data).then((r) => r.data),
   updateValue: (id, data) => client.put(`/price-items/${id}/value`, data).then((r) => r.data),
   remove: (id) => client.delete(`/price-items/${id}`),
+  importExcel: (formData) => client.post('/price-items/import', formData).then((r) => r.data),
+  templateUrl: () => {
+    const base = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api');
+    const token = localStorage.getItem('token');
+    return `${base}/price-items/import/template?token=${encodeURIComponent(token)}`;
+  },
 };
 
 export const apuApi = {

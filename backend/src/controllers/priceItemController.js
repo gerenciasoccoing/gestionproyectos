@@ -1,6 +1,9 @@
+const XLSX = require('xlsx');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { sequelize, PriceItem, PriceHistory } = require('../models');
+const { parseExcelSafely } = require('../services/excelParseService');
+const { importPriceItemsFromRows } = require('../services/priceImportService');
 
 const list = asyncHandler(async (req, res) => {
   const items = await PriceItem.findAll({ order: [['name', 'ASC']] });
@@ -68,4 +71,34 @@ const remove = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
-module.exports = { list, get, create, update, updateValue, remove };
+// Importación masiva desde Excel: crea ítems nuevos y actualiza el valor de los existentes
+// (mismo tipo + nombre), reportando fila por fila los errores sin abortar el resto.
+const importExcel = asyncHandler(async (req, res) => {
+  if (!req.file) throw new ApiError(400, 'Debe adjuntar un archivo Excel (.xlsx o .xls)');
+
+  const rows = await parseExcelSafely(req.file.buffer);
+  if (!rows.length) throw new ApiError(400, 'El archivo no contiene filas de datos');
+
+  const result = await importPriceItemsFromRows(rows, req.body.effectiveDate);
+  res.json(result);
+});
+
+// Plantilla de ejemplo para que el usuario complete y luego importe.
+const downloadTemplate = asyncHandler(async (req, res) => {
+  const worksheet = XLSX.utils.aoa_to_sheet([
+    ['Tipo', 'Nombre', 'Unidad', 'Valor'],
+    ['material', 'Cemento gris', 'bulto 50kg', 35000],
+    ['mano_obra', 'Oficial de construcción', 'jornal', 80000],
+    ['equipo', 'Retroexcavadora', 'hora', 120000],
+  ]);
+  worksheet['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 12 }];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Base de Precios');
+  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="plantilla-base-precios.xlsx"');
+  res.send(buffer);
+});
+
+module.exports = { list, get, create, update, updateValue, remove, importExcel, downloadTemplate };
