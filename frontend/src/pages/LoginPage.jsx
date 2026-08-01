@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button, Input, ErrorText, extractError } from '../components/ui';
+import Logo from '../components/Logo';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -26,19 +27,32 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <form onSubmit={handleSubmit} className="bg-white shadow-md rounded-lg p-8 w-full max-w-sm">
-        <h1 className="text-xl font-bold text-gray-900 mb-1">Gestión de Proyectos</h1>
-        <p className="text-sm text-gray-500 mb-6">Ingrese sus credenciales</p>
-        <div className="flex flex-col gap-3">
-          <Input label="Correo" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <Input label="Contraseña" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 via-blue-50 to-slate-100 p-4">
+      <div className="w-full max-w-sm">
+        <div className="flex justify-center mb-6">
+          <Logo size={48} />
         </div>
-        <ErrorText>{error}</ErrorText>
-        <Button type="submit" className="w-full mt-4" disabled={loading}>
-          {loading ? 'Ingresando...' : 'Ingresar'}
-        </Button>
-      </form>
+
+        <form onSubmit={handleSubmit} className="bg-white shadow-xl shadow-blue-950/5 border border-gray-100 rounded-2xl p-8">
+          <h1 className="text-lg font-semibold text-gray-900 mb-1 text-center">Bienvenido</h1>
+          <p className="text-sm text-gray-500 mb-6 text-center">Ingresá tus credenciales para continuar</p>
+
+          <div className="flex flex-col gap-4">
+            <Input label="Correo" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
+            <Input label="Contraseña" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+
+          <ErrorText>{error}</ErrorText>
+
+          <Button type="submit" className="w-full mt-6 py-2.5 rounded-lg" disabled={loading}>
+            {loading ? 'Ingresando...' : 'Ingresar'}
+          </Button>
+        </form>
+
+        <p className="text-center text-xs text-gray-400 mt-6">
+          Gestión de proyectos de construcción &middot; ERGY-PROJECT
+        </p>
+      </div>
     </div>
   );
 }
