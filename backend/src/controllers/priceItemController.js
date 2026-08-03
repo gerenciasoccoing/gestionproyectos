@@ -19,13 +19,13 @@ const get = asyncHandler(async (req, res) => {
 });
 
 const create = asyncHandler(async (req, res) => {
-  const { type, name, unit, currentValue } = req.body;
+  const { type, code, name, unit, currentValue } = req.body;
   if (!['material', 'mano_obra', 'equipo'].includes(type)) throw new ApiError(400, 'type debe ser material, mano_obra o equipo');
   if (!name || !unit || currentValue === undefined) throw new ApiError(400, 'name, unit y currentValue son obligatorios');
   if (Number(currentValue) < 0) throw new ApiError(400, 'currentValue no puede ser negativo');
 
   const item = await sequelize.transaction(async (t) => {
-    const created = await PriceItem.create({ type, name, unit, currentValue }, { transaction: t });
+    const created = await PriceItem.create({ type, code, name, unit, currentValue }, { transaction: t });
     await PriceHistory.create({
       priceItemId: created.id, value: currentValue, effectiveDate: new Date().toISOString().slice(0, 10),
     }, { transaction: t });
@@ -56,10 +56,11 @@ const updateValue = asyncHandler(async (req, res) => {
 const update = asyncHandler(async (req, res) => {
   const item = await PriceItem.findByPk(req.params.id);
   if (!item) throw new ApiError(404, 'Ítem de precio no encontrado');
-  const { name, unit, type } = req.body;
+  const { name, unit, type, code } = req.body;
   if (name !== undefined) item.name = name;
   if (unit !== undefined) item.unit = unit;
   if (type !== undefined) item.type = type;
+  if (code !== undefined) item.code = code;
   await item.save();
   res.json(item);
 });
@@ -86,12 +87,12 @@ const importExcel = asyncHandler(async (req, res) => {
 // Plantilla de ejemplo para que el usuario complete y luego importe.
 const downloadTemplate = asyncHandler(async (req, res) => {
   const worksheet = XLSX.utils.aoa_to_sheet([
-    ['Tipo', 'Nombre', 'Unidad', 'Valor'],
-    ['material', 'Cemento gris', 'bulto 50kg', 35000],
-    ['mano_obra', 'Oficial de construcción', 'jornal', 80000],
-    ['equipo', 'Retroexcavadora', 'hora', 120000],
+    ['Codigo', 'Tipo', 'Nombre', 'Unidad', 'Valor'],
+    ['04.11.001', 'material', 'Cemento gris', 'bulto 50kg', 35000],
+    ['MO0011', 'mano_obra', 'Oficial de construcción', 'jornal', 80000],
+    ['EQ001', 'equipo', 'Retroexcavadora', 'hora', 120000],
   ]);
-  worksheet['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 12 }];
+  worksheet['!cols'] = [{ wch: 14 }, { wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 12 }];
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Base de Precios');
   const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });

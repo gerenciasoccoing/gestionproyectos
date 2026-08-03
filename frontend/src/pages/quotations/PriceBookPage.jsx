@@ -1,26 +1,45 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { priceItemsApi } from '../../api';
 import { Card, Button, Input, Select, Table, ErrorText, extractError, money } from '../../components/ui';
 import Can from '../../components/Can';
 
 const TYPE_LABELS = { material: 'Material', mano_obra: 'Mano de obra', equipo: 'Equipo/Maquinaria' };
+const PAGE_SIZE = 50;
 
 export default function PriceBookPage() {
   const [items, setItems] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ type: 'material', name: '', unit: '', currentValue: '' });
+  const [form, setForm] = useState({ type: 'material', code: '', name: '', unit: '', currentValue: '' });
   const [error, setError] = useState('');
   const [editing, setEditing] = useState({});
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [page, setPage] = useState(1);
 
   const load = () => priceItemsApi.list().then(setItems);
   useEffect(() => { load(); }, []);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return items.filter((it) => {
+      if (typeFilter && it.type !== typeFilter) return false;
+      if (!q) return true;
+      return it.name.toLowerCase().includes(q) || (it.code || '').toLowerCase().includes(q);
+    });
+  }, [items, search, typeFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => { setPage(1); }, [search, typeFilter]);
 
   const submit = async (e) => {
     e.preventDefault();
     setError('');
     try {
       await priceItemsApi.create(form);
-      setForm({ type: 'material', name: '', unit: '', currentValue: '' });
+      setForm({ type: 'material', code: '', name: '', unit: '', currentValue: '' });
       setShowForm(false);
       load();
     } catch (err) {
@@ -60,6 +79,7 @@ export default function PriceBookPage() {
               <option value="mano_obra">Mano de obra</option>
               <option value="equipo">Equipo/Maquinaria</option>
             </Select>
+            <Input label="Código (opcional)" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
             <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
             <Input label="Unidad" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} required />
             <Input label="Valor" type="number" min="0" value={form.currentValue} onChange={(e) => setForm({ ...form, currentValue: e.target.value })} required />
@@ -67,9 +87,22 @@ export default function PriceBookPage() {
             <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
           </form>
         )}
-        <Table columns={['Tipo', 'Nombre', 'Unidad', 'Valor actual', 'Actualizar valor', '']}>
-          {items.map((it) => (
+
+        <div className="flex flex-wrap gap-3 items-end mb-3">
+          <Input label="Buscar por nombre o código" value={search} onChange={(e) => setSearch(e.target.value)} className="w-64" />
+          <Select label="Tipo" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <option value="">Todos</option>
+            <option value="material">Material</option>
+            <option value="mano_obra">Mano de obra</option>
+            <option value="equipo">Equipo/Maquinaria</option>
+          </Select>
+          <span className="text-sm text-gray-500 pb-1.5">{filtered.length} ítem(s)</span>
+        </div>
+
+        <Table columns={['Código', 'Tipo', 'Nombre', 'Unidad', 'Valor actual', 'Actualizar valor', '']}>
+          {pageItems.map((it) => (
             <tr key={it.id} className="border-b border-gray-100">
+              <td className="py-1 pr-3 text-gray-400">{it.code || '-'}</td>
               <td className="py-1 pr-3">{TYPE_LABELS[it.type]}</td>
               <td className="py-1 pr-3">{it.name}</td>
               <td className="py-1 pr-3">{it.unit}</td>
@@ -87,8 +120,18 @@ export default function PriceBookPage() {
               </td>
             </tr>
           ))}
-          {items.length === 0 && <tr><td colSpan={6} className="py-2 text-center text-gray-400">Sin ítems registrados.</td></tr>}
+          {filtered.length === 0 && <tr><td colSpan={7} className="py-2 text-center text-gray-400">Sin ítems que coincidan.</td></tr>}
         </Table>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-3 text-sm">
+            <span className="text-gray-500">Página {currentPage} de {totalPages}</span>
+            <div className="flex gap-2">
+              <Button variant="secondary" disabled={currentPage <= 1} onClick={() => setPage((p) => p - 1)}>Anterior</Button>
+              <Button variant="secondary" disabled={currentPage >= totalPages} onClick={() => setPage((p) => p + 1)}>Siguiente</Button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );
@@ -125,8 +168,8 @@ function ImportSection({ onImported }) {
     <Card title="Importar Base de Precios desde Excel">
       <p className="text-sm text-gray-500 mb-3">
         El archivo debe tener columnas <strong>Tipo</strong> (material, mano_obra o equipo), <strong>Nombre</strong>,{' '}
-        <strong>Unidad</strong> y <strong>Valor</strong>. Si un ítem ya existe (mismo tipo y nombre), se actualiza su valor
-        en vez de duplicarlo.
+        <strong>Unidad</strong> y <strong>Valor</strong>, y opcionalmente <strong>Codigo</strong>. Si un ítem ya existe
+        (mismo código, o mismo tipo y nombre si no hay código), se actualiza su valor en vez de duplicarlo.
       </p>
       <form onSubmit={submit} className="flex flex-wrap gap-3 items-end mb-2">
         <Input label="Archivo (.xlsx / .xls)" type="file" accept=".xlsx,.xls" onChange={(e) => setFile(e.target.files[0])} />
@@ -143,7 +186,7 @@ function ImportSection({ onImported }) {
           {result.errors.length > 0 && (
             <div className="mt-2">
               <p className="text-yellow-700 font-medium">{result.errors.length} fila(s) con error:</p>
-              <ul className="list-disc list-inside text-yellow-700">
+              <ul className="list-disc list-inside text-yellow-700 max-h-40 overflow-y-auto">
                 {result.errors.map((e, i) => (
                   <li key={i}>Fila {e.row}: {e.message}</li>
                 ))}

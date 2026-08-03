@@ -1,15 +1,17 @@
 const { Budget, BudgetItem, APU, APUComponent, PriceItem, ProgressEntry } = require('../models');
 
-// Costo unitario del APU = costo directo (Σ rendimiento * valor unitario del insumo) * (1 + AIU%)
+// Costo unitario del APU = costo directo (Σ rendimiento * valor unitario del insumo, más otros
+// costos directos sin precio unitario propio, ej. herramienta menor) * (1 + AIU%)
 async function computeApuUnitCost(apuId) {
   const apu = await APU.findByPk(apuId, {
     include: [{ model: APUComponent, as: 'components', include: [{ model: PriceItem, as: 'priceItem' }] }],
   });
   if (!apu) return null;
-  const directCost = apu.components.reduce(
+  const componentsCost = apu.components.reduce(
     (sum, c) => sum + Number(c.yield) * Number(c.priceItem.currentValue),
     0
   );
+  const directCost = componentsCost + Number(apu.otherCosts || 0);
   const unitCost = directCost * (1 + Number(apu.aiuPercent) / 100);
   return { apu, directCost, unitCost };
 }

@@ -4,7 +4,7 @@ const { sequelize, User, Role, Permission, LaborParameters, CompanySettings } = 
 const { MODULES, ACTIONS, DEFAULT_ROLE_PERMISSIONS } = require('./config/permissions');
 
 async function seed() {
-  await sequelize.sync();
+  await sequelize.sync({ alter: true });
 
   // Catálogo de permisos (module:action)
   const permissionMap = {};

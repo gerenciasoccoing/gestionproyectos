@@ -8,7 +8,7 @@ export default function ApuPage() {
   const [priceItems, setPriceItems] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', unit: '', aiuPercent: '0' });
+  const [form, setForm] = useState({ name: '', unit: '', aiuPercent: '0', otherCosts: '0' });
   const [components, setComponents] = useState([{ priceItemId: '', yield: '' }]);
   const [error, setError] = useState('');
 
@@ -26,7 +26,7 @@ export default function ApuPage() {
     setError('');
     try {
       await apuApi.create({ ...form, components: components.filter((c) => c.priceItemId) });
-      setForm({ name: '', unit: '', aiuPercent: '0' });
+      setForm({ name: '', unit: '', aiuPercent: '0', otherCosts: '0' });
       setComponents([{ priceItemId: '', yield: '' }]);
       setShowForm(false);
       load();
@@ -53,6 +53,7 @@ export default function ApuPage() {
             <Input label="Nombre del ítem/actividad" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
             <Input label="Unidad" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} required />
             <Input label="AIU (%)" type="number" min="0" value={form.aiuPercent} onChange={(e) => setForm({ ...form, aiuPercent: e.target.value })} required />
+            <Input label="Otros costos directos (ej. herramienta menor)" type="number" min="0" value={form.otherCosts} onChange={(e) => setForm({ ...form, otherCosts: e.target.value })} />
           </div>
           <p className="text-sm font-medium text-gray-600 mb-2">Componentes (materiales, mano de obra, equipo)</p>
           {components.map((c, idx) => (
@@ -70,12 +71,14 @@ export default function ApuPage() {
           <ErrorText>{error}</ErrorText>
         </form>
       )}
-      <Table columns={['Nombre', 'Unidad', 'AIU %', 'Costo directo', 'Costo unitario total', '']}>
+      <Table columns={['Código', 'Nombre', 'Unidad', 'AIU %', 'Otros costos', 'Costo directo', 'Costo unitario total', '']}>
         {apus.map((a) => (
           <tr key={a.id} className="border-b border-gray-100">
+            <td className="py-1 pr-3 text-gray-400">{a.code || '-'}</td>
             <td className="py-1 pr-3">{a.name}</td>
             <td className="py-1 pr-3">{a.unit}</td>
             <td className="py-1 pr-3">{Number(a.aiuPercent)}%</td>
+            <td className="py-1 pr-3">{money(a.otherCosts)}</td>
             <td className="py-1 pr-3">{money(a.directCost)}</td>
             <td className="py-1 pr-3 font-semibold">{money(a.unitCost)}</td>
             <td className="py-1 pr-3 text-right flex gap-2 justify-end">
@@ -86,7 +89,7 @@ export default function ApuPage() {
             </td>
           </tr>
         ))}
-        {apus.length === 0 && <tr><td colSpan={6} className="py-2 text-center text-gray-400">Sin APU registrados.</td></tr>}
+        {apus.length === 0 && <tr><td colSpan={8} className="py-2 text-center text-gray-400">Sin APU registrados.</td></tr>}
       </Table>
 
       {expandedId && <ApuComponents apu={apus.find((a) => a.id === expandedId)} onChange={load} />}

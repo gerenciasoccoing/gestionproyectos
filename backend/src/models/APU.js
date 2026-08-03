@@ -6,6 +6,13 @@ module.exports = (sequelize) => {
     name: { type: DataTypes.STRING, allowNull: false },
     unit: { type: DataTypes.STRING, allowNull: false },
     aiuPercent: { type: DataTypes.DECIMAL(6, 2), allowNull: false, defaultValue: 0, validate: { min: 0 } },
+    // Código de referencia externo (ej. listado oficial de precios unitarios), para poder
+    // reimportar/actualizar sin duplicar. Opcional.
+    code: { type: DataTypes.STRING, allowNull: true },
+    // Costos directos que no corresponden a un insumo con precio propio y reutilizable
+    // (ej. "herramienta menor" calculada como % variable de la mano de obra en cada análisis).
+    // Se suman al costo directo antes de aplicar el AIU.
+    otherCosts: { type: DataTypes.DECIMAL(18, 2), allowNull: false, defaultValue: 0, validate: { min: 0 } },
   });
 
   APU.associate = (models) => {

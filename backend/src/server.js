@@ -6,7 +6,9 @@ const PORT = process.env.PORT || 4000;
 
 async function start() {
   await sequelize.authenticate();
-  await sequelize.sync(); // en producción usar migraciones; aquí se usa sync para agilizar el setup local
+  // en producción usar migraciones; aquí se usa sync({ alter: true }) para agilizar el setup
+  // local y aplicar cambios de esquema (columnas nuevas) sin perder los datos existentes.
+  await sequelize.sync({ alter: true });
   app.listen(PORT, () => {
     console.log(`API escuchando en puerto ${PORT}`);
   });
