@@ -33,12 +33,14 @@ export function Button({ children, variant = 'primary', className = '', ...props
   );
 }
 
+// className se aplica al <label> (el elemento real dentro de un grid/flex, ej. col-span-*),
+// no al control interno, para que utilidades de posicionamiento del contenedor funcionen.
 export function Input({ label, className = '', ...props }) {
   return (
-    <label className="flex flex-col gap-1 text-sm text-gray-600">
+    <label className={`flex flex-col gap-1 text-sm text-gray-600 ${className}`}>
       {label && <span>{label}</span>}
       <input
-        className={`border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400 ${className}`}
+        className="border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400 w-full"
         {...props}
       />
     </label>
@@ -47,10 +49,10 @@ export function Input({ label, className = '', ...props }) {
 
 export function Select({ label, className = '', children, ...props }) {
   return (
-    <label className="flex flex-col gap-1 text-sm text-gray-600">
+    <label className={`flex flex-col gap-1 text-sm text-gray-600 ${className}`}>
       {label && <span>{label}</span>}
       <select
-        className={`border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400 ${className}`}
+        className="border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400 w-full"
         {...props}
       >
         {children}
@@ -61,10 +63,10 @@ export function Select({ label, className = '', children, ...props }) {
 
 export function TextArea({ label, className = '', ...props }) {
   return (
-    <label className="flex flex-col gap-1 text-sm text-gray-600">
+    <label className={`flex flex-col gap-1 text-sm text-gray-600 ${className}`}>
       {label && <span>{label}</span>}
       <textarea
-        className={`border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400 ${className}`}
+        className="border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400 w-full"
         {...props}
       />
     </label>

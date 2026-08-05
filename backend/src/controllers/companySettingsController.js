@@ -15,11 +15,12 @@ const get = asyncHandler(async (req, res) => {
 
 const update = asyncHandler(async (req, res) => {
   const settings = await getOrCreateSettings();
-  const { companyName, nit, address, phone } = req.body;
+  const { companyName, nit, address, phone, defaultPrestacionalPercent } = req.body;
   if (companyName !== undefined) settings.companyName = companyName;
   if (nit !== undefined) settings.nit = nit;
   if (address !== undefined) settings.address = address;
   if (phone !== undefined) settings.phone = phone;
+  if (defaultPrestacionalPercent !== undefined) settings.defaultPrestacionalPercent = defaultPrestacionalPercent;
   if (req.file) settings.logoPath = relativePath(req.file);
   await settings.save();
   res.json(settings);

@@ -1,6 +1,7 @@
 require('dotenv').config();
 const app = require('./app');
 const { sequelize } = require('./models');
+const { applyPostSyncFixups } = require('./utils/postSyncFixups');
 
 const PORT = process.env.PORT || 4000;
 
@@ -9,6 +10,7 @@ async function start() {
   // en producción usar migraciones; aquí se usa sync({ alter: true }) para agilizar el setup
   // local y aplicar cambios de esquema (columnas nuevas) sin perder los datos existentes.
   await sequelize.sync({ alter: true });
+  await applyPostSyncFixups();
   app.listen(PORT, () => {
     console.log(`API escuchando en puerto ${PORT}`);
   });

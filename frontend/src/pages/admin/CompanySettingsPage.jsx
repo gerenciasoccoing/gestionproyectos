@@ -5,7 +5,7 @@ import { fileUrl } from '../../api/client';
 
 export default function CompanySettingsPage() {
   const [settings, setSettings] = useState(null);
-  const [form, setForm] = useState({ companyName: '', nit: '', address: '', phone: '' });
+  const [form, setForm] = useState({ companyName: '', nit: '', address: '', phone: '', defaultPrestacionalPercent: '70' });
   const [logo, setLogo] = useState(null);
   const [error, setError] = useState('');
   const [ok, setOk] = useState(false);
@@ -13,7 +13,13 @@ export default function CompanySettingsPage() {
   useEffect(() => {
     companyApi.get().then((s) => {
       setSettings(s);
-      setForm({ companyName: s.companyName, nit: s.nit || '', address: s.address || '', phone: s.phone || '' });
+      setForm({
+        companyName: s.companyName,
+        nit: s.nit || '',
+        address: s.address || '',
+        phone: s.phone || '',
+        defaultPrestacionalPercent: String(s.defaultPrestacionalPercent ?? 70),
+      });
     });
   }, []);
 
@@ -41,6 +47,12 @@ export default function CompanySettingsPage() {
         <Input label="NIT" value={form.nit} onChange={(e) => setForm({ ...form, nit: e.target.value })} />
         <Input label="Dirección" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
         <Input label="Teléfono" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+        <Input
+          label="Factor prestacional por defecto en APU (%)"
+          type="number" min="0" step="0.01"
+          value={form.defaultPrestacionalPercent}
+          onChange={(e) => setForm({ ...form, defaultPrestacionalPercent: e.target.value })}
+        />
         <div>
           <Input label="Logo" type="file" accept="image/*" onChange={(e) => setLogo(e.target.files[0])} />
           {settings.logoPath && <img src={fileUrl(settings.logoPath)} alt="logo" className="h-16 mt-2" />}

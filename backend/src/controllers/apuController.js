@@ -1,7 +1,65 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { APU, APUComponent, PriceItem } = require('../models');
+const { sequelize, APU, APUComponent, PriceItem } = require('../models');
 const { computeApuUnitCost } = require('../services/budgetService');
+
+// Valida y normaliza un componente recibido del formulario de APU (4 secciones) antes de guardarlo.
+function sanitizeComponent(raw, index) {
+  const category = raw.category;
+  if (!APUComponent.CATEGORIES.includes(category)) {
+    throw new ApiError(400, `Componente #${index + 1}: category inválida`);
+  }
+  if (category !== 'transporte' && !raw.priceItemId) {
+    throw new ApiError(400, `Componente #${index + 1}: priceItemId es obligatorio`);
+  }
+  const quantity = Number(raw.quantity ?? 1);
+  if (Number.isNaN(quantity) || quantity < 0) throw new ApiError(400, `Componente #${index + 1}: quantity inválida`);
+
+  const component = {
+    category,
+    priceItemId: raw.priceItemId || null,
+    description: raw.description || null,
+    quantity,
+    yield: raw.yield !== undefined && raw.yield !== '' ? Number(raw.yield) : 1,
+    unitValue: raw.unitValue !== undefined && raw.unitValue !== '' ? Number(raw.unitValue) : null,
+    prestacionalPercent: null,
+    transportMode: null,
+    transportDistance: null,
+    transportPercent: null,
+  };
+
+  if (category === 'personal') {
+    component.prestacionalPercent = Number(raw.prestacionalPercent ?? 0);
+    if (Number.isNaN(component.prestacionalPercent) || component.prestacionalPercent < 0) {
+      throw new ApiError(400, `Componente #${index + 1}: prestacionalPercent inválido`);
+    }
+  }
+
+  if (category === 'transporte') {
+    if (!APUComponent.TRANSPORT_MODES.includes(raw.transportMode)) {
+      throw new ApiError(400, `Componente #${index + 1}: transportMode inválido`);
+    }
+    component.transportMode = raw.transportMode;
+    if (!raw.priceItemId && (component.unitValue === null || component.unitValue < 0)) {
+      if (raw.transportMode === 'distancia_peso') {
+        throw new ApiError(400, `Componente #${index + 1}: unitValue (tarifa) o priceItemId es obligatorio`);
+      }
+    }
+    if (raw.transportMode === 'distancia_peso') {
+      component.transportDistance = Number(raw.transportDistance ?? 0);
+      if (Number.isNaN(component.transportDistance) || component.transportDistance < 0) {
+        throw new ApiError(400, `Componente #${index + 1}: transportDistance inválida`);
+      }
+    } else {
+      component.transportPercent = Number(raw.transportPercent ?? 0);
+      if (Number.isNaN(component.transportPercent) || component.transportPercent < 0) {
+        throw new ApiError(400, `Componente #${index + 1}: transportPercent inválido`);
+      }
+    }
+  }
+
+  return component;
+}
 
 const list = asyncHandler(async (req, res) => {
   const apus = await APU.findAll({
@@ -27,20 +85,27 @@ const create = asyncHandler(async (req, res) => {
   if (Number(aiuPercent) < 0) throw new ApiError(400, 'aiuPercent no puede ser negativo');
   if (Number(otherCosts) < 0) throw new ApiError(400, 'otherCosts no puede ser negativo');
 
-  const apu = await APU.create({ name, unit, code, aiuPercent, otherCosts });
-  if (components.length) {
-    await APUComponent.bulkCreate(
-      components.map((c) => ({ apuId: apu.id, priceItemId: c.priceItemId, yield: c.yield }))
-    );
-  }
+  const sanitized = components.map(sanitizeComponent);
+
+  const apu = await sequelize.transaction(async (t) => {
+    const created = await APU.create({ name, unit, code, aiuPercent, otherCosts }, { transaction: t });
+    if (sanitized.length) {
+      await APUComponent.bulkCreate(
+        sanitized.map((c) => ({ ...c, apuId: created.id })),
+        { transaction: t }
+      );
+    }
+    return created;
+  });
+
   const result = await computeApuUnitCost(apu.id);
-  res.status(201).json({ ...result.apu.toJSON(), directCost: result.directCost, unitCost: result.unitCost });
+  res.status(201).json({ ...result.apu.toJSON(), directCost: result.directCost, unitCost: result.unitCost, sections: result.sections });
 });
 
 const update = asyncHandler(async (req, res) => {
   const apu = await APU.findByPk(req.params.id);
   if (!apu) throw new ApiError(404, 'APU no encontrado');
-  const { name, unit, code, aiuPercent, otherCosts } = req.body;
+  const { name, unit, code, aiuPercent, otherCosts, components } = req.body;
   if (name !== undefined) apu.name = name;
   if (unit !== undefined) apu.unit = unit;
   if (code !== undefined) apu.code = code;
@@ -49,9 +114,24 @@ const update = asyncHandler(async (req, res) => {
     if (Number(otherCosts) < 0) throw new ApiError(400, 'otherCosts no puede ser negativo');
     apu.otherCosts = otherCosts;
   }
-  await apu.save();
+
+  const sanitized = Array.isArray(components) ? components.map(sanitizeComponent) : null;
+
+  await sequelize.transaction(async (t) => {
+    await apu.save({ transaction: t });
+    if (sanitized) {
+      await APUComponent.destroy({ where: { apuId: apu.id }, transaction: t });
+      if (sanitized.length) {
+        await APUComponent.bulkCreate(
+          sanitized.map((c) => ({ ...c, apuId: apu.id })),
+          { transaction: t }
+        );
+      }
+    }
+  });
+
   const result = await computeApuUnitCost(apu.id);
-  res.json({ ...result.apu.toJSON(), directCost: result.directCost, unitCost: result.unitCost });
+  res.json({ ...result.apu.toJSON(), directCost: result.directCost, unitCost: result.unitCost, sections: result.sections });
 });
 
 const remove = asyncHandler(async (req, res) => {

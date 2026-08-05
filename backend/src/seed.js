@@ -2,9 +2,11 @@ require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const { sequelize, User, Role, Permission, LaborParameters, CompanySettings } = require('./models');
 const { MODULES, ACTIONS, DEFAULT_ROLE_PERMISSIONS } = require('./config/permissions');
+const { applyPostSyncFixups } = require('./utils/postSyncFixups');
 
 async function seed() {
   await sequelize.sync({ alter: true });
+  await applyPostSyncFixups();
 
   // Catálogo de permisos (module:action)
   const permissionMap = {};
