@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { purchaseOrdersApi, budgetApi } from '../../api';
-import { Card, Button, Input, Select, Table, Badge, ErrorText, extractError, money } from '../../components/ui';
+import { Card, Button, Input, SearchSelect, Table, Badge, ErrorText, extractError, money } from '../../components/ui';
 import Can from '../../components/Can';
 
 const STATUS_COLORS = {
@@ -80,10 +80,13 @@ export default function PurchaseOrdersPage() {
                 <Input label="Unidad" value={it.unit} onChange={(e) => updateItemRow(idx, 'unit', e.target.value)} required />
                 <Input label="Cant. ordenada" type="number" min="0" step="0.01" value={it.quantityOrdered} onChange={(e) => updateItemRow(idx, 'quantityOrdered', e.target.value)} required />
                 <Input label="Vr. unitario" type="number" min="0" step="0.01" value={it.unitPrice} onChange={(e) => updateItemRow(idx, 'unitPrice', e.target.value)} required />
-                <Select label="Ítem presupuesto (opcional)" value={it.budgetItemId} onChange={(e) => updateItemRow(idx, 'budgetItemId', e.target.value)}>
-                  <option value="">-- ninguno --</option>
-                  {budgetItems.map((bi) => <option key={bi.id} value={bi.id}>{bi.description}</option>)}
-                </Select>
+                <SearchSelect
+                  label="Ítem presupuesto (opcional)"
+                  options={budgetItems.map((bi) => ({ value: bi.id, label: bi.description }))}
+                  value={it.budgetItemId}
+                  onChange={(v) => updateItemRow(idx, 'budgetItemId', v)}
+                  placeholder="-- ninguno --"
+                />
                 <Button type="button" variant="danger" onClick={() => removeRow(idx)}>Quitar</Button>
               </div>
             ))}

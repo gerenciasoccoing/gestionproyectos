@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { quotationsApi, apuApi } from '../../api';
-import { Card, Button, Input, Select, Table, Badge, ErrorText, extractError, money } from '../../components/ui';
+import { Card, Button, Input, SearchSelect, Table, Badge, ErrorText, extractError, money } from '../../components/ui';
 import Can from '../../components/Can';
 
 export default function QuotationDetailPage() {
@@ -138,10 +138,13 @@ export default function QuotationDetailPage() {
       }>
         {showForm && (
           <form onSubmit={submitItem} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-            <Select label="APU" value={form.apuId} onChange={(e) => onApuChange(e.target.value)}>
-              <option value="">-- ítem manual --</option>
-              {apus.map((a) => <option key={a.id} value={a.id}>{a.name} ({money(a.unitCost)}/{a.unit})</option>)}
-            </Select>
+            <SearchSelect
+              label="APU"
+              options={apus.map((a) => ({ value: a.id, label: `${a.name} (${money(a.unitCost)}/${a.unit})` }))}
+              value={form.apuId}
+              onChange={onApuChange}
+              placeholder="-- ítem manual --"
+            />
             <Input label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required />
             <Input label="Unidad" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} required />
             <Input label="Cantidad" type="number" min="0" step="0.01" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} required />

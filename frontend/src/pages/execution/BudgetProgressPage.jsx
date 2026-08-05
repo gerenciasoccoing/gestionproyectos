@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { budgetApi, progressApi, apuApi } from '../../api';
-import { Card, Button, Input, Select, Table, ErrorText, extractError, money } from '../../components/ui';
+import { Card, Button, Input, SearchSelect, Table, ErrorText, extractError, money } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
 
@@ -104,10 +104,13 @@ export default function BudgetProgressPage() {
       }>
         {showItemForm && (
           <form onSubmit={submitItem} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-            <Select label="APU (opcional)" value={itemForm.apuId} onChange={(e) => onApuChange(e.target.value)}>
-              <option value="">-- Ítem manual (sin APU) --</option>
-              {apus.map((a) => <option key={a.id} value={a.id}>{a.name} ({money(a.unitCost)}/{a.unit})</option>)}
-            </Select>
+            <SearchSelect
+              label="APU (opcional)"
+              options={apus.map((a) => ({ value: a.id, label: `${a.name} (${money(a.unitCost)}/${a.unit})` }))}
+              value={itemForm.apuId}
+              onChange={onApuChange}
+              placeholder="-- Ítem manual (sin APU) --"
+            />
             <Input label="Descripción" value={itemForm.description} onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })} required />
             <Input label="Unidad" value={itemForm.unit} onChange={(e) => setItemForm({ ...itemForm, unit: e.target.value })} required />
             <Input label="Cantidad presupuestada" type="number" min="0" step="0.01" value={itemForm.quantity} onChange={(e) => setItemForm({ ...itemForm, quantity: e.target.value })} required />

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apuApi, priceItemsApi, companyApi } from '../../api';
-import { Card, Button, Input, Select, Table, ErrorText, extractError, money } from '../../components/ui';
+import { Card, Button, Input, Select, SearchSelect, Table, ErrorText, extractError, money } from '../../components/ui';
 import Can from '../../components/Can';
 
 const SECTION_DEFS = [
@@ -318,16 +318,18 @@ function ApuSection({ def, rows, options, subtotal, collapsed, onToggle, onAdd, 
   );
 }
 
+function priceItemLabel(p) {
+  return `${p.name} (${money(p.currentValue)}/${p.unit})`;
+}
+
 function SectionRow({ category, row, options, onChange, onRemove }) {
   const selected = options.find((p) => p.id === row.priceItemId);
+  const searchOptions = options.map((p) => ({ value: p.id, label: priceItemLabel(p) }));
 
   if (category === 'material') {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-start sm:items-end">
-        <Select label="Material" className="col-span-2 sm:col-span-6" value={row.priceItemId} onChange={(e) => onChange('priceItemId', e.target.value)}>
-          <option value="">-- seleccionar --</option>
-          {options.map((p) => <option key={p.id} value={p.id}>{p.name} ({money(p.currentValue)}/{p.unit})</option>)}
-        </Select>
+        <SearchSelect label="Material" className="col-span-2 sm:col-span-6" options={searchOptions} value={row.priceItemId} onChange={(v) => onChange('priceItemId', v)} />
         <Input label="Cantidad" className="col-span-1 sm:col-span-3" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
         <div className="col-span-1 sm:col-span-2 text-sm text-gray-600 pb-1.5 self-end">{money((Number(row.quantity) || 0) * Number(selected?.currentValue || 0))}</div>
         <Button type="button" variant="danger" className="col-span-2 sm:col-span-1" onClick={onRemove}>×</Button>
@@ -339,10 +341,7 @@ function SectionRow({ category, row, options, onChange, onRemove }) {
     const total = (Number(row.quantity) || 0) * (Number(row.yield) || 1) * Number(selected?.currentValue || 0);
     return (
       <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-start sm:items-end">
-        <Select label="Herramienta/Equipo" className="col-span-2 sm:col-span-5" value={row.priceItemId} onChange={(e) => onChange('priceItemId', e.target.value)}>
-          <option value="">-- seleccionar --</option>
-          {options.map((p) => <option key={p.id} value={p.id}>{p.name} ({money(p.currentValue)}/{p.unit})</option>)}
-        </Select>
+        <SearchSelect label="Herramienta/Equipo" className="col-span-2 sm:col-span-5" options={searchOptions} value={row.priceItemId} onChange={(v) => onChange('priceItemId', v)} />
         <Input label="Cantidad" className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
         <Input label="Rendimiento" className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.yield} onChange={(e) => onChange('yield', e.target.value)} />
         <div className="col-span-1 sm:col-span-2 text-sm text-gray-600 pb-1.5 self-end">{money(total)}</div>
@@ -356,10 +355,7 @@ function SectionRow({ category, row, options, onChange, onRemove }) {
     const total = ((Number(row.quantity) || 0) * base * (1 + (Number(row.prestacionalPercent) || 0) / 100)) / (Number(row.yield) || 1);
     return (
       <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-start sm:items-end">
-        <Select label="Personal" className="col-span-2 sm:col-span-4" value={row.priceItemId} onChange={(e) => onChange('priceItemId', e.target.value)}>
-          <option value="">-- seleccionar --</option>
-          {options.map((p) => <option key={p.id} value={p.id}>{p.name} ({money(p.currentValue)}/{p.unit})</option>)}
-        </Select>
+        <SearchSelect label="Personal" className="col-span-2 sm:col-span-4" options={searchOptions} value={row.priceItemId} onChange={(v) => onChange('priceItemId', v)} />
         <Input label="Cantidad" className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
         <Input label="Rendimiento" className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.yield} onChange={(e) => onChange('yield', e.target.value)} />
         <Input label="Valor base" className="col-span-1 sm:col-span-2" value={money(base)} readOnly disabled />
@@ -378,10 +374,7 @@ function SectionRow({ category, row, options, onChange, onRemove }) {
         <option value="distancia_peso">Distancia y peso</option>
         <option value="porcentaje_materiales">% sobre materiales</option>
       </Select>
-      <Select label="Insumo (opcional)" className="col-span-2 sm:col-span-4" value={row.priceItemId} onChange={(e) => onChange('priceItemId', e.target.value)}>
-        <option value="">-- manual --</option>
-        {options.map((p) => <option key={p.id} value={p.id}>{p.name} ({money(p.currentValue)}/{p.unit})</option>)}
-      </Select>
+      <SearchSelect label="Insumo (opcional)" className="col-span-2 sm:col-span-4" options={searchOptions} value={row.priceItemId} onChange={(v) => onChange('priceItemId', v)} placeholder="-- manual --" />
       {!row.priceItemId && (
         <Input label="Descripción" className="col-span-2 sm:col-span-4" value={row.description} onChange={(e) => onChange('description', e.target.value)} />
       )}

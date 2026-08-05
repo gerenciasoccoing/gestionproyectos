@@ -1,3 +1,5 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+
 export function money(n) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(n || 0));
 }
@@ -58,6 +60,111 @@ export function Select({ label, className = '', children, ...props }) {
         {children}
       </select>
     </label>
+  );
+}
+
+// Rango Unicode de marcas diacríticas combinantes (U+0300-U+036F), construido con
+// fromCharCode para evitar caracteres combinantes literales sueltos en el código fuente.
+const COMBINING_MARKS_START = String.fromCharCode(0x0300);
+const COMBINING_MARKS_END = String.fromCharCode(0x036f);
+const COMBINING_MARKS = new RegExp(`[${COMBINING_MARKS_START}-${COMBINING_MARKS_END}]`, 'g');
+
+function normalizeSearch(s) {
+  return String(s ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(COMBINING_MARKS, '');
+}
+
+const SEARCH_SELECT_MAX_RESULTS = 50;
+
+// Combobox con filtro de texto para listas largas (ej. base de precios, APU). options es
+// [{ value, label }]. A diferencia de Select, escribir filtra las opciones en vez de saltar
+// a la que empieza con esa letra.
+export function SearchSelect({ label, className = '', options, value, onChange, placeholder = '-- seleccionar --', disabled = false }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [highlighted, setHighlighted] = useState(0);
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    function onDocMouseDown(e) {
+      if (rootRef.current && !rootRef.current.contains(e.target)) {
+        setOpen(false);
+        setQuery('');
+      }
+    }
+    document.addEventListener('mousedown', onDocMouseDown);
+    return () => document.removeEventListener('mousedown', onDocMouseDown);
+  }, []);
+
+  const selected = options.find((o) => o.value === value);
+
+  const filtered = useMemo(() => {
+    const q = normalizeSearch(query);
+    if (!q) return options;
+    return options.filter((o) => normalizeSearch(o.label).includes(q));
+  }, [options, query]);
+
+  const shown = filtered.slice(0, SEARCH_SELECT_MAX_RESULTS);
+
+  const selectOption = (opt) => {
+    onChange(opt.value);
+    setQuery('');
+    setOpen(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (!open) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter') { e.preventDefault(); setOpen(true); setHighlighted(0); }
+      return;
+    }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHighlighted((h) => Math.min(h + 1, shown.length - 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setHighlighted((h) => Math.max(h - 1, 0)); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (shown[highlighted]) selectOption(shown[highlighted]); }
+    else if (e.key === 'Escape') { setOpen(false); setQuery(''); }
+  };
+
+  return (
+    <div className={`flex flex-col gap-1 text-sm text-gray-600 relative ${className}`} ref={rootRef}>
+      {label && <label className="block">{label}</label>}
+      <input
+        type="text"
+        disabled={disabled}
+        className="border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400 w-full disabled:bg-gray-100"
+        value={open ? query : (selected ? selected.label : '')}
+        placeholder={placeholder}
+        onFocus={(e) => { setOpen(true); setQuery(''); setHighlighted(0); e.target.select(); }}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); setHighlighted(0); }}
+        onKeyDown={handleKeyDown}
+      />
+      {open && (
+        <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-64 overflow-y-auto">
+          <div
+            className={`px-2 py-1.5 text-sm text-gray-400 cursor-pointer hover:bg-blue-50 ${!value ? 'bg-blue-50' : ''}`}
+            onMouseDown={(e) => { e.preventDefault(); selectOption({ value: '', label: '' }); }}
+          >
+            {placeholder}
+          </div>
+          {shown.map((o, i) => (
+            <div
+              key={o.value}
+              className={`px-2 py-1.5 text-sm cursor-pointer hover:bg-blue-50 ${i === highlighted ? 'bg-blue-100' : ''} ${o.value === value ? 'font-medium' : ''}`}
+              onMouseDown={(e) => { e.preventDefault(); selectOption(o); }}
+              onMouseEnter={() => setHighlighted(i)}
+            >
+              {o.label}
+            </div>
+          ))}
+          {shown.length === 0 && <div className="px-2 py-1.5 text-sm text-gray-400">Sin resultados.</div>}
+          {filtered.length > SEARCH_SELECT_MAX_RESULTS && (
+            <div className="px-2 py-1 text-xs text-gray-400 border-t border-gray-100">
+              Mostrando {SEARCH_SELECT_MAX_RESULTS} de {filtered.length} resultados — sigue escribiendo para filtrar más.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
