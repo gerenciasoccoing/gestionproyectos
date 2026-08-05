@@ -13,9 +13,21 @@ export default function BudgetProgressPage() {
   const [expandedId, setExpandedId] = useState(null);
   const [showItemForm, setShowItemForm] = useState(false);
   const [itemForm, setItemForm] = useState({ apuId: '', description: '', unit: '', quantity: '', unitCost: '' });
+  const [aiuForm, setAiuForm] = useState({ adminPercent: '0', imprevistosPercent: '0', utilidadPercent: '0' });
+  const [aiuSaved, setAiuSaved] = useState(false);
   const [error, setError] = useState('');
 
-  const load = () => budgetApi.get(projectId).then((data) => { setBudget(data.budget); setItems(data.items); });
+  const load = () => budgetApi.get(projectId).then((data) => {
+    setBudget(data.budget);
+    setItems(data.items);
+    if (data.budget) {
+      setAiuForm({
+        adminPercent: String(data.budget.adminPercent),
+        imprevistosPercent: String(data.budget.imprevistosPercent),
+        utilidadPercent: String(data.budget.utilidadPercent),
+      });
+    }
+  });
   useEffect(() => { load(); apuApi.list().then(setApus); }, [projectId]);
 
   const ensureBudget = async () => {
@@ -23,6 +35,19 @@ export default function BudgetProgressPage() {
     const created = await budgetApi.createVersion(projectId, 'inicial');
     setBudget(created);
     return created;
+  };
+
+  const submitAiu = async (e) => {
+    e.preventDefault();
+    setError(''); setAiuSaved(false);
+    try {
+      const b = await ensureBudget();
+      await budgetApi.updateAiu(projectId, b.id, aiuForm);
+      setAiuSaved(true);
+      load();
+    } catch (err) {
+      setError(extractError(err));
+    }
   };
 
   const submitItem = async (e) => {
@@ -48,6 +73,30 @@ export default function BudgetProgressPage() {
 
   return (
     <div>
+      <Card title="AIU del presupuesto">
+        <form onSubmit={submitAiu} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+          <Input
+            label="Administración (%)" type="number" min="0" step="0.01"
+            value={aiuForm.adminPercent} onChange={(e) => setAiuForm({ ...aiuForm, adminPercent: e.target.value })}
+          />
+          <Input
+            label="Imprevistos (%)" type="number" min="0" step="0.01"
+            value={aiuForm.imprevistosPercent} onChange={(e) => setAiuForm({ ...aiuForm, imprevistosPercent: e.target.value })}
+          />
+          <Input
+            label="Utilidad (%)" type="number" min="0" step="0.01"
+            value={aiuForm.utilidadPercent} onChange={(e) => setAiuForm({ ...aiuForm, utilidadPercent: e.target.value })}
+          />
+          <Can module="ejecucion" action="edit">
+            <div className="col-span-full flex items-center gap-3">
+              <Button type="submit">Guardar AIU</Button>
+              <p className="text-xs text-gray-400">Se aplica a los ítems basados en APU que agregues de aquí en adelante.</p>
+              {aiuSaved && <p className="text-sm text-green-600">Guardado.</p>}
+            </div>
+          </Can>
+        </form>
+      </Card>
+
       <Card title="Ítems del presupuesto y avance físico" actions={
         <Can module="ejecucion" action="create">
           <Button onClick={() => setShowItemForm((s) => !s)}>{showItemForm ? 'Cancelar' : '+ Agregar ítem'}</Button>

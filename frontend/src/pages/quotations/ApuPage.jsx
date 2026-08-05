@@ -23,7 +23,7 @@ function emptyRow(category, defaultPrestacionalPercent) {
   return { priceItemId: '', quantity: '1' }; // material
 }
 
-const emptyForm = { name: '', unit: '', code: '', aiuPercent: '0', otherCosts: '0' };
+const emptyForm = { name: '', unit: '', code: '', otherCosts: '0' };
 
 export default function ApuPage() {
   const [apus, setApus] = useState([]);
@@ -65,7 +65,6 @@ export default function ApuPage() {
       name: full.name,
       unit: full.unit,
       code: full.code || '',
-      aiuPercent: String(full.aiuPercent),
       otherCosts: String(full.otherCosts ?? 0),
     });
     const next = { material: [], herramienta: [], personal: [], transporte: [] };
@@ -192,11 +191,10 @@ export default function ApuPage() {
     }>
       {showForm && (
         <form onSubmit={submit} className="mb-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
             <Input label="Nombre del ítem/actividad" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
             <Input label="Unidad" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} required />
             <Input label="Código" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
-            <Input label="AIU (%)" type="number" min="0" value={form.aiuPercent} onChange={(e) => setForm({ ...form, aiuPercent: e.target.value })} required />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -264,15 +262,13 @@ export default function ApuPage() {
         </form>
       )}
 
-      <Table columns={['Código', 'Nombre', 'Unidad', 'AIU %', 'Costo directo', 'Costo unitario total', '']}>
+      <Table columns={['Código', 'Nombre', 'Unidad', 'Costo directo', '']}>
         {apus.map((a) => (
           <tr key={a.id} className="border-b border-gray-100">
             <td className="py-1 pr-3 text-gray-400">{a.code || '-'}</td>
             <td className="py-1 pr-3">{a.name}</td>
             <td className="py-1 pr-3">{a.unit}</td>
-            <td className="py-1 pr-3">{Number(a.aiuPercent)}%</td>
-            <td className="py-1 pr-3">{money(a.directCost)}</td>
-            <td className="py-1 pr-3 font-semibold">{money(a.unitCost)}</td>
+            <td className="py-1 pr-3 font-semibold">{money(a.directCost)}</td>
             <td className="py-1 pr-3 text-right flex gap-2 justify-end">
               <Button variant="secondary" onClick={() => setExpandedId(expandedId === a.id ? null : a.id)}>
                 {expandedId === a.id ? 'Cerrar' : 'Componentes'}
@@ -282,7 +278,7 @@ export default function ApuPage() {
             </td>
           </tr>
         ))}
-        {apus.length === 0 && <tr><td colSpan={7} className="py-2 text-center text-gray-400">Sin APU registrados.</td></tr>}
+        {apus.length === 0 && <tr><td colSpan={5} className="py-2 text-center text-gray-400">Sin APU registrados.</td></tr>}
       </Table>
 
       {expandedId && <ApuComponents apu={apus.find((a) => a.id === expandedId)} />}
@@ -327,14 +323,14 @@ function SectionRow({ category, row, options, onChange, onRemove }) {
 
   if (category === 'material') {
     return (
-      <div className="grid grid-cols-12 gap-2 items-end">
-        <Select label="Material" className="col-span-6" value={row.priceItemId} onChange={(e) => onChange('priceItemId', e.target.value)}>
+      <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-start sm:items-end">
+        <Select label="Material" className="col-span-2 sm:col-span-6" value={row.priceItemId} onChange={(e) => onChange('priceItemId', e.target.value)}>
           <option value="">-- seleccionar --</option>
           {options.map((p) => <option key={p.id} value={p.id}>{p.name} ({money(p.currentValue)}/{p.unit})</option>)}
         </Select>
-        <Input label="Cantidad" className="col-span-3" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
-        <div className="col-span-2 text-sm text-gray-600 pb-1.5">{money((Number(row.quantity) || 0) * Number(selected?.currentValue || 0))}</div>
-        <Button type="button" variant="danger" className="col-span-1" onClick={onRemove}>×</Button>
+        <Input label="Cantidad" className="col-span-1 sm:col-span-3" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
+        <div className="col-span-1 sm:col-span-2 text-sm text-gray-600 pb-1.5 self-end">{money((Number(row.quantity) || 0) * Number(selected?.currentValue || 0))}</div>
+        <Button type="button" variant="danger" className="col-span-2 sm:col-span-1" onClick={onRemove}>×</Button>
       </div>
     );
   }
@@ -342,15 +338,15 @@ function SectionRow({ category, row, options, onChange, onRemove }) {
   if (category === 'herramienta') {
     const total = (Number(row.quantity) || 0) * (Number(row.yield) || 1) * Number(selected?.currentValue || 0);
     return (
-      <div className="grid grid-cols-12 gap-2 items-end">
-        <Select label="Herramienta/Equipo" className="col-span-5" value={row.priceItemId} onChange={(e) => onChange('priceItemId', e.target.value)}>
+      <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-start sm:items-end">
+        <Select label="Herramienta/Equipo" className="col-span-2 sm:col-span-5" value={row.priceItemId} onChange={(e) => onChange('priceItemId', e.target.value)}>
           <option value="">-- seleccionar --</option>
           {options.map((p) => <option key={p.id} value={p.id}>{p.name} ({money(p.currentValue)}/{p.unit})</option>)}
         </Select>
-        <Input label="Cantidad" className="col-span-2" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
-        <Input label="Rendimiento" className="col-span-2" type="number" min="0" step="0.0001" value={row.yield} onChange={(e) => onChange('yield', e.target.value)} />
-        <div className="col-span-2 text-sm text-gray-600 pb-1.5">{money(total)}</div>
-        <Button type="button" variant="danger" className="col-span-1" onClick={onRemove}>×</Button>
+        <Input label="Cantidad" className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
+        <Input label="Rendimiento" className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.yield} onChange={(e) => onChange('yield', e.target.value)} />
+        <div className="col-span-1 sm:col-span-2 text-sm text-gray-600 pb-1.5 self-end">{money(total)}</div>
+        <Button type="button" variant="danger" className="col-span-1 sm:col-span-1" onClick={onRemove}>×</Button>
       </div>
     );
   }
@@ -359,16 +355,16 @@ function SectionRow({ category, row, options, onChange, onRemove }) {
     const base = Number(selected?.currentValue || 0);
     const total = ((Number(row.quantity) || 0) * base * (1 + (Number(row.prestacionalPercent) || 0) / 100)) / (Number(row.yield) || 1);
     return (
-      <div className="grid grid-cols-12 gap-2 items-end">
-        <Select label="Personal" className="col-span-4" value={row.priceItemId} onChange={(e) => onChange('priceItemId', e.target.value)}>
+      <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-start sm:items-end">
+        <Select label="Personal" className="col-span-2 sm:col-span-4" value={row.priceItemId} onChange={(e) => onChange('priceItemId', e.target.value)}>
           <option value="">-- seleccionar --</option>
           {options.map((p) => <option key={p.id} value={p.id}>{p.name} ({money(p.currentValue)}/{p.unit})</option>)}
         </Select>
-        <Input label="Cantidad" className="col-span-2" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
-        <Input label="Rendimiento" className="col-span-2" type="number" min="0" step="0.0001" value={row.yield} onChange={(e) => onChange('yield', e.target.value)} />
-        <Input label="Valor base" className="col-span-2" value={money(base)} readOnly disabled />
-        <Input label="% Prestacional" className="col-span-1" type="number" min="0" step="0.01" value={row.prestacionalPercent} onChange={(e) => onChange('prestacionalPercent', e.target.value)} />
-        <Button type="button" variant="danger" className="col-span-1" onClick={onRemove}>×</Button>
+        <Input label="Cantidad" className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
+        <Input label="Rendimiento" className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.yield} onChange={(e) => onChange('yield', e.target.value)} />
+        <Input label="Valor base" className="col-span-1 sm:col-span-2" value={money(base)} readOnly disabled />
+        <Input label="% Prestacional" className="col-span-1 sm:col-span-1" type="number" min="0" step="0.01" value={row.prestacionalPercent} onChange={(e) => onChange('prestacionalPercent', e.target.value)} />
+        <Button type="button" variant="danger" className="col-span-2 sm:col-span-1" onClick={onRemove}>×</Button>
         <div className="col-span-full text-right text-sm text-gray-600 -mt-1">Valor ítem (con prestaciones): {money(total)}</div>
       </div>
     );
@@ -377,30 +373,30 @@ function SectionRow({ category, row, options, onChange, onRemove }) {
   // transporte
   const rate = row.priceItemId ? Number(selected?.currentValue || 0) : (Number(row.unitValue) || 0);
   return (
-    <div className="grid grid-cols-12 gap-2 items-end">
-      <Select label="Modalidad" className="col-span-3" value={row.transportMode} onChange={(e) => onChange('transportMode', e.target.value)}>
+    <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-start sm:items-end">
+      <Select label="Modalidad" className="col-span-2 sm:col-span-3" value={row.transportMode} onChange={(e) => onChange('transportMode', e.target.value)}>
         <option value="distancia_peso">Distancia y peso</option>
         <option value="porcentaje_materiales">% sobre materiales</option>
       </Select>
-      <Select label="Insumo (opcional)" className="col-span-4" value={row.priceItemId} onChange={(e) => onChange('priceItemId', e.target.value)}>
+      <Select label="Insumo (opcional)" className="col-span-2 sm:col-span-4" value={row.priceItemId} onChange={(e) => onChange('priceItemId', e.target.value)}>
         <option value="">-- manual --</option>
         {options.map((p) => <option key={p.id} value={p.id}>{p.name} ({money(p.currentValue)}/{p.unit})</option>)}
       </Select>
       {!row.priceItemId && (
-        <Input label="Descripción" className="col-span-4" value={row.description} onChange={(e) => onChange('description', e.target.value)} />
+        <Input label="Descripción" className="col-span-2 sm:col-span-4" value={row.description} onChange={(e) => onChange('description', e.target.value)} />
       )}
       {row.transportMode === 'distancia_peso' ? (
         <>
-          <Input label="Peso (kg)" className="col-span-2" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
-          <Input label="Distancia (km)" className="col-span-2" type="number" min="0" step="0.0001" value={row.transportDistance} onChange={(e) => onChange('transportDistance', e.target.value)} />
+          <Input label="Peso (kg)" className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
+          <Input label="Distancia (km)" className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.transportDistance} onChange={(e) => onChange('transportDistance', e.target.value)} />
           {!row.priceItemId && (
-            <Input label="Valor por kg-km" className="col-span-2" type="number" min="0" step="0.0001" value={row.unitValue} onChange={(e) => onChange('unitValue', e.target.value)} />
+            <Input label="Valor por kg-km" className="col-span-2 sm:col-span-2" type="number" min="0" step="0.0001" value={row.unitValue} onChange={(e) => onChange('unitValue', e.target.value)} />
           )}
         </>
       ) : (
-        <Input label="% sobre materiales" className="col-span-2" type="number" min="0" step="0.01" value={row.transportPercent} onChange={(e) => onChange('transportPercent', e.target.value)} />
+        <Input label="% sobre materiales" className="col-span-2 sm:col-span-2" type="number" min="0" step="0.01" value={row.transportPercent} onChange={(e) => onChange('transportPercent', e.target.value)} />
       )}
-      <Button type="button" variant="danger" className="col-span-1" onClick={onRemove}>×</Button>
+      <Button type="button" variant="danger" className="col-span-2 sm:col-span-1" onClick={onRemove}>×</Button>
       {row.transportMode === 'distancia_peso' && (
         <div className="col-span-full text-right text-sm text-gray-600 -mt-1">
           Valor total: {money((Number(row.quantity) || 0) * (Number(row.transportDistance) || 0) * rate)}

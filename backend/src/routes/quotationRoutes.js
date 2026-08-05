@@ -9,6 +9,7 @@ router.get('/', requirePermission('cotizaciones', 'view'), quotationController.l
 router.post('/', requirePermission('cotizaciones', 'create'), quotationController.create);
 router.get('/:id', requirePermission('cotizaciones', 'view'), quotationController.get);
 router.put('/:id', requirePermission('cotizaciones', 'edit'), quotationController.update);
+router.put('/:id/budget-aiu', requirePermission('cotizaciones', 'edit'), quotationController.updateAiu);
 router.delete('/:id', requirePermission('cotizaciones', 'delete'), quotationController.remove);
 router.post('/:id/items', requirePermission('cotizaciones', 'edit'), quotationController.addItem);
 router.delete('/:id/items/:itemId', requirePermission('cotizaciones', 'edit'), quotationController.removeItem);

@@ -11,9 +11,20 @@ export default function QuotationDetailPage() {
   const [apus, setApus] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ apuId: '', description: '', unit: '', quantity: '' });
+  const [aiuForm, setAiuForm] = useState(null);
+  const [aiuSaved, setAiuSaved] = useState(false);
   const [error, setError] = useState('');
 
-  const load = () => quotationsApi.get(id).then(setData);
+  const load = () => quotationsApi.get(id).then((d) => {
+    setData(d);
+    if (d.budget) {
+      setAiuForm({
+        adminPercent: String(d.budget.adminPercent),
+        imprevistosPercent: String(d.budget.imprevistosPercent),
+        utilidadPercent: String(d.budget.utilidadPercent),
+      });
+    }
+  });
   useEffect(() => { load(); apuApi.list().then(setApus); }, [id]);
 
   if (!data) return <div className="text-gray-500">Cargando...</div>;
@@ -21,6 +32,18 @@ export default function QuotationDetailPage() {
   const items = budget?.items || [];
   const total = items.reduce((s, i) => s + Number(i.totalCost), 0);
   const isConverted = quotation.status === 'convertida';
+
+  const submitAiu = async (e) => {
+    e.preventDefault();
+    setError(''); setAiuSaved(false);
+    try {
+      await quotationsApi.updateAiu(id, aiuForm);
+      setAiuSaved(true);
+      load();
+    } catch (err) {
+      setError(extractError(err));
+    }
+  };
 
   const onApuChange = (apuId) => {
     const apu = apus.find((a) => a.id === apuId);
@@ -74,6 +97,37 @@ export default function QuotationDetailPage() {
           <div><span className="text-gray-500">Condiciones:</span> {quotation.paymentTerms || '-'}</div>
         </div>
       </Card>
+
+      {aiuForm && (
+        <Card title="AIU del presupuesto">
+          <form onSubmit={submitAiu} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+            <Input
+              label="Administración (%)" type="number" min="0" step="0.01"
+              value={aiuForm.adminPercent} onChange={(e) => setAiuForm({ ...aiuForm, adminPercent: e.target.value })}
+              disabled={isConverted}
+            />
+            <Input
+              label="Imprevistos (%)" type="number" min="0" step="0.01"
+              value={aiuForm.imprevistosPercent} onChange={(e) => setAiuForm({ ...aiuForm, imprevistosPercent: e.target.value })}
+              disabled={isConverted}
+            />
+            <Input
+              label="Utilidad (%)" type="number" min="0" step="0.01"
+              value={aiuForm.utilidadPercent} onChange={(e) => setAiuForm({ ...aiuForm, utilidadPercent: e.target.value })}
+              disabled={isConverted}
+            />
+            {!isConverted && (
+              <Can module="cotizaciones" action="edit">
+                <div className="col-span-full flex items-center gap-3">
+                  <Button type="submit">Guardar AIU</Button>
+                  <p className="text-xs text-gray-400">Se aplica a los ítems basados en APU que agregues de aquí en adelante.</p>
+                  {aiuSaved && <p className="text-sm text-green-600">Guardado.</p>}
+                </div>
+              </Can>
+            )}
+          </form>
+        </Card>
+      )}
 
       <Card title="Presupuesto (ítems basados en APU)" actions={
         !isConverted && (

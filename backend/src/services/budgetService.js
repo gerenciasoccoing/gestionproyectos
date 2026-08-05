@@ -42,6 +42,9 @@ function computeSectionCosts(components) {
   return { materialsCost, herramientasCost, personalCost, transporteCost };
 }
 
+// El APU ya no incluye AIU: es puro costo directo (materiales, herramientas, personal,
+// transporte y otros costos directos). El AIU se define al crear el presupuesto (ver
+// applyBudgetAiu) y se aplica sobre este costo directo al agregar el ítem al presupuesto.
 async function computeApuUnitCost(apuId) {
   const apu = await APU.findByPk(apuId, {
     include: [{ model: APUComponent, as: 'components', include: [{ model: PriceItem, as: 'priceItem' }] }],
@@ -50,8 +53,14 @@ async function computeApuUnitCost(apuId) {
   const sections = computeSectionCosts(apu.components);
   const componentsCost = sections.materialsCost + sections.herramientasCost + sections.personalCost + sections.transporteCost;
   const directCost = componentsCost + Number(apu.otherCosts || 0);
-  const unitCost = directCost * (1 + Number(apu.aiuPercent) / 100);
-  return { apu, directCost, unitCost, sections: { ...sections, otherCosts: Number(apu.otherCosts || 0) } };
+  return { apu, directCost, unitCost: directCost, sections: { ...sections, otherCosts: Number(apu.otherCosts || 0) } };
+}
+
+// AIU discriminado del presupuesto (Administración + Imprevistos + Utilidad), aplicado
+// sobre el costo directo de un ítem basado en APU al agregarlo al presupuesto.
+function applyBudgetAiu(directCost, budget) {
+  const aiuPercent = Number(budget.adminPercent || 0) + Number(budget.imprevistosPercent || 0) + Number(budget.utilidadPercent || 0);
+  return directCost * (1 + aiuPercent / 100);
 }
 
 async function getCurrentBudgetForProject(projectId) {
@@ -85,4 +94,4 @@ async function getBudgetItemsWithProgress(projectId) {
   return { budget, items };
 }
 
-module.exports = { computeApuUnitCost, computeSectionCosts, getCurrentBudgetForProject, getBudgetItemsWithProgress };
+module.exports = { computeApuUnitCost, computeSectionCosts, applyBudgetAiu, getCurrentBudgetForProject, getBudgetItemsWithProgress };

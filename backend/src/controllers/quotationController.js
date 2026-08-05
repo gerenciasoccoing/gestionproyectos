@@ -1,10 +1,19 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { Quotation, Budget, BudgetItem } = require('../models');
-const { computeApuUnitCost } = require('../services/budgetService');
+const { computeApuUnitCost, applyBudgetAiu } = require('../services/budgetService');
 const { getQuotationWithBudget, convertQuotationToProject } = require('../services/quotationService');
 const { generateQuotationPdf } = require('../services/pdfService');
 const { getSettingsForPdf } = require('./companySettingsController');
+
+// Extrae y valida el AIU discriminado (Administración/Imprevistos/Utilidad) del body.
+function parseAiuPercents(body) {
+  const { adminPercent = 0, imprevistosPercent = 0, utilidadPercent = 0 } = body;
+  for (const [label, value] of [['adminPercent', adminPercent], ['imprevistosPercent', imprevistosPercent], ['utilidadPercent', utilidadPercent]]) {
+    if (Number(value) < 0) throw new ApiError(400, `${label} no puede ser negativo`);
+  }
+  return { adminPercent, imprevistosPercent, utilidadPercent };
+}
 
 const list = asyncHandler(async (req, res) => {
   const quotations = await Quotation.findAll({ order: [['date', 'DESC']] });
@@ -17,17 +26,32 @@ const get = asyncHandler(async (req, res) => {
   res.json(data);
 });
 
+// El AIU discriminado (Administración, Imprevistos, Utilidad) se define aquí, al crear el
+// presupuesto (versión 1) implícito de la cotización.
 const create = asyncHandler(async (req, res) => {
   const { clientName, projectNameProposed, date, validityDays, paymentTerms } = req.body;
   if (!clientName || !projectNameProposed || !date) {
     throw new ApiError(400, 'clientName, projectNameProposed y date son obligatorios');
   }
+  const aiu = parseAiuPercents(req.body);
   const quotation = await Quotation.create({
     clientName, projectNameProposed, date, validityDays: validityDays || 30, paymentTerms,
     createdBy: req.user.id,
   });
-  await Budget.create({ quotationId: quotation.id, version: 1, type: 'inicial' });
+  await Budget.create({ quotationId: quotation.id, version: 1, type: 'inicial', ...aiu });
   res.status(201).json(quotation);
+});
+
+// Actualiza el AIU discriminado del presupuesto vigente de la cotización.
+const updateAiu = asyncHandler(async (req, res) => {
+  const quotation = await Quotation.findByPk(req.params.id);
+  if (!quotation) throw new ApiError(404, 'Cotización no encontrada');
+  if (quotation.status === 'convertida') throw new ApiError(400, 'La cotización ya fue convertida y no puede editarse');
+  const budget = await Budget.findOne({ where: { quotationId: quotation.id }, order: [['version', 'DESC']] });
+  if (!budget) throw new ApiError(404, 'Presupuesto no encontrado');
+  const aiu = parseAiuPercents(req.body);
+  await budget.update(aiu);
+  res.json(budget);
 });
 
 const update = asyncHandler(async (req, res) => {
@@ -75,7 +99,7 @@ const addItem = asyncHandler(async (req, res) => {
   if (apuId) {
     const result = await computeApuUnitCost(apuId);
     if (!result) throw new ApiError(404, 'APU no encontrado');
-    unitCost = result.unitCost;
+    unitCost = applyBudgetAiu(result.directCost, budget);
   }
 
   const item = await BudgetItem.create({
@@ -122,7 +146,10 @@ const exportPdf = asyncHandler(async (req, res) => {
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="cotizacion-${quotation.clientName.replace(/\s+/g, '_')}.pdf"`);
-  const doc = generateQuotationPdf({ quotation, items, company });
+  const aiu = budget
+    ? { adminPercent: Number(budget.adminPercent), imprevistosPercent: Number(budget.imprevistosPercent), utilidadPercent: Number(budget.utilidadPercent) }
+    : { adminPercent: 0, imprevistosPercent: 0, utilidadPercent: 0 };
+  const doc = generateQuotationPdf({ quotation, items, company, aiu });
   doc.pipe(res);
 });
 
@@ -132,4 +159,4 @@ const convert = asyncHandler(async (req, res) => {
   res.status(201).json(project);
 });
 
-module.exports = { list, get, create, update, remove, addItem, removeItem, exportPdf, convert };
+module.exports = { list, get, create, update, remove, addItem, removeItem, updateAiu, exportPdf, convert };

@@ -80,15 +80,14 @@ const get = asyncHandler(async (req, res) => {
 });
 
 const create = asyncHandler(async (req, res) => {
-  const { name, unit, code, aiuPercent = 0, otherCosts = 0, components = [] } = req.body;
+  const { name, unit, code, otherCosts = 0, components = [] } = req.body;
   if (!name || !unit) throw new ApiError(400, 'name y unit son obligatorios');
-  if (Number(aiuPercent) < 0) throw new ApiError(400, 'aiuPercent no puede ser negativo');
   if (Number(otherCosts) < 0) throw new ApiError(400, 'otherCosts no puede ser negativo');
 
   const sanitized = components.map(sanitizeComponent);
 
   const apu = await sequelize.transaction(async (t) => {
-    const created = await APU.create({ name, unit, code, aiuPercent, otherCosts }, { transaction: t });
+    const created = await APU.create({ name, unit, code, otherCosts }, { transaction: t });
     if (sanitized.length) {
       await APUComponent.bulkCreate(
         sanitized.map((c) => ({ ...c, apuId: created.id })),
@@ -105,11 +104,10 @@ const create = asyncHandler(async (req, res) => {
 const update = asyncHandler(async (req, res) => {
   const apu = await APU.findByPk(req.params.id);
   if (!apu) throw new ApiError(404, 'APU no encontrado');
-  const { name, unit, code, aiuPercent, otherCosts, components } = req.body;
+  const { name, unit, code, otherCosts, components } = req.body;
   if (name !== undefined) apu.name = name;
   if (unit !== undefined) apu.unit = unit;
   if (code !== undefined) apu.code = code;
-  if (aiuPercent !== undefined) apu.aiuPercent = aiuPercent;
   if (otherCosts !== undefined) {
     if (Number(otherCosts) < 0) throw new ApiError(400, 'otherCosts no puede ser negativo');
     apu.otherCosts = otherCosts;

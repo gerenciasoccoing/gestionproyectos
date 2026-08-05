@@ -69,7 +69,8 @@ export const milestonesApi = {
 
 export const budgetApi = {
   get: (pid) => client.get(`/projects/${pid}/budget`).then((r) => r.data),
-  createVersion: (pid, type) => client.post(`/projects/${pid}/budget`, { type }).then((r) => r.data),
+  createVersion: (pid, type, aiu = {}) => client.post(`/projects/${pid}/budget`, { type, ...aiu }).then((r) => r.data),
+  updateAiu: (pid, budgetId, aiu) => client.put(`/projects/${pid}/budget/${budgetId}`, aiu).then((r) => r.data),
   addItem: (pid, budgetId, data) => client.post(`/projects/${pid}/budget/${budgetId}/items`, data).then((r) => r.data),
   removeItem: (pid, budgetId, itemId) => client.delete(`/projects/${pid}/budget/${budgetId}/items/${itemId}`),
 };
@@ -163,6 +164,7 @@ export const quotationsApi = {
   get: (id) => client.get(`/quotations/${id}`).then((r) => r.data),
   create: (data) => client.post('/quotations', data).then((r) => r.data),
   update: (id, data) => client.put(`/quotations/${id}`, data).then((r) => r.data),
+  updateAiu: (id, aiu) => client.put(`/quotations/${id}/budget-aiu`, aiu).then((r) => r.data),
   remove: (id) => client.delete(`/quotations/${id}`),
   addItem: (id, data) => client.post(`/quotations/${id}/items`, data).then((r) => r.data),
   removeItem: (id, itemId) => client.delete(`/quotations/${id}/items/${itemId}`),

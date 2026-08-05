@@ -7,7 +7,8 @@ import Can from '../../components/Can';
 export default function QuotationsListPage() {
   const [quotations, setQuotations] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ clientName: '', projectNameProposed: '', date: '', validityDays: 30, paymentTerms: '' });
+  const emptyForm = { clientName: '', projectNameProposed: '', date: '', validityDays: 30, paymentTerms: '', adminPercent: '0', imprevistosPercent: '0', utilidadPercent: '0' };
+  const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
 
   const load = () => quotationsApi.list().then(setQuotations);
@@ -18,7 +19,7 @@ export default function QuotationsListPage() {
     setError('');
     try {
       await quotationsApi.create(form);
-      setForm({ clientName: '', projectNameProposed: '', date: '', validityDays: 30, paymentTerms: '' });
+      setForm(emptyForm);
       setShowForm(false);
       load();
     } catch (err) {
@@ -41,6 +42,10 @@ export default function QuotationsListPage() {
           <Input label="Fecha" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
           <Input label="Validez (días)" type="number" min="1" value={form.validityDays} onChange={(e) => setForm({ ...form, validityDays: e.target.value })} />
           <TextArea label="Condiciones de pago" value={form.paymentTerms} onChange={(e) => setForm({ ...form, paymentTerms: e.target.value })} className="col-span-full" />
+          <p className="col-span-full text-sm font-medium text-gray-600 -mb-1">AIU del presupuesto (aplicado sobre el costo directo de los ítems basados en APU)</p>
+          <Input label="Administración (%)" type="number" min="0" step="0.01" value={form.adminPercent} onChange={(e) => setForm({ ...form, adminPercent: e.target.value })} />
+          <Input label="Imprevistos (%)" type="number" min="0" step="0.01" value={form.imprevistosPercent} onChange={(e) => setForm({ ...form, imprevistosPercent: e.target.value })} />
+          <Input label="Utilidad (%)" type="number" min="0" step="0.01" value={form.utilidadPercent} onChange={(e) => setForm({ ...form, utilidadPercent: e.target.value })} />
           <Button type="submit" className="col-span-full">Crear cotización</Button>
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>

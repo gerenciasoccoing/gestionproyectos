@@ -67,8 +67,8 @@ function generateProjectReportPdf({ project, evm, milestones, minutes, risks, pr
 }
 
 // Genera la cotización en PDF como propuesta ejecutiva: logo, datos del cliente/proyecto,
-// tabla resumen de ítems, subtotal, AIU, total y condiciones.
-function generateQuotationPdf({ quotation, items, company }) {
+// tabla resumen de ítems, subtotal, AIU discriminado (Administración/Imprevistos/Utilidad) y total.
+function generateQuotationPdf({ quotation, items, company, aiu }) {
   const doc = new PDFDocument({ margin: 50 });
 
   // Encabezado con branding
@@ -128,7 +128,15 @@ function generateQuotationPdf({ quotation, items, company }) {
   y += 8;
   doc.font('Helvetica').text(`Subtotal (costo directo): ${money(subtotalDirect)}`, 300, y, { align: 'right', width: 245 });
   y += 16;
-  doc.text(`AIU: ${money(totalAiu)}`, 300, y, { align: 'right', width: 245 });
+  if (aiu) {
+    doc.text(`Administración (${Number(aiu.adminPercent)}%): ${money(subtotalDirect * Number(aiu.adminPercent) / 100)}`, 300, y, { align: 'right', width: 245 });
+    y += 16;
+    doc.text(`Imprevistos (${Number(aiu.imprevistosPercent)}%): ${money(subtotalDirect * Number(aiu.imprevistosPercent) / 100)}`, 300, y, { align: 'right', width: 245 });
+    y += 16;
+    doc.text(`Utilidad (${Number(aiu.utilidadPercent)}%): ${money(subtotalDirect * Number(aiu.utilidadPercent) / 100)}`, 300, y, { align: 'right', width: 245 });
+  } else {
+    doc.text(`AIU: ${money(totalAiu)}`, 300, y, { align: 'right', width: 245 });
+  }
   y += 16;
   doc.font('Helvetica-Bold').fontSize(11).text(`TOTAL: ${money(total)}`, 300, y, { align: 'right', width: 245 });
 
