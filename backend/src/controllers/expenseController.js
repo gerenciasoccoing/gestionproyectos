@@ -3,6 +3,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { Expense, ExpenseBudget } = require('../models');
 const { relativePath } = require('../middleware/upload');
+const { scanInvoice } = require('../services/invoiceScanService');
 
 const CATEGORIES = ['mano_obra', 'materiales', 'equipos', 'viaticos', 'imprevistos'];
 
@@ -20,7 +21,7 @@ const list = asyncHandler(async (req, res) => {
 });
 
 const create = asyncHandler(async (req, res) => {
-  const { category, amount, date, description } = req.body;
+  const { category, amount, date, description, vendorName, vendorNit, subtotal, taxAmount } = req.body;
   if (!category || !CATEGORIES.includes(category)) throw new ApiError(400, `category debe ser uno de: ${CATEGORIES.join(', ')}`);
   if (amount === undefined || Number(amount) < 0) throw new ApiError(400, 'amount es obligatorio y no puede ser negativo');
   if (!date) throw new ApiError(400, 'date es obligatorio');
@@ -31,6 +32,10 @@ const create = asyncHandler(async (req, res) => {
     amount,
     date,
     description,
+    vendorName: vendorName || null,
+    vendorNit: vendorNit || null,
+    subtotal: subtotal || null,
+    taxAmount: taxAmount || null,
     supportFilePath: relativePath(req.file),
     source: 'manual',
     createdBy: req.user.id,
@@ -38,12 +43,22 @@ const create = asyncHandler(async (req, res) => {
   res.status(201).json(expense);
 });
 
+// Lee una factura (PDF o imagen) subida y devuelve los datos que se lograron reconocer, para
+// prellenar el formulario de gasto. No crea el gasto: el usuario revisa/corrige y confirma.
+// Lectura 100% local (OCR con Tesseract + heurísticas de texto), sin proveedor de IA externo,
+// así que la precisión es limitada: siempre debe revisarse antes de guardar.
+const scan = asyncHandler(async (req, res) => {
+  if (!req.file) throw new ApiError(400, 'Debe adjuntar un archivo PDF o imagen (jpg, png, webp)');
+  const result = await scanInvoice(req.file.buffer, req.file.mimetype);
+  res.json(result);
+});
+
 const update = asyncHandler(async (req, res) => {
   const expense = await Expense.findOne({ where: { id: req.params.id, projectId: req.params.projectId } });
   if (!expense) throw new ApiError(404, 'Gasto no encontrado');
   if (expense.source !== 'manual') throw new ApiError(400, 'Este gasto se generó automáticamente y no puede editarse manualmente');
 
-  const { category, amount, date, description } = req.body;
+  const { category, amount, date, description, vendorName, vendorNit, subtotal, taxAmount } = req.body;
   if (category !== undefined) {
     if (!CATEGORIES.includes(category)) throw new ApiError(400, `category debe ser uno de: ${CATEGORIES.join(', ')}`);
     expense.category = category;
@@ -54,6 +69,10 @@ const update = asyncHandler(async (req, res) => {
   }
   if (date !== undefined) expense.date = date;
   if (description !== undefined) expense.description = description;
+  if (vendorName !== undefined) expense.vendorName = vendorName || null;
+  if (vendorNit !== undefined) expense.vendorNit = vendorNit || null;
+  if (subtotal !== undefined) expense.subtotal = subtotal || null;
+  if (taxAmount !== undefined) expense.taxAmount = taxAmount || null;
   if (req.file) expense.supportFilePath = relativePath(req.file);
   await expense.save();
   res.json(expense);
@@ -111,4 +130,4 @@ const summary = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { list, create, update, remove, setBudget, summary };
+module.exports = { list, create, update, remove, setBudget, summary, scan };

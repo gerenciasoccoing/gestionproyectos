@@ -114,6 +114,7 @@ export const expensesApi = {
   remove: (pid, id) => client.delete(`/projects/${pid}/expenses/${id}`),
   setBudget: (pid, data) => client.post(`/projects/${pid}/expenses/budget`, data).then((r) => r.data),
   summary: (pid) => client.get(`/projects/${pid}/expenses/summary`).then((r) => r.data),
+  scan: (pid, formData) => client.post(`/projects/${pid}/expenses/scan`, formData).then((r) => r.data),
 };
 
 export const risksApi = {
