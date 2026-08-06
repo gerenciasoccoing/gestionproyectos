@@ -2,6 +2,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { Budget, BudgetItem } = require('../models');
 const { computeApuUnitCost, applyBudgetAiu, getBudgetItemsWithProgress } = require('../services/budgetService');
+const { importBudgetFromWorkbook } = require('../services/budgetImportService');
 
 // Extrae y valida el AIU discriminado (Administración/Imprevistos/Utilidad) del body.
 // Los tres son opcionales de forma independiente; los que no vengan quedan en 0.
@@ -80,4 +81,17 @@ const removeItem = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
-module.exports = { getProjectBudget, createBudgetVersion, updateBudget, addItem, removeItem };
+// Sube un Excel de listado de precios unitarios (hojas "Items de Presupuesto" + "Unitarios")
+// y crea automáticamente una nueva versión de presupuesto con sus ítems y los APU (con
+// materiales/personal/equipos) referenciados, creando en la Base de Precios los insumos que
+// no existan todavía. El AIU (Administración/Imprevistos/Utilidad) se define aquí, igual que
+// al crear un presupuesto manual.
+const importFromFile = asyncHandler(async (req, res) => {
+  if (!req.file) throw new ApiError(400, 'Debe adjuntar un archivo Excel (.xlsx o .xls)');
+  const aiu = parseAiuPercents(req.body);
+  const { type = 'inicial' } = req.body;
+  const result = await importBudgetFromWorkbook({ projectId: req.params.projectId, buffer: req.file.buffer, aiu, type });
+  res.status(201).json(result);
+});
+
+module.exports = { getProjectBudget, createBudgetVersion, updateBudget, addItem, removeItem, importFromFile };

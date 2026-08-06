@@ -17,6 +17,13 @@ export default function BudgetProgressPage() {
   const [aiuSaved, setAiuSaved] = useState(false);
   const [error, setError] = useState('');
 
+  const [showImport, setShowImport] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importAiu, setImportAiu] = useState({ adminPercent: '0', imprevistosPercent: '0', utilidadPercent: '0' });
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [importError, setImportError] = useState('');
+
   const load = () => budgetApi.get(projectId).then((data) => {
     setBudget(data.budget);
     setItems(data.items);
@@ -71,8 +78,79 @@ export default function BudgetProgressPage() {
     setItemForm((f) => ({ ...f, apuId, unit: apu ? apu.unit : f.unit, unitCost: apu ? apu.unitCost.toFixed(2) : f.unitCost }));
   };
 
+  const submitImport = async (e) => {
+    e.preventDefault();
+    setImportError(''); setImportResult(null);
+    if (!importFile) { setImportError('Debes seleccionar un archivo.'); return; }
+    setImporting(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', importFile);
+      fd.append('adminPercent', importAiu.adminPercent);
+      fd.append('imprevistosPercent', importAiu.imprevistosPercent);
+      fd.append('utilidadPercent', importAiu.utilidadPercent);
+      const result = await budgetApi.importFile(projectId, fd);
+      setImportResult(result);
+      setImportFile(null);
+      apuApi.list().then(setApus);
+      load();
+    } catch (err) {
+      setImportError(extractError(err));
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div>
+      <Card title="Importar presupuesto y APU desde Excel" actions={
+        <Can module="ejecucion" action="create">
+          <Button onClick={() => setShowImport((s) => !s)}>{showImport ? 'Cancelar' : '+ Importar desde Excel'}</Button>
+        </Can>
+      }>
+        {showImport && (
+          <form onSubmit={submitImport} className="space-y-3">
+            <p className="text-sm text-gray-600">
+              Sube un Excel con el listado de precios unitarios: hoja "Items de Presupuesto" (ítem, descripción,
+              unidad, cantidad, y el código de su análisis unitario) y hoja "Unitarios" (el detalle de materiales,
+              personal y equipos de cada ítem). El sistema crea automáticamente los ítems del presupuesto con sus
+              APU, y agrega a la Base de Precios los insumos que todavía no existan.
+            </p>
+            <Input label="Archivo Excel (.xlsx)" type="file" accept=".xlsx,.xls" onChange={(e) => setImportFile(e.target.files[0])} />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Input label="Administración (%)" type="number" min="0" step="0.01" value={importAiu.adminPercent} onChange={(e) => setImportAiu({ ...importAiu, adminPercent: e.target.value })} />
+              <Input label="Imprevistos (%)" type="number" min="0" step="0.01" value={importAiu.imprevistosPercent} onChange={(e) => setImportAiu({ ...importAiu, imprevistosPercent: e.target.value })} />
+              <Input label="Utilidad (%)" type="number" min="0" step="0.01" value={importAiu.utilidadPercent} onChange={(e) => setImportAiu({ ...importAiu, utilidadPercent: e.target.value })} />
+            </div>
+            <p className="text-xs text-gray-400">
+              Los APU se importan como costo directo puro (sin AIU); si tu archivo indica un AIU, ingrésalo aquí
+              para que los valores totales del presupuesto coincidan con el archivo original. Esto crea una nueva
+              versión de presupuesto.
+            </p>
+            <Button type="submit" disabled={importing}>{importing ? 'Importando… puede tardar un momento' : 'Importar'}</Button>
+            <ErrorText>{importError}</ErrorText>
+          </form>
+        )}
+        {importResult && (
+          <div className="mt-4 border-t pt-3 text-sm space-y-1">
+            <p className="font-medium text-green-700">Importación completada.</p>
+            <p>{importResult.budgetItemsCreated} ítems de presupuesto y {importResult.apusCreated} APU creados ({importResult.componentsCreated} componentes en total).</p>
+            <p>Base de Precios: {importResult.priceItemsCreated} insumos nuevos, {importResult.priceItemsUpdated} actualizados.</p>
+            {importResult.skippedCount > 0 && (
+              <details className="text-yellow-700">
+                <summary className="cursor-pointer">{importResult.skippedCount} ítem(s) omitidos (sin análisis unitario reconocible en el archivo)</summary>
+                <ul className="list-disc pl-5 mt-1">
+                  {importResult.skipped.map((s, i) => <li key={i}>{s.item} — {s.description}</li>)}
+                </ul>
+                {importResult.skippedCount > importResult.skipped.length && (
+                  <p className="mt-1">…y {importResult.skippedCount - importResult.skipped.length} más.</p>
+                )}
+              </details>
+            )}
+          </div>
+        )}
+      </Card>
+
       <Card title="AIU del presupuesto">
         <form onSubmit={submitAiu} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
           <Input

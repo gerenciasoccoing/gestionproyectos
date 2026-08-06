@@ -71,6 +71,7 @@ export const budgetApi = {
   get: (pid) => client.get(`/projects/${pid}/budget`).then((r) => r.data),
   createVersion: (pid, type, aiu = {}) => client.post(`/projects/${pid}/budget`, { type, ...aiu }).then((r) => r.data),
   updateAiu: (pid, budgetId, aiu) => client.put(`/projects/${pid}/budget/${budgetId}`, aiu).then((r) => r.data),
+  importFile: (pid, formData) => client.post(`/projects/${pid}/budget/import`, formData).then((r) => r.data),
   addItem: (pid, budgetId, data) => client.post(`/projects/${pid}/budget/${budgetId}/items`, data).then((r) => r.data),
   removeItem: (pid, budgetId, itemId) => client.delete(`/projects/${pid}/budget/${budgetId}/items/${itemId}`),
 };

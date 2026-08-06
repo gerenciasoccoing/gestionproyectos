@@ -24,6 +24,7 @@ function emptyRow(category, defaultPrestacionalPercent) {
 }
 
 const emptyForm = { name: '', unit: '', code: '', otherCosts: '0' };
+const PAGE_SIZE = 50;
 
 export default function ApuPage() {
   const [apus, setApus] = useState([]);
@@ -35,6 +36,9 @@ export default function ApuPage() {
   const [sections, setSections] = useState({ material: [], herramienta: [], personal: [], transporte: [] });
   const [collapsed, setCollapsed] = useState({ material: false, herramienta: false, personal: false, transporte: false });
   const [expandedId, setExpandedId] = useState(null);
+  const [expandedApu, setExpandedApu] = useState(null);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [error, setError] = useState('');
 
   const load = () => apuApi.list().then(setApus);
@@ -43,6 +47,26 @@ export default function ApuPage() {
     priceItemsApi.list().then(setPriceItems);
     companyApi.get().then((s) => setDefaultPrestacionalPercent(Number(s.defaultPrestacionalPercent ?? 70)));
   }, []);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return apus;
+    return apus.filter((a) => a.name.toLowerCase().includes(q) || (a.code || '').toLowerCase().includes(q));
+  }, [apus, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageApus = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => { setPage(1); }, [search]);
+
+  const toggleComponents = async (id) => {
+    if (expandedId === id) { setExpandedId(null); setExpandedApu(null); return; }
+    setExpandedId(id);
+    setExpandedApu(null);
+    const full = await apuApi.get(id);
+    setExpandedApu(full);
+  };
 
   const priceItemsByType = (type) => priceItems.filter((p) => p.type === type);
   const priceById = (id) => priceItems.find((p) => p.id === id);
@@ -262,15 +286,20 @@ export default function ApuPage() {
         </form>
       )}
 
+      <div className="flex flex-wrap gap-3 items-end mb-3">
+        <Input label="Buscar por nombre o código" value={search} onChange={(e) => setSearch(e.target.value)} className="w-64" />
+        <span className="text-sm text-gray-500 pb-1.5">{filtered.length} APU</span>
+      </div>
+
       <Table columns={['Código', 'Nombre', 'Unidad', 'Costo directo', '']}>
-        {apus.map((a) => (
+        {pageApus.map((a) => (
           <tr key={a.id} className="border-b border-gray-100">
             <td className="py-1 pr-3 text-gray-400">{a.code || '-'}</td>
             <td className="py-1 pr-3">{a.name}</td>
             <td className="py-1 pr-3">{a.unit}</td>
             <td className="py-1 pr-3 font-semibold">{money(a.directCost)}</td>
             <td className="py-1 pr-3 text-right flex gap-2 justify-end">
-              <Button variant="secondary" onClick={() => setExpandedId(expandedId === a.id ? null : a.id)}>
+              <Button variant="secondary" onClick={() => toggleComponents(a.id)}>
                 {expandedId === a.id ? 'Cerrar' : 'Componentes'}
               </Button>
               <Can module="cotizaciones" action="edit"><Button variant="secondary" onClick={() => startEdit(a)}>Editar</Button></Can>
@@ -278,10 +307,21 @@ export default function ApuPage() {
             </td>
           </tr>
         ))}
-        {apus.length === 0 && <tr><td colSpan={5} className="py-2 text-center text-gray-400">Sin APU registrados.</td></tr>}
+        {filtered.length === 0 && <tr><td colSpan={5} className="py-2 text-center text-gray-400">Sin APU que coincidan.</td></tr>}
       </Table>
 
-      {expandedId && <ApuComponents apu={apus.find((a) => a.id === expandedId)} />}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-3 text-sm">
+          <span className="text-gray-500">Página {currentPage} de {totalPages}</span>
+          <div className="flex gap-2">
+            <Button variant="secondary" disabled={currentPage <= 1} onClick={() => setPage((p) => p - 1)}>Anterior</Button>
+            <Button variant="secondary" disabled={currentPage >= totalPages} onClick={() => setPage((p) => p + 1)}>Siguiente</Button>
+          </div>
+        </div>
+      )}
+
+      {expandedId && !expandedApu && <p className="text-sm text-gray-400 mt-3">Cargando componentes…</p>}
+      {expandedApu && <ApuComponents apu={expandedApu} />}
     </Card>
   );
 }

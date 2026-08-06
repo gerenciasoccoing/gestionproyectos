@@ -1,7 +1,7 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { sequelize, APU, APUComponent, PriceItem } = require('../models');
-const { computeApuUnitCost } = require('../services/budgetService');
+const { computeApuUnitCost, computeSectionCosts } = require('../services/budgetService');
 
 // Valida y normaliza un componente recibido del formulario de APU (4 secciones) antes de guardarlo.
 function sanitizeComponent(raw, index) {
@@ -61,15 +61,23 @@ function sanitizeComponent(raw, index) {
   return component;
 }
 
+// Costo por APU calculado en memoria a partir de un único query con todos los componentes
+// (evita N+1: antes recalculaba cada APU con una consulta propia vía computeApuUnitCost,
+// lo que agota el pool de conexiones con miles de APU, ej. tras una importación masiva).
+// No incluye el detalle de componentes en la respuesta (puede haber miles de APU con varios
+// componentes cada uno): para eso está GET /apus/:id, que sí los trae.
 const list = asyncHandler(async (req, res) => {
   const apus = await APU.findAll({
     include: [{ model: APUComponent, as: 'components', include: [{ model: PriceItem, as: 'priceItem' }] }],
     order: [['name', 'ASC']],
   });
-  const withCosts = await Promise.all(apus.map(async (apu) => {
-    const { directCost, unitCost } = await computeApuUnitCost(apu.id);
-    return { ...apu.toJSON(), directCost, unitCost };
-  }));
+  const withCosts = apus.map((apu) => {
+    const sections = computeSectionCosts(apu.components);
+    const componentsCost = sections.materialsCost + sections.herramientasCost + sections.personalCost + sections.transporteCost;
+    const directCost = componentsCost + Number(apu.otherCosts || 0);
+    const { components, ...json } = apu.toJSON();
+    return { ...json, directCost, unitCost: directCost };
+  });
   res.json(withCosts);
 });
 
