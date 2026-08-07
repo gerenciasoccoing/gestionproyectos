@@ -30,6 +30,8 @@ const modelDefiners = [
   require('./LaborParameters'),
   require('./Severance'),
   require('./Expense'),
+  require('./ExpenseItem'),
+  require('./ExpenseTax'),
   require('./ExpenseBudget'),
   require('./Risk'),
   require('./CompanySettings'),

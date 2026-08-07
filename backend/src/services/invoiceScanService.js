@@ -87,7 +87,7 @@ function findMoneyOnLastLineWith(lines, keywordRegex, excludeRegex) {
   return lastMoneyOnLine(matches[matches.length - 1]);
 }
 
-const HEADER_LINE_RE = /^(factura|invoice|proveedor|raz[oó]n social|vendedor|emisor|nit|fecha|cliente|no\.?\s*\d|orden de compra|remisi[oó]n)\b/i;
+const HEADER_LINE_RE = /^(factura|invoice|proveedor|raz[oó]n social|vendedor|emisor|nit|fecha|cliente|no\.?\s*\d|orden de compra|remisi[oó]n|tel[eé]fono|cel(?:ular)?\.?|correo|e-?mail|direcci[oó]n)\b/i;
 
 function findVendorName(lines) {
   const labelLine = lines.find((l) => /^(proveedor|raz[oó]n social|vendedor|emisor)\b/i.test(l));
@@ -107,22 +107,91 @@ function findVendorName(lines) {
 }
 
 // Ítems: las líneas antes de la sección de subtotal/total, quitando las que ya se identificaron
-// como encabezado (proveedor, NIT, fecha, etc.). Se entrega como texto libre editable (no como
-// tabla estructurada): con OCR local el reconocimiento de columnas no es confiable, así que se
-// prioriza que el usuario pueda leerlo y corregirlo fácilmente.
-function findItemsText(lines, vendorLine) {
+// como encabezado (proveedor, NIT, fecha, etc.).
+function itemLines(lines, vendorLine) {
   const totalsIdx = lines.findIndex((l) => /(sub)?total/i.test(l));
   const end = totalsIdx >= 0 ? totalsIdx : lines.length;
-  const body = lines.slice(0, end).filter((l) => l !== vendorLine && !HEADER_LINE_RE.test(l));
-  return body.join('\n');
+  return lines.slice(0, end).filter((l) => l !== vendorLine && !HEADER_LINE_RE.test(l));
+}
+
+// Interpreta una línea de ítem como {descripción, cantidad, valor unitario, valor total}.
+// Convención asumida (la más común): los últimos 3 números de la línea son
+// cantidad, valor unitario y valor total, en ese orden; si solo hay 2, se asume cantidad=1.
+// Las fracciones tipo "1/2" (ej. "VARILLA 1/2 PULG") se tratan como texto, no como números.
+function parseItemLine(line) {
+  const masked = line.replace(/\d+\/\d+/g, (m) => '#'.repeat(m.length));
+  const numMatches = [...masked.matchAll(/\d[\d.,]*/g)];
+  if (!numMatches.length) return null;
+  const nums = numMatches.map((m) => m[0]);
+  const description = line.slice(0, numMatches[0].index).trim() || line.trim();
+
+  let quantity = 1;
+  let unitPrice = null;
+  let totalPrice = null;
+  if (nums.length === 1) {
+    totalPrice = parseMoneyLoose(nums[0]);
+    unitPrice = totalPrice;
+  } else if (nums.length === 2) {
+    unitPrice = parseMoneyLoose(nums[0]);
+    totalPrice = parseMoneyLoose(nums[1]);
+  } else {
+    const last3 = nums.slice(-3);
+    quantity = parseMoneyLoose(last3[0]) ?? 1;
+    unitPrice = parseMoneyLoose(last3[1]);
+    totalPrice = parseMoneyLoose(last3[2]);
+  }
+  if (!totalPrice) return null;
+  if (unitPrice === null) unitPrice = quantity ? totalPrice / quantity : totalPrice;
+  return { description, quantity, unitPrice, totalPrice };
+}
+
+function findItems(lines, vendorLine) {
+  return itemLines(lines, vendorLine).map(parseItemLine).filter(Boolean);
+}
+
+const TAX_LABELS = [
+  { name: 'IVA', re: /\bi\.?v\.?a\.?\b/i },
+  { name: 'ReteIVA', re: /\breteiva\b|\bretenci[oó]n\s+de\s+iva\b/i },
+  { name: 'ReteICA', re: /\breteica\b/i },
+  { name: 'ICA', re: /\bica\b/i },
+  { name: 'Retención en la fuente', re: /\bretefuente\b|\bretenci[oó]n\s+en\s+la\s+fuente\b/i },
+  { name: 'Impoconsumo', re: /\bimpoconsumo\b/i },
+];
+
+// Impuestos que componen la factura: una línea por cada tipo reconocido (IVA, ICA, retenciones,
+// etc.), con su tarifa (%) si aparece y el monto. Distinto tipos pueden coexistir en una factura.
+function findTaxes(lines) {
+  const taxes = [];
+  const used = new Set();
+  for (const { name, re } of TAX_LABELS) {
+    const line = lines.find((l, i) => re.test(l) && !used.has(i) && !((name === 'IVA') && /reteiva/i.test(l)) && !((name === 'ICA') && /reteica/i.test(l)));
+    if (!line) continue;
+    used.add(lines.indexOf(line));
+    const amount = lastMoneyOnLine(line);
+    if (amount === null) continue;
+    const rateMatch = line.match(/(\d{1,2}(?:[.,]\d+)?)\s*%/);
+    taxes.push({ name, rate: rateMatch ? parseFloat(rateMatch[1].replace(',', '.')) : null, amount });
+  }
+  return taxes;
+}
+
+function findPhone(text) {
+  const m = text.match(/tel[eé]fono[^\d]{0,10}(\+?\d[\d\s-]{6,}\d)/i) || text.match(/\bcel(?:ular)?\.?[^\d]{0,10}(\+?\d[\d\s-]{6,}\d)/i);
+  return m ? m[1].trim() : null;
+}
+
+function findEmail(text) {
+  const m = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  return m ? m[0] : null;
 }
 
 function parseInvoiceText(text) {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
 
   const subtotal = findMoneyOnLastLineWith(lines, /subtotal/i);
-  const taxAmount = findMoneyOnLastLineWith(lines, /i\.?v\.?a\.?\b/i);
   const total = findMoneyOnLastLineWith(lines, /\btotal\b/i, /subtotal/i);
+  const taxes = findTaxes(lines);
+  const taxAmount = taxes.length ? taxes.reduce((s, t) => s + t.amount, 0) : null;
 
   const nitMatch = text.match(/n\.?i\.?t\.?\s*:?\s*([\d.,-]{5,})/i);
   const vendor = findVendorName(lines);
@@ -130,11 +199,14 @@ function parseInvoiceText(text) {
   return {
     vendorName: vendor.name,
     vendorNit: nitMatch ? nitMatch[1].trim() : null,
+    vendorPhone: findPhone(text),
+    vendorEmail: findEmail(text),
     date: findDate(text),
     subtotal,
     taxAmount,
+    taxes,
     total,
-    itemsText: findItemsText(lines, vendor.line),
+    items: findItems(lines, vendor.line),
     rawText: text,
   };
 }

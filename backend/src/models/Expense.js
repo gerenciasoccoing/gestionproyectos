@@ -15,7 +15,10 @@ module.exports = (sequelize) => {
     // Datos opcionales extraídos (o digitados) de la factura de soporte.
     vendorName: { type: DataTypes.STRING, allowNull: true },
     vendorNit: { type: DataTypes.STRING, allowNull: true },
+    vendorPhone: { type: DataTypes.STRING, allowNull: true },
+    vendorEmail: { type: DataTypes.STRING, allowNull: true },
     subtotal: { type: DataTypes.DECIMAL(18, 2), allowNull: true, validate: { min: 0 } },
+    // Suma de los impuestos (ver ExpenseTax para el detalle por impuesto).
     taxAmount: { type: DataTypes.DECIMAL(18, 2), allowNull: true, validate: { min: 0 } },
     source: { type: DataTypes.ENUM('manual', 'purchase_receipt', 'liquidacion'), defaultValue: 'manual' },
     sourceId: { type: DataTypes.UUID, allowNull: true },
@@ -24,6 +27,8 @@ module.exports = (sequelize) => {
 
   Expense.associate = (models) => {
     Expense.belongsTo(models.Project, { foreignKey: 'projectId' });
+    Expense.hasMany(models.ExpenseItem, { foreignKey: 'expenseId', as: 'items', onDelete: 'CASCADE' });
+    Expense.hasMany(models.ExpenseTax, { foreignKey: 'expenseId', as: 'taxes', onDelete: 'CASCADE' });
   };
 
   return Expense;

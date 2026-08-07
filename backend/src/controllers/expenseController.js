@@ -1,11 +1,49 @@
 const { Op } = require('sequelize');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { Expense, ExpenseBudget } = require('../models');
+const { sequelize, Expense, ExpenseItem, ExpenseTax, ExpenseBudget } = require('../models');
 const { relativePath } = require('../middleware/upload');
 const { scanInvoice } = require('../services/invoiceScanService');
 
 const CATEGORIES = ['mano_obra', 'materiales', 'equipos', 'viaticos', 'imprevistos'];
+const EXPENSE_INCLUDE = [
+  { model: ExpenseItem, as: 'items' },
+  { model: ExpenseTax, as: 'taxes' },
+];
+
+// items/taxes llegan como JSON string (el formulario es multipart/form-data por el archivo
+// adjunto). Se valida y normaliza cada fila; una fila inválida se descarta en vez de abortar.
+function parseJsonArray(raw) {
+  if (raw === undefined || raw === null || raw === '') return [];
+  if (Array.isArray(raw)) return raw;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    throw new ApiError(400, 'items/taxes debe ser un JSON array válido');
+  }
+}
+
+function sanitizeItems(raw) {
+  return parseJsonArray(raw)
+    .filter((it) => it && it.description && String(it.description).trim())
+    .map((it) => ({
+      description: String(it.description).trim(),
+      quantity: Number(it.quantity) || 0,
+      unitPrice: Number(it.unitPrice) || 0,
+      totalPrice: Number(it.totalPrice) || 0,
+    }));
+}
+
+function sanitizeTaxes(raw) {
+  return parseJsonArray(raw)
+    .filter((t) => t && t.name && String(t.name).trim())
+    .map((t) => ({
+      name: String(t.name).trim(),
+      rate: t.rate === '' || t.rate === undefined || t.rate === null ? null : Number(t.rate),
+      amount: Number(t.amount) || 0,
+    }));
+}
 
 const list = asyncHandler(async (req, res) => {
   const { from, to, category } = req.query;
@@ -16,31 +54,43 @@ const list = asyncHandler(async (req, res) => {
     if (from) where.date[Op.gte] = from;
     if (to) where.date[Op.lte] = to;
   }
-  const expenses = await Expense.findAll({ where, order: [['date', 'DESC']] });
+  const expenses = await Expense.findAll({ where, include: EXPENSE_INCLUDE, order: [['date', 'DESC']] });
   res.json(expenses);
 });
 
 const create = asyncHandler(async (req, res) => {
-  const { category, amount, date, description, vendorName, vendorNit, subtotal, taxAmount } = req.body;
+  const { category, amount, date, description, vendorName, vendorNit, vendorPhone, vendorEmail, subtotal, taxAmount } = req.body;
   if (!category || !CATEGORIES.includes(category)) throw new ApiError(400, `category debe ser uno de: ${CATEGORIES.join(', ')}`);
   if (amount === undefined || Number(amount) < 0) throw new ApiError(400, 'amount es obligatorio y no puede ser negativo');
   if (!date) throw new ApiError(400, 'date es obligatorio');
 
-  const expense = await Expense.create({
-    projectId: req.params.projectId,
-    category,
-    amount,
-    date,
-    description,
-    vendorName: vendorName || null,
-    vendorNit: vendorNit || null,
-    subtotal: subtotal || null,
-    taxAmount: taxAmount || null,
-    supportFilePath: relativePath(req.file),
-    source: 'manual',
-    createdBy: req.user.id,
+  const items = sanitizeItems(req.body.items);
+  const taxes = sanitizeTaxes(req.body.taxes);
+
+  const expense = await sequelize.transaction(async (t) => {
+    const created = await Expense.create({
+      projectId: req.params.projectId,
+      category,
+      amount,
+      date,
+      description,
+      vendorName: vendorName || null,
+      vendorNit: vendorNit || null,
+      vendorPhone: vendorPhone || null,
+      vendorEmail: vendorEmail || null,
+      subtotal: subtotal || null,
+      taxAmount: taxAmount || null,
+      supportFilePath: relativePath(req.file),
+      source: 'manual',
+      createdBy: req.user.id,
+    }, { transaction: t });
+    if (items.length) await ExpenseItem.bulkCreate(items.map((it) => ({ ...it, expenseId: created.id })), { transaction: t });
+    if (taxes.length) await ExpenseTax.bulkCreate(taxes.map((tx) => ({ ...tx, expenseId: created.id })), { transaction: t });
+    return created;
   });
-  res.status(201).json(expense);
+
+  const full = await Expense.findByPk(expense.id, { include: EXPENSE_INCLUDE });
+  res.status(201).json(full);
 });
 
 // Lee una factura (PDF o imagen) subida y devuelve los datos que se lograron reconocer, para
@@ -58,7 +108,7 @@ const update = asyncHandler(async (req, res) => {
   if (!expense) throw new ApiError(404, 'Gasto no encontrado');
   if (expense.source !== 'manual') throw new ApiError(400, 'Este gasto se generó automáticamente y no puede editarse manualmente');
 
-  const { category, amount, date, description, vendorName, vendorNit, subtotal, taxAmount } = req.body;
+  const { category, amount, date, description, vendorName, vendorNit, vendorPhone, vendorEmail, subtotal, taxAmount } = req.body;
   if (category !== undefined) {
     if (!CATEGORIES.includes(category)) throw new ApiError(400, `category debe ser uno de: ${CATEGORIES.join(', ')}`);
     expense.category = category;
@@ -71,11 +121,29 @@ const update = asyncHandler(async (req, res) => {
   if (description !== undefined) expense.description = description;
   if (vendorName !== undefined) expense.vendorName = vendorName || null;
   if (vendorNit !== undefined) expense.vendorNit = vendorNit || null;
+  if (vendorPhone !== undefined) expense.vendorPhone = vendorPhone || null;
+  if (vendorEmail !== undefined) expense.vendorEmail = vendorEmail || null;
   if (subtotal !== undefined) expense.subtotal = subtotal || null;
   if (taxAmount !== undefined) expense.taxAmount = taxAmount || null;
   if (req.file) expense.supportFilePath = relativePath(req.file);
-  await expense.save();
-  res.json(expense);
+
+  const items = req.body.items !== undefined ? sanitizeItems(req.body.items) : null;
+  const taxes = req.body.taxes !== undefined ? sanitizeTaxes(req.body.taxes) : null;
+
+  await sequelize.transaction(async (t) => {
+    await expense.save({ transaction: t });
+    if (items) {
+      await ExpenseItem.destroy({ where: { expenseId: expense.id }, transaction: t });
+      if (items.length) await ExpenseItem.bulkCreate(items.map((it) => ({ ...it, expenseId: expense.id })), { transaction: t });
+    }
+    if (taxes) {
+      await ExpenseTax.destroy({ where: { expenseId: expense.id }, transaction: t });
+      if (taxes.length) await ExpenseTax.bulkCreate(taxes.map((tx) => ({ ...tx, expenseId: expense.id })), { transaction: t });
+    }
+  });
+
+  const full = await Expense.findByPk(expense.id, { include: EXPENSE_INCLUDE });
+  res.json(full);
 });
 
 const remove = asyncHandler(async (req, res) => {
