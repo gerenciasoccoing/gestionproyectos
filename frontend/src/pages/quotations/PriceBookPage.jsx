@@ -82,7 +82,7 @@ export default function PriceBookPage() {
             <Input label="Código (opcional)" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
             <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
             <Input label="Unidad" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} required />
-            <Input label="Valor" type="number" min="0" value={form.currentValue} onChange={(e) => setForm({ ...form, currentValue: e.target.value })} required />
+            <Input label="Valor" type="number" min="0" step="0.01" value={form.currentValue} onChange={(e) => setForm({ ...form, currentValue: e.target.value })} required />
             <Button type="submit" className="col-span-full">Guardar</Button>
             <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
           </form>
@@ -110,7 +110,7 @@ export default function PriceBookPage() {
               <td className="py-1 pr-3">
                 <Can module="cotizaciones" action="edit">
                   <div className="flex flex-wrap gap-2">
-                    <Input type="number" min="0" placeholder="Nuevo valor" value={editing[it.id] || ''} onChange={(e) => setEditing((s) => ({ ...s, [it.id]: e.target.value }))} />
+                    <Input type="number" min="0" step="0.01" placeholder="Nuevo valor" value={editing[it.id] || ''} onChange={(e) => setEditing((s) => ({ ...s, [it.id]: e.target.value }))} />
                     <Button onClick={() => updateValue(it.id)}>Actualizar</Button>
                   </div>
                 </Can>

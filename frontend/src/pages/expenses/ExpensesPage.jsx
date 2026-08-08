@@ -167,7 +167,7 @@ export default function ExpensesPage() {
               <Select label="Categoría" value={budgetForm.category} onChange={(e) => setBudgetForm({ ...budgetForm, category: e.target.value })}>
                 {CATEGORIES.map((c) => <option key={c} value={c}>{LABELS[c]}</option>)}
               </Select>
-              <Input label="Valor presupuestado" type="number" min="0" value={budgetForm.budgetedAmount} onChange={(e) => setBudgetForm({ ...budgetForm, budgetedAmount: e.target.value })} required />
+              <Input label="Valor presupuestado" type="number" min="0" step="0.01" value={budgetForm.budgetedAmount} onChange={(e) => setBudgetForm({ ...budgetForm, budgetedAmount: e.target.value })} required />
               <Button type="submit">Fijar presupuesto</Button>
             </form>
           </Can>
@@ -200,7 +200,7 @@ export default function ExpensesPage() {
               <Select label="Categoría" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
                 {CATEGORIES.map((c) => <option key={c} value={c}>{LABELS[c]}</option>)}
               </Select>
-              <Input label="Valor total" type="number" min="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
+              <Input label="Valor total" type="number" min="0" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
               <Input label="Fecha" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
               <Input label="Proveedor" value={form.vendorName} onChange={(e) => setForm({ ...form, vendorName: e.target.value })} />
               <Input label="NIT proveedor" value={form.vendorNit} onChange={(e) => setForm({ ...form, vendorNit: e.target.value })} />
@@ -219,8 +219,8 @@ export default function ExpensesPage() {
                   <tr key={idx} className="border-b border-gray-100">
                     <td className="py-1 pr-2"><Input value={it.description} onChange={(e) => updateItem(idx, 'description', e.target.value)} /></td>
                     <td className="py-1 pr-2 w-28"><Input type="number" min="0" step="any" value={it.quantity} onChange={(e) => updateItem(idx, 'quantity', e.target.value)} /></td>
-                    <td className="py-1 pr-2 w-36"><Input type="number" min="0" value={it.unitPrice} onChange={(e) => updateItem(idx, 'unitPrice', e.target.value)} /></td>
-                    <td className="py-1 pr-2 w-36"><Input type="number" min="0" value={it.totalPrice} onChange={(e) => updateItem(idx, 'totalPrice', e.target.value)} /></td>
+                    <td className="py-1 pr-2 w-36"><Input type="number" min="0" step="0.01" value={it.unitPrice} onChange={(e) => updateItem(idx, 'unitPrice', e.target.value)} /></td>
+                    <td className="py-1 pr-2 w-36"><Input type="number" min="0" step="0.01" value={it.totalPrice} onChange={(e) => updateItem(idx, 'totalPrice', e.target.value)} /></td>
                     <td className="py-1 text-right"><Button type="button" variant="danger" onClick={() => removeItem(idx)}>Quitar</Button></td>
                   </tr>
                 ))}
@@ -242,7 +242,7 @@ export default function ExpensesPage() {
                   <tr key={idx} className="border-b border-gray-100">
                     <td className="py-1 pr-2"><Input list="tax-name-suggestions" value={t.name} onChange={(e) => updateTax(idx, 'name', e.target.value)} /></td>
                     <td className="py-1 pr-2 w-28"><Input type="number" min="0" step="any" value={t.rate} onChange={(e) => updateTax(idx, 'rate', e.target.value)} /></td>
-                    <td className="py-1 pr-2 w-36"><Input type="number" min="0" value={t.amount} onChange={(e) => updateTax(idx, 'amount', e.target.value)} /></td>
+                    <td className="py-1 pr-2 w-36"><Input type="number" min="0" step="0.01" value={t.amount} onChange={(e) => updateTax(idx, 'amount', e.target.value)} /></td>
                     <td className="py-1 text-right"><Button type="button" variant="danger" onClick={() => removeTax(idx)}>Quitar</Button></td>
                   </tr>
                 ))}

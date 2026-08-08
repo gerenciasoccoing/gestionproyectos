@@ -51,8 +51,8 @@ export default function PersonnelListPage() {
           <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           <Input label="Rol/Cargo" value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} required />
           <Input label="Fecha de ingreso" type="date" value={form.entryDate} onChange={(e) => setForm({ ...form, entryDate: e.target.value })} required />
-          <Input label="Dedicación (horas)" type="number" min="0" value={form.dedicationHours} onChange={(e) => setForm({ ...form, dedicationHours: e.target.value })} />
-          <Input label="Salario mensual" type="number" min="0" value={form.salaryValue} onChange={(e) => setForm({ ...form, salaryValue: e.target.value })} required />
+          <Input label="Dedicación (horas)" type="number" min="0" step="0.01" value={form.dedicationHours} onChange={(e) => setForm({ ...form, dedicationHours: e.target.value })} />
+          <Input label="Salario mensual" type="number" min="0" step="0.01" value={form.salaryValue} onChange={(e) => setForm({ ...form, salaryValue: e.target.value })} required />
           <Input label="Contrato laboral (archivo)" type="file" onChange={(e) => setFile(e.target.files[0])} />
           <Button type="submit" className="col-span-full">Guardar</Button>
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>

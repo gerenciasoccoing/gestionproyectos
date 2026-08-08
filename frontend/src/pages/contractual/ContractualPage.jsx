@@ -62,7 +62,7 @@ function ContractsSection({ projectId, contracts, onChange }) {
       {showForm && (
         <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
           <Input label="Objeto del contrato" value={form.object} onChange={(e) => setForm({ ...form, object: e.target.value })} required className="col-span-full" />
-          <Input label="Valor" type="number" min="0" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} required />
+          <Input label="Valor" type="number" min="0" step="0.01" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} required />
           <Input label="Archivo (PDF/Word)" type="file" onChange={(e) => setFile(e.target.files[0])} />
           <Input label="Fecha de firma" type="date" value={form.signedDate} onChange={(e) => setForm({ ...form, signedDate: e.target.value })} required />
           <Input label="Fecha de terminación" type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} required />
@@ -127,7 +127,7 @@ function PoliciesSection({ projectId, policies, onChange }) {
       {showForm && (
         <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
           <Input label="Tipo de garantía" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} required />
-          <Input label="Valor" type="number" min="0" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} required />
+          <Input label="Valor" type="number" min="0" step="0.01" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} required />
           <Input label="Inicio de cobertura" type="date" value={form.coverageStart} onChange={(e) => setForm({ ...form, coverageStart: e.target.value })} required />
           <Input label="Fin de cobertura" type="date" value={form.coverageEnd} onChange={(e) => setForm({ ...form, coverageEnd: e.target.value })} required />
           <Input label="Archivo" type="file" onChange={(e) => setFile(e.target.files[0])} />

@@ -41,13 +41,13 @@ export default function LaborParametersPage() {
       {showForm && (
         <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
           <Input label="Vigente desde" type="date" value={form.effectiveDate} onChange={(e) => setForm({ ...form, effectiveDate: e.target.value })} required />
-          <Input label="SMLV" type="number" min="0" value={form.smlv} onChange={(e) => setForm({ ...form, smlv: e.target.value })} required />
-          <Input label="Auxilio de transporte" type="number" min="0" value={form.auxTransporte} onChange={(e) => setForm({ ...form, auxTransporte: e.target.value })} />
-          <Input label="Tope aux. transporte (en SMLV)" type="number" min="0" value={form.topeAuxTransporteSalarios} onChange={(e) => setForm({ ...form, topeAuxTransporteSalarios: e.target.value })} />
-          <Input label="Divisor cesantías" type="number" min="1" value={form.cesantiasDivisor} onChange={(e) => setForm({ ...form, cesantiasDivisor: e.target.value })} />
-          <Input label="% intereses cesantías" type="number" min="0" value={form.interesesCesantiasPercent} onChange={(e) => setForm({ ...form, interesesCesantiasPercent: e.target.value })} />
-          <Input label="Divisor prima" type="number" min="1" value={form.primaDivisor} onChange={(e) => setForm({ ...form, primaDivisor: e.target.value })} />
-          <Input label="Divisor vacaciones" type="number" min="1" value={form.vacacionesDivisor} onChange={(e) => setForm({ ...form, vacacionesDivisor: e.target.value })} />
+          <Input label="SMLV" type="number" min="0" step="0.01" value={form.smlv} onChange={(e) => setForm({ ...form, smlv: e.target.value })} required />
+          <Input label="Auxilio de transporte" type="number" min="0" step="0.01" value={form.auxTransporte} onChange={(e) => setForm({ ...form, auxTransporte: e.target.value })} />
+          <Input label="Tope aux. transporte (en SMLV)" type="number" min="0" step="0.01" value={form.topeAuxTransporteSalarios} onChange={(e) => setForm({ ...form, topeAuxTransporteSalarios: e.target.value })} />
+          <Input label="Divisor cesantías" type="number" min="1" step="0.01" value={form.cesantiasDivisor} onChange={(e) => setForm({ ...form, cesantiasDivisor: e.target.value })} />
+          <Input label="% intereses cesantías" type="number" min="0" step="0.01" value={form.interesesCesantiasPercent} onChange={(e) => setForm({ ...form, interesesCesantiasPercent: e.target.value })} />
+          <Input label="Divisor prima" type="number" min="1" step="0.01" value={form.primaDivisor} onChange={(e) => setForm({ ...form, primaDivisor: e.target.value })} />
+          <Input label="Divisor vacaciones" type="number" min="1" step="0.01" value={form.vacacionesDivisor} onChange={(e) => setForm({ ...form, vacacionesDivisor: e.target.value })} />
           <Input label="Notas" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="col-span-full" />
           <Button type="submit" className="col-span-full">Guardar nueva versión</Button>
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>

@@ -126,7 +126,7 @@ function PaymentsSection({ projectId, employee, onChange }) {
         <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3 items-end">
           <Input label="Fecha" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
           <Input label="Periodo" placeholder="Ej: Julio 2026" value={form.periodLabel} onChange={(e) => setForm({ ...form, periodLabel: e.target.value })} required />
-          <Input label="Monto" type="number" min="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
+          <Input label="Monto" type="number" min="0" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
           <Input label="Comprobante" type="file" onChange={(e) => setFile(e.target.files[0])} required />
           <Button type="submit" className="col-span-full">Adjuntar comprobante</Button>
         </form>

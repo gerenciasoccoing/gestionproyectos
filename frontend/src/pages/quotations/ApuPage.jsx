@@ -271,7 +271,7 @@ export default function ApuPage() {
           <div className="mt-4 flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-t pt-3">
             <Input
               label="Otros costos directos (opcional)"
-              type="number" min="0"
+              type="number" min="0" step="0.01"
               value={form.otherCosts}
               onChange={(e) => setForm({ ...form, otherCosts: e.target.value })}
               className="max-w-xs"
