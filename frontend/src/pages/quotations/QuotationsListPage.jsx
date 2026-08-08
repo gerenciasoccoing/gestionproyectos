@@ -1,24 +1,33 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { quotationsApi } from '../../api';
-import { Card, Button, Input, TextArea, Table, Badge, ErrorText, extractError } from '../../components/ui';
+import { quotationsApi, thirdPartiesApi } from '../../api';
+import { Card, Button, Input, SearchSelect, TextArea, Table, Badge, ErrorText, extractError } from '../../components/ui';
 import Can from '../../components/Can';
 
 export default function QuotationsListPage() {
   const [quotations, setQuotations] = useState([]);
+  const [clients, setClients] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const emptyForm = { clientName: '', projectNameProposed: '', date: '', validityDays: 30, paymentTerms: '', adminPercent: '0', imprevistosPercent: '0', utilidadPercent: '0' };
+  const emptyForm = { clientName: '', clientId: '', projectNameProposed: '', date: '', validityDays: 30, paymentTerms: '', adminPercent: '0', imprevistosPercent: '0', utilidadPercent: '0' };
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
 
   const load = () => quotationsApi.list().then(setQuotations);
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    thirdPartiesApi.list({ type: 'cliente' }).then(setClients);
+  }, []);
+
+  const pickClient = (clientId) => {
+    const c = clients.find((x) => x.id === clientId);
+    setForm((f) => ({ ...f, clientId, clientName: c ? c.name : f.clientName }));
+  };
 
   const submit = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      await quotationsApi.create(form);
+      await quotationsApi.create({ ...form, clientId: form.clientId || undefined });
       setForm(emptyForm);
       setShowForm(false);
       load();
@@ -37,7 +46,14 @@ export default function QuotationsListPage() {
     }>
       {showForm && (
         <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-          <Input label="Cliente" value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })} required />
+          <SearchSelect
+            label="Cliente registrado (opcional)"
+            options={clients.map((c) => ({ value: c.id, label: c.name }))}
+            value={form.clientId}
+            onChange={pickClient}
+            placeholder="-- ninguno / digitar manualmente --"
+          />
+          <Input label="Cliente" value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value, clientId: '' })} required />
           <Input label="Nombre del proyecto propuesto" value={form.projectNameProposed} onChange={(e) => setForm({ ...form, projectNameProposed: e.target.value })} required />
           <Input label="Fecha" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
           <Input label="Validez (días)" type="number" min="1" value={form.validityDays} onChange={(e) => setForm({ ...form, validityDays: e.target.value })} />

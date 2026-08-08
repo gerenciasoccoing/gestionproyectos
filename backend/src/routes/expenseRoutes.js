@@ -7,6 +7,10 @@ const { makeUploader } = require('../middleware/upload');
 const expenseController = require('../controllers/expenseController');
 
 const upload = makeUploader('expenses', 'any');
+const uploadFiles = upload.fields([
+  { name: 'invoiceFile', maxCount: 1 },
+  { name: 'paymentReceiptFile', maxCount: 1 },
+]);
 
 // En memoria (no se persiste): solo se usa para leer la factura y descartarla; el archivo
 // definitivo se vuelve a subir (a disco, vía `upload`) cuando el usuario confirma el gasto.
@@ -28,8 +32,8 @@ router.get('/summary', requirePermission('gastos', 'view'), expenseController.su
 router.post('/budget', requirePermission('gastos', 'edit'), expenseController.setBudget);
 router.post('/scan', requirePermission('gastos', 'create'), scanUpload.single('file'), expenseController.scan);
 router.get('/', requirePermission('gastos', 'view'), expenseController.list);
-router.post('/', requirePermission('gastos', 'create'), upload.single('file'), expenseController.create);
-router.put('/:id', requirePermission('gastos', 'edit'), upload.single('file'), expenseController.update);
+router.post('/', requirePermission('gastos', 'create'), uploadFiles, expenseController.create);
+router.put('/:id', requirePermission('gastos', 'edit'), uploadFiles, expenseController.update);
 router.delete('/:id', requirePermission('gastos', 'delete'), expenseController.remove);
 
 module.exports = router;

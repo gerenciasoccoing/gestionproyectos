@@ -11,6 +11,7 @@ const MODULES = [
   'gastos',
   'informes',
   'cotizaciones',
+  'terceros',
 ];
 
 const ACTIONS = ['view', 'create', 'edit', 'delete'];
@@ -35,6 +36,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
     'gastos:view',
     'gastos:create',
     'informes:view',
+    'terceros:view',
   ],
   financiero: [
     'proyectos:view',
@@ -49,6 +51,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
     'gastos:edit',
     'informes:view',
     'cotizaciones:view',
+    'terceros:view',
   ],
   comercial: [
     'proyectos:view',
@@ -56,6 +59,9 @@ const DEFAULT_ROLE_PERMISSIONS = {
     'cotizaciones:create',
     'cotizaciones:edit',
     'informes:view',
+    'terceros:view',
+    'terceros:create',
+    'terceros:edit',
   ],
 };
 

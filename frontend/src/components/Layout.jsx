@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { to: '/quotations', label: 'Cotizaciones' },
   { to: '/price-book', label: 'Base de Precios' },
   { to: '/apus', label: 'APU' },
+  { to: '/third-parties', label: 'Proveedores y Clientes' },
 ];
 
 export default function Layout() {

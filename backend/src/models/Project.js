@@ -5,6 +5,7 @@ module.exports = (sequelize) => {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
     name: { type: DataTypes.STRING, allowNull: false },
     client: { type: DataTypes.STRING },
+    clientId: { type: DataTypes.UUID, allowNull: true }, // vínculo opcional a Terceros (cliente)
     description: { type: DataTypes.TEXT },
     status: {
       type: DataTypes.ENUM('activo', 'suspendido', 'terminado', 'liquidado'),
@@ -18,6 +19,7 @@ module.exports = (sequelize) => {
   Project.associate = (models) => {
     Project.belongsToMany(models.User, { through: models.ProjectUser, foreignKey: 'projectId' });
     Project.belongsTo(models.Quotation, { foreignKey: 'quotationId', as: 'quotation' });
+    Project.belongsTo(models.ThirdParty, { foreignKey: 'clientId', as: 'clientParty' });
     Project.hasMany(models.Contract, { foreignKey: 'projectId', as: 'contracts' });
     Project.hasMany(models.Policy, { foreignKey: 'projectId', as: 'policies' });
     Project.hasMany(models.Minute, { foreignKey: 'projectId', as: 'minutes' });

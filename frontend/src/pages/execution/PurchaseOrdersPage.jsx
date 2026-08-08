@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { purchaseOrdersApi, budgetApi } from '../../api';
-import { Card, Button, Input, SearchSelect, Table, Badge, ErrorText, extractError, money } from '../../components/ui';
+import { purchaseOrdersApi, budgetApi, thirdPartiesApi } from '../../api';
+import { Card, Button, Input, Select, SearchSelect, Table, Badge, ErrorText, extractError, money } from '../../components/ui';
 import Can from '../../components/Can';
 
 const STATUS_COLORS = {
@@ -11,20 +11,25 @@ const STATUS_COLORS = {
   cerrada_con_faltantes: 'red',
 };
 
+const CATEGORIES = ['mano_obra', 'materiales', 'equipos', 'viaticos', 'imprevistos'];
+const CATEGORY_LABELS = { mano_obra: 'Mano de obra', materiales: 'Materiales', equipos: 'Equipos', viaticos: 'Viáticos', imprevistos: 'Imprevistos' };
+
 export default function PurchaseOrdersPage() {
   const { projectId } = useOutletContext();
   const [orders, setOrders] = useState([]);
   const [budgetItems, setBudgetItems] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
-  const [form, setForm] = useState({ supplier: '', date: '', items: [{ name: '', unit: '', quantityOrdered: '', unitPrice: '', budgetItemId: '' }] });
+  const [form, setForm] = useState({ supplier: '', supplierId: '', date: '', items: [{ name: '', unit: '', quantityOrdered: '', unitPrice: '', budgetItemId: '' }] });
   const [report, setReport] = useState(null);
 
   const load = () => purchaseOrdersApi.list(projectId).then(setOrders);
   useEffect(() => {
     load();
     budgetApi.get(projectId).then((d) => setBudgetItems(d.items));
+    thirdPartiesApi.list({ type: 'proveedor' }).then(setSuppliers);
   }, [projectId]);
 
   const updateItemRow = (idx, field, value) => {
@@ -37,17 +42,23 @@ export default function PurchaseOrdersPage() {
   const addRow = () => setForm((f) => ({ ...f, items: [...f.items, { name: '', unit: '', quantityOrdered: '', unitPrice: '', budgetItemId: '' }] }));
   const removeRow = (idx) => setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
 
+  const pickSupplier = (supplierId) => {
+    const s = suppliers.find((x) => x.id === supplierId);
+    setForm((f) => ({ ...f, supplierId, supplier: s ? s.name : f.supplier }));
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setError('');
     try {
       const payload = {
         supplier: form.supplier,
+        supplierId: form.supplierId || undefined,
         date: form.date,
         items: form.items.map((it) => ({ ...it, budgetItemId: it.budgetItemId || undefined })),
       };
       await purchaseOrdersApi.create(projectId, payload);
-      setForm({ supplier: '', date: '', items: [{ name: '', unit: '', quantityOrdered: '', unitPrice: '', budgetItemId: '' }] });
+      setForm({ supplier: '', supplierId: '', date: '', items: [{ name: '', unit: '', quantityOrdered: '', unitPrice: '', budgetItemId: '' }] });
       setShowForm(false);
       load();
     } catch (err) {
@@ -69,8 +80,15 @@ export default function PurchaseOrdersPage() {
       }>
         {showForm && (
           <form onSubmit={submit} className="mb-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-              <Input label="Proveedor" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} required />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+              <SearchSelect
+                label="Proveedor registrado (opcional)"
+                options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                value={form.supplierId}
+                onChange={pickSupplier}
+                placeholder="-- ninguno / digitar manualmente --"
+              />
+              <Input label="Proveedor" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value, supplierId: '' })} required />
               <Input label="Fecha" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
             </div>
             <p className="text-sm font-medium text-gray-600 mb-2">Ítems</p>
@@ -96,13 +114,14 @@ export default function PurchaseOrdersPage() {
           </form>
         )}
 
-        <Table columns={['Proveedor', 'Fecha', 'Estado', 'Ítems', '']}>
+        <Table columns={['Proveedor', 'Fecha', 'Estado', 'Ítems', 'Gastos', '']}>
           {orders.map((o) => (
             <tr key={o.id} className="border-b border-gray-100">
               <td className="py-2 pr-3">{o.supplier}</td>
               <td className="py-2 pr-3">{o.date}</td>
               <td className="py-2 pr-3"><Badge color={STATUS_COLORS[o.status]}>{o.status}</Badge></td>
               <td className="py-2 pr-3">{o.items?.length || 0}</td>
+              <td className="py-2 pr-3">{o.expenseId ? <Badge color="green">Trasladada</Badge> : <span className="text-gray-400 text-xs">-</span>}</td>
               <td className="py-2 pr-3 text-right">
                 <Button variant="secondary" onClick={() => setExpandedId(expandedId === o.id ? null : o.id)}>
                   {expandedId === o.id ? 'Cerrar' : 'Detalle'}
@@ -110,11 +129,11 @@ export default function PurchaseOrdersPage() {
               </td>
             </tr>
           ))}
-          {orders.length === 0 && <tr><td colSpan={5} className="py-3 text-center text-gray-400">Sin órdenes de compra.</td></tr>}
+          {orders.length === 0 && <tr><td colSpan={6} className="py-3 text-center text-gray-400">Sin órdenes de compra.</td></tr>}
         </Table>
       </Card>
 
-      {expandedId && <OrderDetail projectId={projectId} orderId={expandedId} onChange={load} />}
+      {expandedId && <OrderDetail projectId={projectId} orderId={expandedId} budgetItems={budgetItems} onChange={load} />}
 
       {report && (
         <Card title="Reporte consolidado de compras">
@@ -139,10 +158,14 @@ export default function PurchaseOrdersPage() {
   );
 }
 
-function OrderDetail({ projectId, orderId, onChange }) {
+function OrderDetail({ projectId, orderId, budgetItems, onChange }) {
   const [order, setOrder] = useState(null);
   const [receiptForms, setReceiptForms] = useState({});
   const [closureReason, setClosureReason] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [convertForm, setConvertForm] = useState({ category: 'materiales', date: '' });
+  const [showConvert, setShowConvert] = useState(false);
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
 
@@ -164,6 +187,26 @@ function OrderDetail({ projectId, orderId, onChange }) {
     }
   };
 
+  const startEdit = (it) => {
+    setEditingId(it.id);
+    setEditForm({ name: it.name, unit: it.unit, quantityOrdered: it.quantityOrdered, unitPrice: it.unitPrice, budgetItemId: it.budgetItemId || '' });
+  };
+
+  const saveEdit = async (itemId) => {
+    setError('');
+    try {
+      await purchaseOrdersApi.updateItem(projectId, orderId, itemId, {
+        ...editForm,
+        budgetItemId: editForm.budgetItemId || null,
+      });
+      setEditingId(null);
+      load();
+      onChange();
+    } catch (err) {
+      setError(extractError(err));
+    }
+  };
+
   const close = async (withReason) => {
     setError('');
     try {
@@ -175,30 +218,84 @@ function OrderDetail({ projectId, orderId, onChange }) {
     }
   };
 
+  const convertToExpense = async () => {
+    setError('');
+    if (!confirm('¿Trasladar todos los ítems de esta orden a un gasto del proyecto? Esta acción no se puede deshacer ni repetir para la misma orden.')) return;
+    try {
+      await purchaseOrdersApi.convertToExpense(projectId, orderId, convertForm);
+      setShowConvert(false);
+      load();
+      onChange();
+    } catch (err) {
+      setError(extractError(err));
+    }
+  };
+
   if (!order) return null;
   const canClose = order.status !== 'cerrada' && order.status !== 'cerrada_con_faltantes';
   const fullyDelivered = order.items?.every((i) => i.pending <= 0);
+  const itemsLocked = !canClose || !!order.expenseId;
 
   return (
     <Card title={`Detalle orden - ${order.supplier}`}>
+      {order.expenseId && (
+        <p className="text-sm text-green-700 mb-3 bg-green-50 border border-green-200 rounded px-3 py-2">
+          Esta orden ya fue trasladada a Gastos. Sus ítems no pueden editarse ni volver a trasladarse.
+        </p>
+      )}
       <Table columns={['Ítem', 'Ordenada', 'Entregada', 'Pendiente', 'Registrar recepción', '']}>
         {order.items?.map((it) => (
           <tr key={it.id} className="border-b border-gray-100 align-top">
-            <td className="py-2 pr-3">{it.name} ({it.unit})</td>
-            <td className="py-2 pr-3">{Number(it.quantityOrdered)}</td>
-            <td className="py-2 pr-3">{it.delivered}</td>
-            <td className="py-2 pr-3">{it.pending}</td>
-            <td className="py-2 pr-3">
-              <Can module="ordenes_compra" action="edit">
-                {canClose && (
-                  <div className="flex flex-wrap gap-2">
-                    <Input type="date" value={receiptForms[it.id]?.date || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], date: e.target.value } }))} />
-                    <Input type="number" min="0" step="0.01" placeholder="Cant." value={receiptForms[it.id]?.quantityReceived || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], quantityReceived: e.target.value } }))} />
-                    <Button onClick={() => submitReceipt(it.id)}>Registrar</Button>
+            {editingId === it.id ? (
+              <>
+                <td className="py-2 pr-3" colSpan={4}>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    <Input label="Nombre" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+                    <Input label="Unidad" value={editForm.unit} onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })} />
+                    <Input label="Cant. ordenada" type="number" min="0" step="0.01" value={editForm.quantityOrdered} onChange={(e) => setEditForm({ ...editForm, quantityOrdered: e.target.value })} />
+                    <Input label="Vr. unitario" type="number" min="0" step="0.01" value={editForm.unitPrice} onChange={(e) => setEditForm({ ...editForm, unitPrice: e.target.value })} />
+                    <SearchSelect
+                      label="Ítem presupuesto"
+                      options={budgetItems.map((bi) => ({ value: bi.id, label: bi.description }))}
+                      value={editForm.budgetItemId}
+                      onChange={(v) => setEditForm({ ...editForm, budgetItemId: v })}
+                      placeholder="-- ninguno --"
+                    />
                   </div>
-                )}
-              </Can>
-            </td>
+                </td>
+                <td className="py-2 pr-3 text-right">
+                  <div className="flex gap-2 justify-end">
+                    <Button onClick={() => saveEdit(it.id)}>Guardar</Button>
+                    <Button variant="secondary" onClick={() => setEditingId(null)}>Cancelar</Button>
+                  </div>
+                </td>
+              </>
+            ) : (
+              <>
+                <td className="py-2 pr-3">
+                  {it.name} ({it.unit})
+                  {!itemsLocked && (
+                    <Can module="ordenes_compra" action="edit">
+                      <button type="button" className="ml-2 text-xs text-blue-600 hover:underline" onClick={() => startEdit(it)}>Editar</button>
+                    </Can>
+                  )}
+                </td>
+                <td className="py-2 pr-3">{Number(it.quantityOrdered)}</td>
+                <td className="py-2 pr-3">{it.delivered}</td>
+                <td className="py-2 pr-3">{it.pending}</td>
+                <td className="py-2 pr-3">
+                  <Can module="ordenes_compra" action="edit">
+                    {canClose && (
+                      <div className="flex flex-wrap gap-2">
+                        <Input type="date" value={receiptForms[it.id]?.date || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], date: e.target.value } }))} />
+                        <Input type="number" min="0" step="0.01" placeholder="Cant." value={receiptForms[it.id]?.quantityReceived || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], quantityReceived: e.target.value } }))} />
+                        <Button onClick={() => submitReceipt(it.id)}>Registrar</Button>
+                      </div>
+                    )}
+                  </Can>
+                </td>
+              </>
+            )}
           </tr>
         ))}
       </Table>
@@ -220,6 +317,26 @@ function OrderDetail({ projectId, orderId, onChange }) {
         </Can>
       )}
       {order.closureReason && <p className="text-sm text-gray-500 mt-2">Motivo de cierre: {order.closureReason}</p>}
+
+      {!order.expenseId && (
+        <Can module="ordenes_compra" action="edit">
+          <div className="mt-4 border-t pt-3">
+            {!showConvert ? (
+              <Button variant="secondary" onClick={() => setShowConvert(true)}>Pasar a Gastos</Button>
+            ) : (
+              <div className="flex flex-wrap gap-2 items-end">
+                <Select label="Categoría del gasto" value={convertForm.category} onChange={(e) => setConvertForm({ ...convertForm, category: e.target.value })}>
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                </Select>
+                <Input label="Fecha del gasto" type="date" value={convertForm.date} onChange={(e) => setConvertForm({ ...convertForm, date: e.target.value })} placeholder={order.date} />
+                <Button onClick={convertToExpense}>Confirmar traslado a Gastos</Button>
+                <Button variant="secondary" onClick={() => setShowConvert(false)}>Cancelar</Button>
+              </div>
+            )}
+            <p className="text-xs text-gray-400 mt-1">Traslada todos los ítems de la orden ({order.items?.length || 0}) a un gasto del proyecto, con la misma descripción, cantidad y valor. Solo se puede hacer una vez por orden.</p>
+          </div>
+        </Can>
+      )}
     </Card>
   );
 }

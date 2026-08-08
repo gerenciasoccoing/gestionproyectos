@@ -22,11 +22,11 @@ const get = asyncHandler(async (req, res) => {
 });
 
 const create = asyncHandler(async (req, res) => {
-  const { name, client, description, userIds = [] } = req.body;
+  const { name, client, clientId, description, userIds = [] } = req.body;
   if (!name) throw new ApiError(400, 'El nombre del proyecto es obligatorio');
 
   const project = await Project.create({
-    name, client, description, origin: 'manual', createdBy: req.user.id,
+    name, client, clientId: clientId || null, description, origin: 'manual', createdBy: req.user.id,
   });
 
   const assignees = new Set([req.user.id, ...userIds]);
@@ -41,9 +41,10 @@ const create = asyncHandler(async (req, res) => {
 const update = asyncHandler(async (req, res) => {
   const project = await Project.findByPk(req.params.id);
   if (!project) throw new ApiError(404, 'Proyecto no encontrado');
-  const { name, client, description, status } = req.body;
+  const { name, client, clientId, description, status } = req.body;
   if (name !== undefined) project.name = name;
   if (client !== undefined) project.client = client;
+  if (clientId !== undefined) project.clientId = clientId || null;
   if (description !== undefined) project.description = description;
   if (status !== undefined) project.status = status;
   await project.save();

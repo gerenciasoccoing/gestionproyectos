@@ -29,13 +29,13 @@ const get = asyncHandler(async (req, res) => {
 // El AIU discriminado (Administración, Imprevistos, Utilidad) se define aquí, al crear el
 // presupuesto (versión 1) implícito de la cotización.
 const create = asyncHandler(async (req, res) => {
-  const { clientName, projectNameProposed, date, validityDays, paymentTerms } = req.body;
+  const { clientName, clientId, projectNameProposed, date, validityDays, paymentTerms } = req.body;
   if (!clientName || !projectNameProposed || !date) {
     throw new ApiError(400, 'clientName, projectNameProposed y date son obligatorios');
   }
   const aiu = parseAiuPercents(req.body);
   const quotation = await Quotation.create({
-    clientName, projectNameProposed, date, validityDays: validityDays || 30, paymentTerms,
+    clientName, clientId: clientId || null, projectNameProposed, date, validityDays: validityDays || 30, paymentTerms,
     createdBy: req.user.id,
   });
   await Budget.create({ quotationId: quotation.id, version: 1, type: 'inicial', ...aiu });
@@ -59,8 +59,9 @@ const update = asyncHandler(async (req, res) => {
   if (!quotation) throw new ApiError(404, 'Cotización no encontrada');
   if (quotation.status === 'convertida') throw new ApiError(400, 'La cotización ya fue convertida y no puede editarse');
 
-  const { clientName, projectNameProposed, date, validityDays, paymentTerms, status } = req.body;
+  const { clientName, clientId, projectNameProposed, date, validityDays, paymentTerms, status } = req.body;
   if (clientName !== undefined) quotation.clientName = clientName;
+  if (clientId !== undefined) quotation.clientId = clientId || null;
   if (projectNameProposed !== undefined) quotation.projectNameProposed = projectNameProposed;
   if (date !== undefined) quotation.date = date;
   if (validityDays !== undefined) quotation.validityDays = validityDays;

@@ -4,6 +4,7 @@ module.exports = (sequelize) => {
   const Quotation = sequelize.define('Quotation', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
     clientName: { type: DataTypes.STRING, allowNull: false },
+    clientId: { type: DataTypes.UUID, allowNull: true }, // vínculo opcional a Terceros (cliente)
     projectNameProposed: { type: DataTypes.STRING, allowNull: false },
     date: { type: DataTypes.DATEONLY, allowNull: false },
     validityDays: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 30 },
@@ -16,6 +17,7 @@ module.exports = (sequelize) => {
   Quotation.associate = (models) => {
     Quotation.hasMany(models.Budget, { foreignKey: 'quotationId', as: 'budgets' });
     Quotation.hasOne(models.Project, { foreignKey: 'quotationId', as: 'project' });
+    Quotation.belongsTo(models.ThirdParty, { foreignKey: 'clientId', as: 'clientParty' });
   };
 
   return Quotation;

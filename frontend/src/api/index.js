@@ -86,6 +86,8 @@ export const purchaseOrdersApi = {
   list: (pid) => client.get(`/projects/${pid}/purchase-orders`).then((r) => r.data),
   get: (pid, id) => client.get(`/projects/${pid}/purchase-orders/${id}`).then((r) => r.data),
   create: (pid, data) => client.post(`/projects/${pid}/purchase-orders`, data).then((r) => r.data),
+  updateItem: (pid, id, itemId, data) => client.put(`/projects/${pid}/purchase-orders/${id}/items/${itemId}`, data).then((r) => r.data),
+  convertToExpense: (pid, id, data) => client.post(`/projects/${pid}/purchase-orders/${id}/convert-to-expense`, data).then((r) => r.data),
   addReceipt: (pid, id, itemId, data) => client.post(`/projects/${pid}/purchase-orders/${id}/items/${itemId}/receipts`, data).then((r) => r.data),
   close: (pid, id, closureReason) => client.post(`/projects/${pid}/purchase-orders/${id}/close`, { closureReason }).then((r) => r.data),
   report: (pid, params) => client.get(`/projects/${pid}/purchase-orders/report`, { params }).then((r) => r.data),
@@ -115,6 +117,15 @@ export const expensesApi = {
   setBudget: (pid, data) => client.post(`/projects/${pid}/expenses/budget`, data).then((r) => r.data),
   summary: (pid) => client.get(`/projects/${pid}/expenses/summary`).then((r) => r.data),
   scan: (pid, formData) => client.post(`/projects/${pid}/expenses/scan`, formData).then((r) => r.data),
+};
+
+export const thirdPartiesApi = {
+  list: (params) => client.get('/third-parties', { params }).then((r) => r.data),
+  get: (id) => client.get(`/third-parties/${id}`).then((r) => r.data),
+  create: (formData) => client.post('/third-parties', formData).then((r) => r.data),
+  update: (id, formData) => client.put(`/third-parties/${id}`, formData).then((r) => r.data),
+  remove: (id) => client.delete(`/third-parties/${id}`),
+  scanRut: (formData) => client.post('/third-parties/scan-rut', formData).then((r) => r.data),
 };
 
 export const risksApi = {

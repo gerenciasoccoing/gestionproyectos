@@ -265,7 +265,10 @@ const ADDED_TAX_NAMES = new Set(['IVA', 'ICA', 'Impoconsumo']);
 function findPhone(text) {
   // "Tel[éfono]" o "Cel[ular]", abreviado o completo; se toma la PRIMERA aparición en el texto
   // (normalmente la del proveedor/emisor, que va antes que la del cliente/receptor).
-  const m = text.match(/\b(?:tel[eé]fono|tel|cel(?:ular)?)\.?\s*:?\s*(\+?\d[\d\s-]{6,}\d)/i);
+  // El número puede ir en la misma línea que la etiqueta o en la siguiente (formularios con campo
+  // en una línea y valor en la otra); en cualquier caso el número capturado no cruza más de un
+  // salto de línea, para no arrastrar pie de página u otro texto no relacionado.
+  const m = text.match(/\b(?:tel[eé]fono|tel|cel(?:ular)?)\.?[ :]{0,10}\n?[ \t]{0,10}(\+?\d[\d -]{5,}\d)/i);
   return m ? m[1].trim() : null;
 }
 
@@ -309,4 +312,4 @@ async function scanInvoice(buffer, mimetype) {
   return { ...parsed, textLength: text.length };
 }
 
-module.exports = { scanInvoice, parseInvoiceText, parseMoneyLoose };
+module.exports = { scanInvoice, parseInvoiceText, parseMoneyLoose, runWorker };

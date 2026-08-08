@@ -1,24 +1,33 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { projectsApi } from '../api';
-import { Card, Button, Input, Table, Badge, ErrorText, extractError } from '../components/ui';
+import { projectsApi, thirdPartiesApi } from '../api';
+import { Card, Button, Input, SearchSelect, Table, Badge, ErrorText, extractError } from '../components/ui';
 import Can from '../components/Can';
 
 export default function ProjectsListPage() {
   const [projects, setProjects] = useState([]);
+  const [clients, setClients] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', client: '', description: '' });
+  const [form, setForm] = useState({ name: '', client: '', clientId: '', description: '' });
   const [error, setError] = useState('');
 
   const load = () => projectsApi.list().then(setProjects);
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    thirdPartiesApi.list({ type: 'cliente' }).then(setClients);
+  }, []);
+
+  const pickClient = (clientId) => {
+    const c = clients.find((x) => x.id === clientId);
+    setForm((f) => ({ ...f, clientId, client: c ? c.name : f.client }));
+  };
 
   const handleCreate = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      await projectsApi.create(form);
-      setForm({ name: '', client: '', description: '' });
+      await projectsApi.create({ ...form, clientId: form.clientId || undefined });
+      setForm({ name: '', client: '', clientId: '', description: '' });
       setShowForm(false);
       load();
     } catch (err) {
@@ -45,7 +54,14 @@ export default function ProjectsListPage() {
         <Card title="Crear proyecto manual">
           <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end">
             <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-            <Input label="Cliente" value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} />
+            <SearchSelect
+              label="Cliente registrado (opcional)"
+              options={clients.map((c) => ({ value: c.id, label: c.name }))}
+              value={form.clientId}
+              onChange={pickClient}
+              placeholder="-- ninguno / digitar manualmente --"
+            />
+            <Input label="Cliente" value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value, clientId: '' })} />
             <Input label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             <Button type="submit">Guardar</Button>
           </form>

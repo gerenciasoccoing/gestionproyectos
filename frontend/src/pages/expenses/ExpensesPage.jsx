@@ -24,7 +24,8 @@ export default function ExpensesPage() {
   const [form, setForm] = useState(emptyForm);
   const [items, setItems] = useState([]);
   const [taxes, setTaxes] = useState([]);
-  const [file, setFile] = useState(null);
+  const [invoiceFile, setInvoiceFile] = useState(null);
+  const [paymentReceiptFile, setPaymentReceiptFile] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [scanNotice, setScanNotice] = useState('');
   const [budgetForm, setBudgetForm] = useState({ category: 'materiales', budgetedAmount: '' });
@@ -44,7 +45,8 @@ export default function ExpensesPage() {
     setForm(emptyForm);
     setItems([]);
     setTaxes([]);
-    setFile(null);
+    setInvoiceFile(null);
+    setPaymentReceiptFile(null);
     setScanNotice('');
   };
 
@@ -58,7 +60,8 @@ export default function ExpensesPage() {
       fd.append('taxAmount', taxesTotal || '');
       fd.append('items', JSON.stringify(items.filter((it) => it.description.trim())));
       fd.append('taxes', JSON.stringify(taxes.filter((t) => t.name.trim())));
-      if (file) fd.append('file', file);
+      if (invoiceFile) fd.append('invoiceFile', invoiceFile);
+      if (paymentReceiptFile) fd.append('paymentReceiptFile', paymentReceiptFile);
       await expensesApi.create(projectId, fd);
       resetForm();
       setShowForm(false);
@@ -69,13 +72,13 @@ export default function ExpensesPage() {
   };
 
   const scanFile = async () => {
-    if (!file) return;
+    if (!invoiceFile) return;
     setScanning(true);
     setError('');
     setScanNotice('');
     try {
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', invoiceFile);
       const result = await expensesApi.scan(projectId, fd);
       setForm((f) => ({
         ...f,
@@ -183,17 +186,23 @@ export default function ExpensesPage() {
           <form onSubmit={submit} className="mb-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3 items-end">
               <Input
-                label="Factura o soporte (PDF, JPG, PNG)"
+                label="Factura (PDF, JPG, PNG)"
                 type="file" accept=".pdf,.jpg,.jpeg,.png,.webp"
-                onChange={(e) => { setFile(e.target.files[0]); setScanNotice(''); }}
+                onChange={(e) => { setInvoiceFile(e.target.files[0]); setScanNotice(''); }}
               />
-              <Button type="button" variant="secondary" disabled={!file || scanning} onClick={scanFile}>
+              <Button type="button" variant="secondary" disabled={!invoiceFile || scanning} onClick={scanFile}>
                 {scanning ? 'Leyendo factura… puede tardar unos segundos' : 'Leer factura automáticamente'}
               </Button>
+              <Input
+                label="Comprobante de pago (PDF, JPG, PNG)"
+                type="file" accept=".pdf,.jpg,.jpeg,.png,.webp"
+                onChange={(e) => setPaymentReceiptFile(e.target.files[0])}
+              />
             </div>
             {scanNotice && <p className="text-sm text-green-700 mb-3">{scanNotice}</p>}
             <p className="text-xs text-gray-400 mb-3">
               La lectura automática es local (OCR + reglas de texto, sin IA externa): úsala como apoyo, no reemplaza revisar la factura.
+              La factura y el comprobante de pago se guardan como adjuntos independientes.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
@@ -257,7 +266,7 @@ export default function ExpensesPage() {
             </div>
           </form>
         )}
-        <Table columns={['Fecha', 'Categoría', 'Proveedor', 'Ítems', 'Valor', 'Origen', 'Soporte', '']}>
+        <Table columns={['Fecha', 'Categoría', 'Proveedor', 'Ítems', 'Valor', 'Origen', 'Factura', 'Comprobante', '']}>
           {expenses.map((e) => (
             <Fragment key={e.id}>
               <tr className="border-b border-gray-100">
@@ -265,15 +274,18 @@ export default function ExpensesPage() {
                 <td className="py-1 pr-3">{LABELS[e.category]}</td>
                 <td className="py-1 pr-3">{e.vendorName || '-'}</td>
                 <td className="py-1 pr-3">
-                  {(e.items?.length || e.taxes?.length) ? (
+                  {(e.items?.length || e.taxes?.length || e.vendorNit || e.vendorPhone || e.vendorEmail || e.description) ? (
                     <button type="button" className="text-blue-600 hover:underline text-xs" onClick={() => setExpandedId(expandedId === e.id ? null : e.id)}>
                       {expandedId === e.id ? 'Ocultar detalle' : `Ver detalle (${e.items?.length || 0})`}
                     </button>
-                  ) : (e.description || '-')}
+                  ) : '-'}
                 </td>
                 <td className="py-1 pr-3">{money(e.amount)}</td>
-                <td className="py-1 pr-3 text-xs text-gray-500">{e.source === 'manual' ? 'Manual' : e.source === 'purchase_receipt' ? 'Compra' : 'Liquidación'}</td>
+                <td className="py-1 pr-3 text-xs text-gray-500">
+                  {e.source === 'manual' ? 'Manual' : e.source === 'purchase_receipt' ? 'Compra' : e.source === 'purchase_order' ? 'Orden de compra' : 'Liquidación'}
+                </td>
                 <td className="py-1 pr-3">{e.supportFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(e.supportFilePath)} target="_blank" rel="noreferrer">Ver</a> : '-'}</td>
+                <td className="py-1 pr-3">{e.paymentReceiptFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(e.paymentReceiptFilePath)} target="_blank" rel="noreferrer">Ver</a> : '-'}</td>
                 <td className="py-1 pr-3 text-right">
                   {e.source === 'manual' && (
                     <Can module="gastos" action="delete"><Button variant="danger" onClick={() => remove(e.id)}>Eliminar</Button></Can>
@@ -282,7 +294,7 @@ export default function ExpensesPage() {
               </tr>
               {expandedId === e.id && (
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  <td colSpan={8} className="py-3 px-3">
+                  <td colSpan={9} className="py-3 px-3">
                     <div className="text-xs text-gray-500 mb-2 flex flex-wrap gap-x-4 gap-y-1">
                       {e.vendorNit && <span>NIT: {e.vendorNit}</span>}
                       {e.vendorPhone && <span>Tel: {e.vendorPhone}</span>}
@@ -317,7 +329,7 @@ export default function ExpensesPage() {
               )}
             </Fragment>
           ))}
-          {expenses.length === 0 && <tr><td colSpan={8} className="py-3 text-center text-gray-400">Sin gastos registrados.</td></tr>}
+          {expenses.length === 0 && <tr><td colSpan={9} className="py-3 text-center text-gray-400">Sin gastos registrados.</td></tr>}
         </Table>
       </Card>
     </div>

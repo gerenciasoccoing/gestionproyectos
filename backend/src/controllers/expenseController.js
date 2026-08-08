@@ -45,6 +45,16 @@ function sanitizeTaxes(raw) {
     }));
 }
 
+// Con upload.fields([...]), multer llena req.files como { invoiceFile: [file], paymentReceiptFile: [file] }
+// en vez de req.file. Cada adjunto queda identificado por su propio campo/columna (factura vs.
+// comprobante de pago), no como adjuntos genéricos.
+function filesFromRequest(req) {
+  return {
+    invoiceFile: req.files?.invoiceFile?.[0] || null,
+    paymentReceiptFile: req.files?.paymentReceiptFile?.[0] || null,
+  };
+}
+
 const list = asyncHandler(async (req, res) => {
   const { from, to, category } = req.query;
   const where = { projectId: req.params.projectId };
@@ -66,6 +76,7 @@ const create = asyncHandler(async (req, res) => {
 
   const items = sanitizeItems(req.body.items);
   const taxes = sanitizeTaxes(req.body.taxes);
+  const { invoiceFile, paymentReceiptFile } = filesFromRequest(req);
 
   const expense = await sequelize.transaction(async (t) => {
     const created = await Expense.create({
@@ -80,7 +91,8 @@ const create = asyncHandler(async (req, res) => {
       vendorEmail: vendorEmail || null,
       subtotal: subtotal || null,
       taxAmount: taxAmount || null,
-      supportFilePath: relativePath(req.file),
+      supportFilePath: relativePath(invoiceFile),
+      paymentReceiptFilePath: relativePath(paymentReceiptFile),
       source: 'manual',
       createdBy: req.user.id,
     }, { transaction: t });
@@ -125,7 +137,9 @@ const update = asyncHandler(async (req, res) => {
   if (vendorEmail !== undefined) expense.vendorEmail = vendorEmail || null;
   if (subtotal !== undefined) expense.subtotal = subtotal || null;
   if (taxAmount !== undefined) expense.taxAmount = taxAmount || null;
-  if (req.file) expense.supportFilePath = relativePath(req.file);
+  const { invoiceFile, paymentReceiptFile } = filesFromRequest(req);
+  if (invoiceFile) expense.supportFilePath = relativePath(invoiceFile);
+  if (paymentReceiptFile) expense.paymentReceiptFilePath = relativePath(paymentReceiptFile);
 
   const items = req.body.items !== undefined ? sanitizeItems(req.body.items) : null;
   const taxes = req.body.taxes !== undefined ? sanitizeTaxes(req.body.taxes) : null;

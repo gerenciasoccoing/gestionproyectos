@@ -35,6 +35,7 @@ const modelDefiners = [
   require('./ExpenseBudget'),
   require('./Risk'),
   require('./CompanySettings'),
+  require('./ThirdParty'),
 ];
 
 const models = {};
