@@ -36,10 +36,31 @@ function filesFromRequest(req) {
   };
 }
 
+// Compara NIT sin importar puntos/guiones/espacios ni mayúsculas (ej. "900.303.701-0" === "9003037010").
+function normalizeNit(nit) {
+  return String(nit || '').replace(/[^0-9a-zA-Z]/g, '').toLowerCase();
+}
+
+// El NIT es el identificador único de un tercero dentro de su tipo (un proveedor y un cliente
+// pueden compartir NIT, ya que son roles distintos frente a la empresa, pero no puede haber dos
+// proveedores ni dos clientes con el mismo NIT). Si no se digitó NIT, no se valida por este medio.
+async function assertNoDuplicateNit({ type, nit, excludeId }) {
+  const normalized = normalizeNit(nit);
+  if (!normalized) return;
+  const candidates = await ThirdParty.findAll({ where: { type } });
+  const dup = candidates.find((c) => c.id !== excludeId && normalizeNit(c.nit) === normalized);
+  if (dup) {
+    const label = type === 'proveedor' ? 'proveedor' : 'cliente';
+    throw new ApiError(409, `Ya existe un ${label} registrado con el NIT ${nit}: "${dup.name}". Verifica que no sea un duplicado.`);
+  }
+}
+
 const create = asyncHandler(async (req, res) => {
   const { type, name, nit, email, phone, address, contactName, notes } = req.body;
   if (!TYPES.includes(type)) throw new ApiError(400, `type debe ser uno de: ${TYPES.join(', ')}`);
   if (!name || !name.trim()) throw new ApiError(400, 'name es obligatorio');
+
+  await assertNoDuplicateNit({ type, nit });
 
   const { rutFile, bankCertificationFile } = filesFromRequest(req);
   const item = await ThirdParty.create({
@@ -63,10 +84,15 @@ const update = asyncHandler(async (req, res) => {
   if (!item) throw new ApiError(404, 'Tercero no encontrado');
 
   const { type, name, nit, email, phone, address, contactName, notes } = req.body;
-  if (type !== undefined) {
-    if (!TYPES.includes(type)) throw new ApiError(400, `type debe ser uno de: ${TYPES.join(', ')}`);
-    item.type = type;
-  }
+  if (type !== undefined && !TYPES.includes(type)) throw new ApiError(400, `type debe ser uno de: ${TYPES.join(', ')}`);
+
+  await assertNoDuplicateNit({
+    type: type !== undefined ? type : item.type,
+    nit: nit !== undefined ? nit : item.nit,
+    excludeId: item.id,
+  });
+
+  if (type !== undefined) item.type = type;
   if (name !== undefined) {
     if (!name.trim()) throw new ApiError(400, 'name no puede quedar vacío');
     item.name = name.trim();

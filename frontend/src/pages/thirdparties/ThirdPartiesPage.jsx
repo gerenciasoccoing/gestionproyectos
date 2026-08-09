@@ -11,6 +11,11 @@ const TYPES = [
 
 const emptyForm = { type: 'proveedor', name: '', nit: '', email: '', phone: '', address: '', contactName: '', notes: '' };
 
+// Compara NIT sin importar puntos/guiones/espacios ni mayúsculas (ej. "900.303.701-0" === "9003037010").
+function normalizeNit(nit) {
+  return String(nit || '').replace(/[^0-9a-zA-Z]/g, '').toLowerCase();
+}
+
 export default function ThirdPartiesPage() {
   const [type, setType] = useState('proveedor');
   const [items, setItems] = useState([]);
@@ -27,8 +32,11 @@ export default function ThirdPartiesPage() {
   const load = () => thirdPartiesApi.list({ type }).then(setItems);
   useEffect(() => { load(); }, [type]);
 
-  const resetForm = () => {
-    setForm({ ...emptyForm, type });
+  // Recibe el tipo explícito en vez de leerlo del estado `type`: si se llama justo después de
+  // cambiar de pestaña (setType), el estado todavía no se actualizó (React lo aplica en el
+  // siguiente render), así que leerlo de closure aquí guardaría el tipo de la pestaña anterior.
+  const resetForm = (forType = type) => {
+    setForm({ ...emptyForm, type: forType });
     setRutFile(null);
     setBankFile(null);
     setScanNotice('');
@@ -50,6 +58,16 @@ export default function ThirdPartiesPage() {
   const submit = async (e) => {
     e.preventDefault();
     setError('');
+
+    const normalized = normalizeNit(form.nit);
+    if (normalized) {
+      const dup = items.find((it) => it.id !== editingId && normalizeNit(it.nit) === normalized);
+      if (dup) {
+        setError(`Ya existe ${form.type === 'proveedor' ? 'un proveedor' : 'un cliente'} registrado con este NIT: "${dup.name}". Verifica que no sea un duplicado.`);
+        return;
+      }
+    }
+
     try {
       const fd = new FormData();
       Object.entries(form).forEach(([k, v]) => fd.append(k, v));
@@ -106,7 +124,7 @@ export default function ThirdPartiesPage() {
           {TYPES.map((t) => (
             <button
               key={t.value}
-              onClick={() => { setType(t.value); setShowForm(false); resetForm(); }}
+              onClick={() => { setType(t.value); setShowForm(false); resetForm(t.value); }}
               className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${type === t.value ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
             >
               {t.label}
