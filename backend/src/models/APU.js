@@ -13,11 +13,15 @@ module.exports = (sequelize) => {
     // Se suman al costo directo del APU (que ya no incluye AIU: el AIU se define al crear
     // el presupuesto y se aplica sobre este costo directo, ver Budget.adminPercent/etc).
     otherCosts: { type: DataTypes.DECIMAL(18, 2), allowNull: false, defaultValue: 0, validate: { min: 0 } },
+    // Último lote de listado de precios que creó o actualizó este APU (null si es 100% manual).
+    lastPriceListImportId: { type: DataTypes.UUID, allowNull: true },
   });
 
   APU.associate = (models) => {
     APU.hasMany(models.APUComponent, { foreignKey: 'apuId', as: 'components', onDelete: 'CASCADE' });
     APU.hasMany(models.BudgetItem, { foreignKey: 'apuId' });
+    APU.hasMany(models.APUPriceHistory, { foreignKey: 'apuId', as: 'priceHistory', onDelete: 'CASCADE' });
+    APU.belongsTo(models.PriceListImport, { foreignKey: 'lastPriceListImportId', as: 'lastImport' });
   };
 
   return APU;

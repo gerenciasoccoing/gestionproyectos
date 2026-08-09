@@ -22,6 +22,8 @@ module.exports = (sequelize) => {
     unitValue: { type: DataTypes.DECIMAL(18, 2), allowNull: true, validate: { min: 0 } },
     // Factor prestacional (%) aplicado sobre el valor base de personal: valor real = base + base*%.
     prestacionalPercent: { type: DataTypes.DECIMAL(6, 2), allowNull: true, defaultValue: 0, validate: { min: 0 } },
+    // % de desperdicio (solo material): cantidad efectiva = quantity * (1 + wastePercent/100).
+    wastePercent: { type: DataTypes.DECIMAL(6, 2), allowNull: true, defaultValue: 0, validate: { min: 0 } },
     transportMode: { type: DataTypes.STRING, allowNull: true, validate: { isIn: [TRANSPORT_MODES] } },
     transportDistance: { type: DataTypes.DECIMAL(18, 6), allowNull: true, validate: { min: 0 } },
     transportPercent: { type: DataTypes.DECIMAL(6, 2), allowNull: true, validate: { min: 0 } },

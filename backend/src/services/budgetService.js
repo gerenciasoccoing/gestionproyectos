@@ -9,7 +9,7 @@ function componentUnitValue(component) {
 
 // Costo directo del APU = suma de las 4 secciones (Materiales, Herramientas y Equipos,
 // Mano de Obra, Transporte) más otros costos directos sin sección propia, según:
-//   Materiales:   Σ cantidad * valor unitario
+//   Materiales:   Σ cantidad * (1 + %desperdicio/100) * valor unitario
 //   Herramientas: Σ cantidad * rendimiento * valor unitario
 //   Personal:     Σ (cantidad * valor unitario * (1 + %prestacional/100)) / rendimiento
 //   Transporte:   por distancia*peso*tarifa, o % sobre el subtotal de Materiales
@@ -20,7 +20,7 @@ function computeSectionCosts(components) {
   const transporte = components.filter((c) => c.category === 'transporte');
 
   const materialsCost = materials.reduce(
-    (sum, c) => sum + Number(c.quantity) * componentUnitValue(c),
+    (sum, c) => sum + Number(c.quantity) * (1 + Number(c.wastePercent || 0) / 100) * componentUnitValue(c),
     0
   );
   const herramientasCost = herramientas.reduce(

@@ -36,6 +36,8 @@ const modelDefiners = [
   require('./Risk'),
   require('./CompanySettings'),
   require('./ThirdParty'),
+  require('./PriceListImport'),
+  require('./APUPriceHistory'),
 ];
 
 const models = {};

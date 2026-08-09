@@ -24,5 +24,7 @@ router.put('/:budgetId', requirePermission('ejecucion', 'edit'), budgetControlle
 router.post('/import', requirePermission('ejecucion', 'create'), importUpload.single('file'), budgetController.importFromFile);
 router.post('/:budgetId/items', requirePermission('ejecucion', 'create'), budgetController.addItem);
 router.delete('/:budgetId/items/:itemId', requirePermission('ejecucion', 'delete'), budgetController.removeItem);
+router.post('/export-pdf', requirePermission('ejecucion', 'view'), budgetController.exportPdf);
+router.post('/export-excel', requirePermission('ejecucion', 'view'), budgetController.exportExcel);
 
 module.exports = router;

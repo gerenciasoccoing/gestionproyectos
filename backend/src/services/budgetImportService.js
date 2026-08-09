@@ -185,13 +185,21 @@ async function importBudgetFromWorkbook({ projectId, buffer, aiu, type = 'inicia
         if (m.precio <= 0) continue; // ej. "Transporte": ya absorbido en otherCosts
         const priceItemId = idMap.get(m.code);
         if (!priceItemId) continue;
-        componentRows.push({ id: crypto.randomUUID(), apuId, category: 'material', priceItemId, quantity: m.qty, yield: 1 });
+        // quantity = cantidad base (antes de desperdicio); wastePercent reproduce "Cant + Desp"
+        // al computar el costo (ver computeSectionCosts), pero queda visible por separado.
+        componentRows.push({
+          id: crypto.randomUUID(), apuId, category: 'material', priceItemId,
+          quantity: m.cantidadBase, wastePercent: m.wastePercent, yield: 1,
+        });
       }
       for (const p of block.personal) {
-        if (p.precio <= 0) continue; // ya absorbido en otherCosts
+        // rendimiento (p.qty) en 0 significa que esta línea no aplica realmente (el archivo
+        // fuente la computa como $0 en "Total Unitario"); crearla con yield=1 por defecto
+        // cobraría el valor completo en el costo en vivo en vez de nada.
+        if (p.precio <= 0 || !p.qty) continue;
         const priceItemId = idMap.get(p.code);
         if (!priceItemId) continue;
-        componentRows.push({ id: crypto.randomUUID(), apuId, category: 'personal', priceItemId, quantity: 1, yield: p.qty || 1, prestacionalPercent: 0 });
+        componentRows.push({ id: crypto.randomUUID(), apuId, category: 'personal', priceItemId, quantity: 1, yield: p.qty, prestacionalPercent: 0 });
       }
       for (const e of block.equipos) {
         if (e.precio <= 0) continue; // el "Precio 0" (ej. herramienta menor) ya quedó absorbido en otherCosts
@@ -234,4 +242,11 @@ async function importBudgetFromWorkbook({ projectId, buffer, aiu, type = 'inicia
   return result;
 }
 
-module.exports = { importBudgetFromWorkbook };
+module.exports = {
+  importBudgetFromWorkbook,
+  // reutilizados por apuCatalogImportService.js (importación/actualización del catálogo global de APU)
+  parseBudgetWorkbook,
+  collectInsumos,
+  upsertPriceItems,
+  computeBlockDirectCost,
+};

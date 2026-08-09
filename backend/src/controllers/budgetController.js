@@ -1,8 +1,14 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { Budget, BudgetItem } = require('../models');
+const {
+  Budget, BudgetItem, APU, APUComponent, PriceItem, Project,
+} = require('../models');
 const { computeApuUnitCost, applyBudgetAiu, getBudgetItemsWithProgress } = require('../services/budgetService');
 const { importBudgetFromWorkbook } = require('../services/budgetImportService');
+const { buildApuExportData } = require('../services/apuExportService');
+const { generateBudgetWithApuAnnexPdf } = require('../services/pdfService');
+const { generateBudgetWithApuAnnexExcelBuffer } = require('../services/apuExcelExportService');
+const { getSettingsForPdf } = require('./companySettingsController');
 
 // Extrae y valida el AIU discriminado (Administración/Imprevistos/Utilidad) del body.
 // Los tres son opcionales de forma independiente; los que no vengan quedan en 0.
@@ -94,4 +100,43 @@ const importFromFile = asyncHandler(async (req, res) => {
   res.status(201).json(result);
 });
 
-module.exports = { getProjectBudget, createBudgetVersion, updateBudget, addItem, removeItem, importFromFile };
+// Reúne el presupuesto vigente con, para cada ítem que tenga un APU asociado, su ficha completa
+// ya armada (mismo AIU del presupuesto, no se vuelve a pedir). Los nombres de firma se digitan en
+// el momento de exportar (no persisten), igual que en la exportación de un APU individual.
+async function buildBudgetExportContext(projectId, body) {
+  const { budget, items } = await getBudgetItemsWithProgress(projectId);
+  if (!budget) throw new ApiError(404, 'Este proyecto no tiene un presupuesto');
+  const project = await Project.findByPk(projectId);
+
+  const apuIds = [...new Set(items.filter((it) => it.apuId).map((it) => it.apuId))];
+  const apus = await APU.findAll({
+    where: { id: apuIds },
+    include: [{ model: APUComponent, as: 'components', include: [{ model: PriceItem, as: 'priceItem' }] }],
+  });
+  const aiu = { adminPercent: budget.adminPercent, imprevistosPercent: budget.imprevistosPercent, utilidadPercent: budget.utilidadPercent };
+  const apuDataById = new Map(apus.map((apu) => [apu.id, buildApuExportData(apu, aiu)]));
+
+  const { elaboroNombre, revisoNombre } = body;
+  return { project, budget, items, apuDataById, elaboroNombre, revisoNombre };
+}
+
+const exportPdf = asyncHandler(async (req, res) => {
+  const ctx = await buildBudgetExportContext(req.params.projectId, req.body);
+  const company = await getSettingsForPdf();
+  const doc = generateBudgetWithApuAnnexPdf({ ...ctx, company });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="presupuesto-${(ctx.project?.name || 'proyecto').replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf"`);
+  doc.pipe(res);
+});
+
+const exportExcel = asyncHandler(async (req, res) => {
+  const ctx = await buildBudgetExportContext(req.params.projectId, req.body);
+  const buffer = generateBudgetWithApuAnnexExcelBuffer(ctx);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="presupuesto-${(ctx.project?.name || 'proyecto').replace(/[^a-zA-Z0-9-_]/g, '_')}.xlsx"`);
+  res.send(buffer);
+});
+
+module.exports = {
+  getProjectBudget, createBudgetVersion, updateBudget, addItem, removeItem, importFromFile, exportPdf, exportExcel,
+};

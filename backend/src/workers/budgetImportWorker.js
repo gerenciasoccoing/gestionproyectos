@@ -93,6 +93,17 @@ function parseApuBlocksSheet(sheet, neededCodes) {
       const precio = parseMoney(rr[6]);
       const parcial = parseMoney(rr[7]);
       const entry = { code: a, name: String(rr[1] || '').trim(), unit: String(rr[2] || '').trim(), qty, precio, parcial };
+      if (section === 'material') {
+        // Columna E (índice 4): "% Desperdicio". La cantidad base se deriva de "Cant + Desp"
+        // (qty, columna F) en vez de leer la "Cantidad" (columna D) directamente: en el archivo
+        // fuente ambas columnas están redondeadas de forma independiente, así que Cantidad *
+        // (1+%Desperdicio) no siempre reproduce exactamente Cant+Desp (diferencias de hasta unos
+        // pesos en insumos con precio muy alto por unidad). Al derivar la base desde Cant+Desp, el
+        // costo calculado en vivo (quantity * (1+wastePercent/100) * precio) sí coincide siempre
+        // con el "Total Unitario" original del archivo.
+        entry.wastePercent = parseNum(rr[4]);
+        entry.cantidadBase = entry.wastePercent ? qty / (1 + entry.wastePercent / 100) : qty;
+      }
       if (section === 'material' && entry.code) materials.push(entry);
       if (section === 'personal' && entry.code) personal.push(entry);
       if (section === 'equipos' && entry.code) equipos.push(entry);
