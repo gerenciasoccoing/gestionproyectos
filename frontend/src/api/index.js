@@ -1,4 +1,4 @@
-import client from './client';
+import client, { postAndDownload } from './client';
 
 export const authApi = {
   login: (email, password) => client.post('/auth/login', { email, password }).then((r) => r.data),
@@ -74,6 +74,8 @@ export const budgetApi = {
   importFile: (pid, formData) => client.post(`/projects/${pid}/budget/import`, formData).then((r) => r.data),
   addItem: (pid, budgetId, data) => client.post(`/projects/${pid}/budget/${budgetId}/items`, data).then((r) => r.data),
   removeItem: (pid, budgetId, itemId) => client.delete(`/projects/${pid}/budget/${budgetId}/items/${itemId}`),
+  exportPdf: (pid, data) => postAndDownload(`/projects/${pid}/budget/export-pdf`, data, 'presupuesto.pdf'),
+  exportExcel: (pid, data) => postAndDownload(`/projects/${pid}/budget/export-excel`, data, 'presupuesto.xlsx'),
 };
 
 export const progressApi = {
@@ -170,6 +172,11 @@ export const apuApi = {
   remove: (id) => client.delete(`/apus/${id}`),
   addComponent: (id, data) => client.post(`/apus/${id}/components`, data).then((r) => r.data),
   removeComponent: (id, componentId) => client.delete(`/apus/${id}/components/${componentId}`),
+  importCatalog: (formData) => client.post('/apus/import', formData).then((r) => r.data),
+  listImports: () => client.get('/apus/imports').then((r) => r.data),
+  priceHistory: (id) => client.get(`/apus/${id}/price-history`).then((r) => r.data),
+  exportPdf: (id, data, code) => postAndDownload(`/apus/${id}/export-pdf`, data, `apu-${code || id}.pdf`),
+  exportExcel: (id, data, code) => postAndDownload(`/apus/${id}/export-excel`, data, `apu-${code || id}.xlsx`),
 };
 
 export const quotationsApi = {

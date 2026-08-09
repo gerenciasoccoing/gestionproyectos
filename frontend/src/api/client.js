@@ -44,3 +44,20 @@ export async function downloadProtectedFile(relativePath, filename) {
   a.click();
   window.URL.revokeObjectURL(url);
 }
+
+// Para exportaciones que necesitan enviar datos en el body (AIU, nombres de firma): hace el POST
+// con responseType blob e inicia la descarga con el nombre de archivo indicado por el backend.
+export async function postAndDownload(path, data, fallbackFilename) {
+  const res = await client.post(path, data, { responseType: 'blob' });
+  const disposition = res.headers['content-disposition'] || '';
+  const match = disposition.match(/filename="([^"]+)"/);
+  const filename = match ? match[1] : fallbackFilename;
+  const url = window.URL.createObjectURL(res.data);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}

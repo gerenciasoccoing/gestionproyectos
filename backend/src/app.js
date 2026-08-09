@@ -14,7 +14,10 @@ const app = express();
 const corsOrigins = !process.env.CORS_ORIGIN || process.env.CORS_ORIGIN === '*'
   ? '*'
   : process.env.CORS_ORIGIN.split(',').map((o) => o.trim());
-app.use(cors({ origin: corsOrigins }));
+// Content-Disposition debe exponerse explícitamente: por defecto el navegador no deja leer ese
+// header en una respuesta cross-origin, así que las descargas armadas por el frontend (blob +
+// nombre de archivo tomado de este header) caían al nombre genérico de reserva.
+app.use(cors({ origin: corsOrigins, exposedHeaders: ['Content-Disposition'] }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 

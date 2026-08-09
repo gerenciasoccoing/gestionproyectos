@@ -24,6 +24,11 @@ export default function BudgetProgressPage() {
   const [importResult, setImportResult] = useState(null);
   const [importError, setImportError] = useState('');
 
+  const [showExport, setShowExport] = useState(false);
+  const [exportNames, setExportNames] = useState({ elaboroNombre: '', revisoNombre: '' });
+  const [exportDownloading, setExportDownloading] = useState('');
+  const [exportError, setExportError] = useState('');
+
   const load = () => budgetApi.get(projectId).then((data) => {
     setBudget(data.budget);
     setItems(data.items);
@@ -101,6 +106,19 @@ export default function BudgetProgressPage() {
     }
   };
 
+  const downloadExport = async (format) => {
+    setExportError('');
+    setExportDownloading(format);
+    try {
+      if (format === 'pdf') await budgetApi.exportPdf(projectId, exportNames);
+      else await budgetApi.exportExcel(projectId, exportNames);
+    } catch (err) {
+      setExportError(extractError(err));
+    } finally {
+      setExportDownloading('');
+    }
+  };
+
   return (
     <div>
       <Card title="Importar presupuesto y APU desde Excel" actions={
@@ -174,6 +192,35 @@ export default function BudgetProgressPage() {
           </Can>
         </form>
       </Card>
+
+      {budget && (
+        <Card title="Exportar presupuesto con anexo de APU" actions={
+          <Button onClick={() => setShowExport((s) => !s)}>{showExport ? 'Cancelar' : '+ Exportar'}</Button>
+        }>
+          {showExport && (
+            <div>
+              <p className="text-sm text-gray-600 mb-3">
+                Genera el resumen del presupuesto junto con la ficha detallada de cada APU usado (con el AIU de este
+                presupuesto). Los nombres de firma se repiten en cada página de APU y no se guardan como datos del
+                sistema.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                <Input label="Elaboró y validó" value={exportNames.elaboroNombre} onChange={(e) => setExportNames({ ...exportNames, elaboroNombre: e.target.value })} />
+                <Input label="Revisó y Aprobó" value={exportNames.revisoNombre} onChange={(e) => setExportNames({ ...exportNames, revisoNombre: e.target.value })} />
+              </div>
+              <div className="flex gap-2 items-center">
+                <Button onClick={() => downloadExport('pdf')} disabled={!!exportDownloading}>
+                  {exportDownloading === 'pdf' ? 'Generando PDF…' : 'Descargar PDF'}
+                </Button>
+                <Button variant="secondary" onClick={() => downloadExport('excel')} disabled={!!exportDownloading}>
+                  {exportDownloading === 'excel' ? 'Generando Excel…' : 'Descargar Excel (sin logo)'}
+                </Button>
+              </div>
+              <ErrorText>{exportError}</ErrorText>
+            </div>
+          )}
+        </Card>
+      )}
 
       <Card title="Ítems del presupuesto y avance físico" actions={
         <Can module="ejecucion" action="create">

@@ -37,9 +37,17 @@ export default function ApuPage() {
   const [collapsed, setCollapsed] = useState({ material: false, herramienta: false, personal: false, transporte: false });
   const [expandedId, setExpandedId] = useState(null);
   const [expandedApu, setExpandedApu] = useState(null);
+  const [exportId, setExportId] = useState(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [error, setError] = useState('');
+
+  const [showImport, setShowImport] = useState(false);
+  const [importForm, setImportForm] = useState({ sourceLabel: '', effectiveDate: '' });
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [importError, setImportError] = useState('');
 
   const load = () => apuApi.list().then(setApus);
   useEffect(() => {
@@ -47,6 +55,28 @@ export default function ApuPage() {
     priceItemsApi.list().then(setPriceItems);
     companyApi.get().then((s) => setDefaultPrestacionalPercent(Number(s.defaultPrestacionalPercent ?? 70)));
   }, []);
+
+  const submitImport = async (e) => {
+    e.preventDefault();
+    setImportError(''); setImportResult(null);
+    if (!importFile) { setImportError('Debes seleccionar un archivo.'); return; }
+    if (!importForm.sourceLabel.trim()) { setImportError('Indica un nombre para este listado (ej. "Listado Abril 2026").'); return; }
+    setImporting(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', importFile);
+      fd.append('sourceLabel', importForm.sourceLabel);
+      if (importForm.effectiveDate) fd.append('effectiveDate', importForm.effectiveDate);
+      const result = await apuApi.importCatalog(fd);
+      setImportResult(result);
+      setImportFile(null);
+      load();
+    } catch (err) {
+      setImportError(extractError(err));
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -206,6 +236,65 @@ export default function ApuPage() {
   };
 
   return (
+    <div>
+      <Card title="Importar / actualizar catálogo de APU desde Excel" actions={
+        <Can module="cotizaciones" action="create">
+          <Button onClick={() => setShowImport((s) => !s)}>{showImport ? 'Cancelar' : '+ Importar listado'}</Button>
+        </Can>
+      }>
+        {showImport && (
+          <form onSubmit={submitImport} className="space-y-3">
+            <p className="text-sm text-gray-600">
+              Sube el Excel oficial del listado de precios unitarios (hojas "Items de Presupuesto" + "Unitarios").
+              Un APU con código nuevo se crea; si el código ya existe y su costo directo cambió, se actualiza — sin
+              tocar los ítems de presupuesto ya agregados en proyectos existentes (su valor queda fijo, como siempre).
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Input label="Nombre del listado (ej. Listado Abril 2026)" value={importForm.sourceLabel} onChange={(e) => setImportForm({ ...importForm, sourceLabel: e.target.value })} required />
+              <Input label="Fecha de vigencia (opcional)" type="date" value={importForm.effectiveDate} onChange={(e) => setImportForm({ ...importForm, effectiveDate: e.target.value })} />
+              <Input label="Archivo Excel (.xlsx / .xls)" type="file" accept=".xlsx,.xls" onChange={(e) => setImportFile(e.target.files[0])} />
+            </div>
+            <Button type="submit" disabled={importing}>{importing ? 'Importando… puede tardar un momento' : 'Importar'}</Button>
+            <ErrorText>{importError}</ErrorText>
+          </form>
+        )}
+        {importResult && (
+          <div className="mt-4 border-t pt-3 text-sm space-y-2">
+            <p className="font-medium text-green-700">
+              Importación "{importResult.sourceLabel}" completada: {importResult.created} APU creados,{' '}
+              {importResult.updated} actualizados, {importResult.unchanged} sin cambio de valor.
+            </p>
+            {importResult.changes.length > 0 ? (
+              <div>
+                <p className="text-gray-600 mb-1">APU que cambiaron de valor (ordenados por mayor variación):</p>
+                <Table columns={['Código', 'Nombre', 'Valor anterior', 'Valor nuevo', '% Variación', 'Presupuestos que lo usan']}>
+                  {importResult.changes.map((c) => (
+                    <tr key={c.apuId} className="border-b border-gray-100">
+                      <td className="py-1 pr-3 text-gray-400">{c.code}</td>
+                      <td className="py-1 pr-3">{c.name}</td>
+                      <td className="py-1 pr-3">{money(c.oldTotal)}</td>
+                      <td className="py-1 pr-3">{money(c.newTotal)}</td>
+                      <td className={`py-1 pr-3 font-semibold ${c.deltaPercent > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {c.deltaPercent !== null ? `${c.deltaPercent > 0 ? '+' : ''}${c.deltaPercent}%` : '-'}
+                      </td>
+                      <td className="py-1 pr-3">
+                        {c.affectedBudgetItemsCount > 0 ? (
+                          <span className="text-yellow-700">{c.affectedBudgetItemsCount} ítem(s) — su valor ya agregado NO cambia</span>
+                        ) : (
+                          <span className="text-gray-400">Ninguno</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </Table>
+              </div>
+            ) : (
+              <p className="text-gray-500">Ningún APU existente cambió de valor.</p>
+            )}
+          </div>
+        )}
+      </Card>
+
     <Card title="Análisis de Precios Unitarios (APU)" actions={
       <Can module="cotizaciones" action="create">
         <Button onClick={() => (showForm ? (setShowForm(false), resetForm()) : startCreate())}>
@@ -302,6 +391,9 @@ export default function ApuPage() {
               <Button variant="secondary" onClick={() => toggleComponents(a.id)}>
                 {expandedId === a.id ? 'Cerrar' : 'Componentes'}
               </Button>
+              <Button variant="secondary" onClick={() => setExportId(exportId === a.id ? null : a.id)}>
+                {exportId === a.id ? 'Cerrar' : 'Exportar'}
+              </Button>
               <Can module="cotizaciones" action="edit"><Button variant="secondary" onClick={() => startEdit(a)}>Editar</Button></Can>
               <Can module="cotizaciones" action="delete"><Button variant="danger" onClick={() => remove(a.id)}>Eliminar</Button></Can>
             </td>
@@ -322,7 +414,55 @@ export default function ApuPage() {
 
       {expandedId && !expandedApu && <p className="text-sm text-gray-400 mt-3">Cargando componentes…</p>}
       {expandedApu && <ApuComponents apu={expandedApu} />}
+      {exportId && <ApuExportPanel apu={apus.find((a) => a.id === exportId)} />}
     </Card>
+    </div>
+  );
+}
+
+function ApuExportPanel({ apu }) {
+  const [aiu, setAiu] = useState({ adminPercent: '0', imprevistosPercent: '0', utilidadPercent: '0' });
+  const [names, setNames] = useState({ elaboroNombre: '', revisoNombre: '' });
+  const [downloading, setDownloading] = useState('');
+  const [error, setError] = useState('');
+
+  if (!apu) return null;
+
+  const download = async (format) => {
+    setError('');
+    setDownloading(format);
+    try {
+      const payload = { ...aiu, ...names };
+      if (format === 'pdf') await apuApi.exportPdf(apu.id, payload, apu.code);
+      else await apuApi.exportExcel(apu.id, payload, apu.code);
+    } catch (err) {
+      setError(extractError(err));
+    } finally {
+      setDownloading('');
+    }
+  };
+
+  return (
+    <div className="mt-3 border-t pt-3">
+      <p className="font-medium text-sm mb-2">Exportar APU: {apu.name}</p>
+      <p className="text-xs text-gray-500 mb-3">
+        El AIU y los nombres de firma se usan solo para este documento — no se guardan en el APU.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+        <Input label="Administración (%)" type="number" min="0" step="0.01" value={aiu.adminPercent} onChange={(e) => setAiu({ ...aiu, adminPercent: e.target.value })} />
+        <Input label="Imprevistos (%)" type="number" min="0" step="0.01" value={aiu.imprevistosPercent} onChange={(e) => setAiu({ ...aiu, imprevistosPercent: e.target.value })} />
+        <Input label="Utilidad (%)" type="number" min="0" step="0.01" value={aiu.utilidadPercent} onChange={(e) => setAiu({ ...aiu, utilidadPercent: e.target.value })} />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+        <Input label="Elaboró y validó" value={names.elaboroNombre} onChange={(e) => setNames({ ...names, elaboroNombre: e.target.value })} />
+        <Input label="Revisó y Aprobó" value={names.revisoNombre} onChange={(e) => setNames({ ...names, revisoNombre: e.target.value })} />
+      </div>
+      <div className="flex gap-2 items-center">
+        <Button onClick={() => download('pdf')} disabled={!!downloading}>{downloading === 'pdf' ? 'Generando PDF…' : 'Descargar PDF'}</Button>
+        <Button variant="secondary" onClick={() => download('excel')} disabled={!!downloading}>{downloading === 'excel' ? 'Generando Excel…' : 'Descargar Excel (sin logo)'}</Button>
+      </div>
+      <ErrorText>{error}</ErrorText>
+    </div>
   );
 }
 
