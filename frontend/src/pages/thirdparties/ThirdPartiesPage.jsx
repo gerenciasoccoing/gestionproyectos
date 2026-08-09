@@ -162,7 +162,7 @@ export default function ThirdPartiesPage() {
           </form>
         )}
 
-        <Table columns={['Nombre', 'NIT', 'Correo', 'Teléfono', 'RUT', 'Cert. bancaria', '']}>
+        <Table columns={type === 'proveedor' ? ['Nombre', 'NIT', 'Correo', 'Teléfono', 'RUT', 'Cert. bancaria', ''] : ['Nombre', 'NIT', 'Correo', 'Teléfono', 'RUT', '']}>
           {filtered.map((it) => (
             <tr key={it.id} className="border-b border-gray-100">
               <td className="py-1 pr-3">{it.name}</td>
@@ -170,11 +170,11 @@ export default function ThirdPartiesPage() {
               <td className="py-1 pr-3">{it.email || '-'}</td>
               <td className="py-1 pr-3">{it.phone || '-'}</td>
               <td className="py-1 pr-3">{it.rutFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(it.rutFilePath)} target="_blank" rel="noreferrer">Ver</a> : '-'}</td>
-              <td className="py-1 pr-3">
-                {it.type === 'proveedor'
-                  ? (it.bankCertificationFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(it.bankCertificationFilePath)} target="_blank" rel="noreferrer">Ver</a> : '-')
-                  : <span className="text-gray-300">-</span>}
-              </td>
+              {type === 'proveedor' && (
+                <td className="py-1 pr-3">
+                  {it.bankCertificationFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(it.bankCertificationFilePath)} target="_blank" rel="noreferrer">Ver</a> : '-'}
+                </td>
+              )}
               <td className="py-1 pr-3 text-right">
                 <Can module="terceros" action="edit">
                   <Button variant="secondary" onClick={() => startEdit(it)}>Editar</Button>
@@ -185,7 +185,7 @@ export default function ThirdPartiesPage() {
               </td>
             </tr>
           ))}
-          {filtered.length === 0 && <tr><td colSpan={7} className="py-3 text-center text-gray-400">Sin {type === 'proveedor' ? 'proveedores' : 'clientes'} registrados.</td></tr>}
+          {filtered.length === 0 && <tr><td colSpan={type === 'proveedor' ? 7 : 6} className="py-3 text-center text-gray-400">Sin {type === 'proveedor' ? 'proveedores' : 'clientes'} registrados.</td></tr>}
         </Table>
       </Card>
     </div>
