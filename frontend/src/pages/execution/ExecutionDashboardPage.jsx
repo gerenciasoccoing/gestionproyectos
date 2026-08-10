@@ -1,18 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { executionApi } from '../../api';
 import { Card, money } from '../../components/ui';
 
-const CATEGORY_LABELS = {
-  mano_obra: 'Mano de obra',
-  materiales: 'Materiales',
-  equipos: 'Equipos',
-  viaticos: 'Viáticos',
-  imprevistos: 'Imprevistos',
-};
-
 export default function ExecutionDashboardPage() {
+  const { t } = useTranslation();
   const { projectId } = useOutletContext();
   const [data, setData] = useState(null);
   const intervalRef = useRef(null);
@@ -25,17 +19,20 @@ export default function ExecutionDashboardPage() {
     return () => clearInterval(intervalRef.current);
   }, [projectId]);
 
-  if (!data) return <div className="text-gray-500">Cargando dashboard...</div>;
+  if (!data) return <div className="text-gray-500">{t('execution.dashboard.loading')}</div>;
 
   const executedVsBudget = [
-    { name: 'Valor', Presupuestado: data.budgetedValue, Ejecutado: data.executedValue },
+    { name: t('common.total'), budgeted: data.budgetedValue, executed: data.executedValue },
   ];
-  const expensesData = data.expensesByCategory.map((e) => ({ name: CATEGORY_LABELS[e.category], Gasto: e.amount }));
+  const expensesData = data.expensesByCategory.map((e) => ({
+    name: t(`execution.dashboard.categories.${e.category}`, e.category),
+    expense: e.amount,
+  }));
 
   return (
     <div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-        <Card title="% de Avance Físico">
+        <Card title={t('execution.dashboard.physicalProgress')}>
           <div className="flex flex-col items-center py-4">
             <div className="relative w-32 h-32">
               <svg viewBox="0 0 36 36" className="w-32 h-32 -rotate-90">
@@ -54,18 +51,18 @@ export default function ExecutionDashboardPage() {
             </div>
           </div>
         </Card>
-        <Card title="Valor Ejecutado vs Presupuesto">
+        <Card title={t('execution.dashboard.executedVsBudget')}>
           <p className="text-2xl font-bold text-gray-800">{money(data.executedValue)}</p>
-          <p className="text-sm text-gray-500">de {money(data.budgetedValue)} presupuestados</p>
+          <p className="text-sm text-gray-500">{t('execution.dashboard.ofBudgeted', { amount: money(data.budgetedValue) })}</p>
         </Card>
-        <Card title="Valor de Gastos Acumulado">
+        <Card title={t('execution.dashboard.accumulatedExpenses')}>
           <p className="text-2xl font-bold text-gray-800">{money(data.expensesValue)}</p>
-          <p className="text-sm text-gray-500">Actualiza automáticamente cada pocos segundos</p>
+          <p className="text-sm text-gray-500">{t('execution.dashboard.autoRefresh')}</p>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Card title="Comparativo Ejecutado vs Presupuestado">
+        <Card title={t('execution.dashboard.comparisonChart')}>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={executedVsBudget}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -73,32 +70,32 @@ export default function ExecutionDashboardPage() {
               <YAxis tickFormatter={(v) => money(v)} width={90} />
               <Tooltip formatter={(v) => money(v)} />
               <Legend />
-              <Bar dataKey="Presupuestado" fill="#93c5fd" />
-              <Bar dataKey="Ejecutado" fill="#2563eb" />
+              <Bar dataKey="budgeted" name={t('execution.dashboard.budgeted')} fill="#93c5fd" />
+              <Bar dataKey="executed" name={t('execution.dashboard.executed')} fill="#2563eb" />
             </BarChart>
           </ResponsiveContainer>
         </Card>
-        <Card title="Gasto por Categoría">
+        <Card title={t('execution.dashboard.expenseByCategory')}>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={expensesData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis tickFormatter={(v) => money(v)} width={90} />
               <Tooltip formatter={(v) => money(v)} />
-              <Bar dataKey="Gasto" fill="#f59e0b" />
+              <Bar dataKey="expense" name={t('execution.dashboard.expense')} fill="#f59e0b" />
             </BarChart>
           </ResponsiveContainer>
         </Card>
       </div>
 
-      <Card title="Detalle por ítem de presupuesto" className="mt-4">
+      <Card title={t('execution.dashboard.itemDetail')} className="mt-4">
         <table className="w-full text-sm text-left">
           <thead>
             <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2 pr-3 font-medium">Ítem</th>
-              <th className="py-2 pr-3 font-medium">% Avance</th>
-              <th className="py-2 pr-3 font-medium">Vr. Ejecutado</th>
-              <th className="py-2 pr-3 font-medium">Vr. Presupuestado</th>
+              <th className="py-2 pr-3 font-medium">{t('execution.dashboard.table.item')}</th>
+              <th className="py-2 pr-3 font-medium">{t('execution.dashboard.table.percent')}</th>
+              <th className="py-2 pr-3 font-medium">{t('execution.dashboard.table.executedValue')}</th>
+              <th className="py-2 pr-3 font-medium">{t('execution.dashboard.table.budgetedValue')}</th>
             </tr>
           </thead>
           <tbody>

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { companyApi } from '../../api';
-import { Card, Button, Input, ErrorText, extractError } from '../../components/ui';
+import { Card, Button, Input, Select, ErrorText, extractError, setCurrencyConfig } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 
 export default function CompanySettingsPage() {
+  const { t } = useTranslation();
   const [settings, setSettings] = useState(null);
-  const [form, setForm] = useState({ companyName: '', nit: '', address: '', phone: '', defaultPrestacionalPercent: '70' });
+  const [form, setForm] = useState({ companyName: '', nit: '', address: '', phone: '', defaultPrestacionalPercent: '70', currency: 'COP' });
   const [logo, setLogo] = useState(null);
   const [error, setError] = useState('');
   const [ok, setOk] = useState(false);
@@ -19,6 +21,7 @@ export default function CompanySettingsPage() {
         address: s.address || '',
         phone: s.phone || '',
         defaultPrestacionalPercent: String(s.defaultPrestacionalPercent ?? 70),
+        currency: s.currency || 'COP',
       });
     });
   }, []);
@@ -32,6 +35,7 @@ export default function CompanySettingsPage() {
       if (logo) fd.append('logo', logo);
       const updated = await companyApi.update(fd);
       setSettings(updated);
+      setCurrencyConfig(updated.currency);
       setOk(true);
     } catch (err) {
       setError(extractError(err));
@@ -41,26 +45,31 @@ export default function CompanySettingsPage() {
   if (!settings) return null;
 
   return (
-    <Card title="Datos de la Empresa (branding para PDF de cotización)">
+    <Card title={t('admin.company.title')}>
       <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Input label="Nombre de la empresa" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} required />
-        <Input label="NIT" value={form.nit} onChange={(e) => setForm({ ...form, nit: e.target.value })} />
-        <Input label="Dirección" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-        <Input label="Teléfono" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+        <Input label={t('admin.company.companyName')} value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} required />
+        <Input label={t('admin.company.nit')} value={form.nit} onChange={(e) => setForm({ ...form, nit: e.target.value })} />
+        <Input label={t('admin.company.address')} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+        <Input label={t('admin.company.phone')} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
         <Input
-          label="Factor prestacional por defecto en APU (%)"
+          label={t('admin.company.prestacionalDefault')}
           type="number" min="0" step="0.01"
           value={form.defaultPrestacionalPercent}
           onChange={(e) => setForm({ ...form, defaultPrestacionalPercent: e.target.value })}
         />
+        <Select label={t('admin.company.currency')} value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
+          <option value="COP">{t('admin.company.currencyOptions.COP')}</option>
+          <option value="USD">{t('admin.company.currencyOptions.USD')}</option>
+          <option value="EUR">{t('admin.company.currencyOptions.EUR')}</option>
+        </Select>
         <div>
-          <Input label="Logo" type="file" accept="image/*" onChange={(e) => setLogo(e.target.files[0])} />
+          <Input label={t('admin.company.logo')} type="file" accept="image/*" onChange={(e) => setLogo(e.target.files[0])} />
           {settings.logoPath && <img src={fileUrl(settings.logoPath)} alt="logo" className="h-16 mt-2" />}
         </div>
-        <Button type="submit" className="col-span-full w-fit">Guardar</Button>
+        <Button type="submit" className="col-span-full w-fit">{t('admin.company.save')}</Button>
         <div className="col-span-full">
           <ErrorText>{error}</ErrorText>
-          {ok && <p className="text-sm text-green-600">Guardado correctamente.</p>}
+          {ok && <p className="text-sm text-green-600">{t('admin.company.saved')}</p>}
         </div>
       </form>
     </Card>

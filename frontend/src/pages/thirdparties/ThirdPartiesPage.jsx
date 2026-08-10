@@ -1,13 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { thirdPartiesApi } from '../../api';
 import { Card, Button, Input, TextArea, Table, ErrorText, extractError } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
-
-const TYPES = [
-  { value: 'proveedor', label: 'Proveedores' },
-  { value: 'cliente', label: 'Clientes' },
-];
 
 const emptyForm = { type: 'proveedor', name: '', nit: '', email: '', phone: '', address: '', contactName: '', notes: '' };
 
@@ -17,6 +13,11 @@ function normalizeNit(nit) {
 }
 
 export default function ThirdPartiesPage() {
+  const { t } = useTranslation();
+  const TYPES = [
+    { value: 'proveedor', label: t('thirdParties.tabs.suppliers') },
+    { value: 'cliente', label: t('thirdParties.tabs.clients') },
+  ];
   const [type, setType] = useState('proveedor');
   const [items, setItems] = useState([]);
   const [search, setSearch] = useState('');
@@ -63,7 +64,7 @@ export default function ThirdPartiesPage() {
     if (normalized) {
       const dup = items.find((it) => it.id !== editingId && normalizeNit(it.nit) === normalized);
       if (dup) {
-        setError(`Ya existe ${form.type === 'proveedor' ? 'un proveedor' : 'un cliente'} registrado con este NIT: "${dup.name}". Verifica que no sea un duplicado.`);
+        setError(t(form.type === 'proveedor' ? 'thirdParties.duplicateNitSupplier' : 'thirdParties.duplicateNitClient', { name: dup.name }));
         return;
       }
     }
@@ -99,7 +100,7 @@ export default function ThirdPartiesPage() {
         email: result.email || f.email,
         phone: result.phone || f.phone,
       }));
-      setScanNotice('Lectura automática del RUT completada (local, sin IA externa) — revisa y corrige los datos antes de guardar.');
+      setScanNotice(t('thirdParties.scanDone'));
     } catch (err) {
       setError(extractError(err));
     } finally {
@@ -108,7 +109,7 @@ export default function ThirdPartiesPage() {
   };
 
   const remove = async (id) => {
-    if (!confirm('¿Eliminar este tercero?')) return;
+    if (!confirm(t('thirdParties.confirmDelete'))) return;
     await thirdPartiesApi.remove(id);
     load();
   };
@@ -121,22 +122,22 @@ export default function ThirdPartiesPage() {
     <div>
       <Card>
         <div className="flex flex-wrap gap-2 mb-4 border-b border-gray-200">
-          {TYPES.map((t) => (
+          {TYPES.map((tab) => (
             <button
-              key={t.value}
-              onClick={() => { setType(t.value); setShowForm(false); resetForm(t.value); }}
-              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${type === t.value ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              key={tab.value}
+              onClick={() => { setType(tab.value); setShowForm(false); resetForm(tab.value); }}
+              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${type === tab.value ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
             >
-              {t.label}
+              {tab.label}
             </button>
           ))}
         </div>
 
         <div className="flex flex-wrap items-end justify-between gap-2 mb-3">
-          <Input label="Buscar por nombre o NIT" value={search} onChange={(e) => setSearch(e.target.value)} className="w-64" />
+          <Input label={t('thirdParties.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} className="w-64" />
           <Can module="terceros" action="create">
             <Button onClick={() => { if (showForm) resetForm(); setShowForm((s) => !s); }}>
-              {showForm ? 'Cancelar' : `+ ${type === 'proveedor' ? 'Nuevo proveedor' : 'Nuevo cliente'}`}
+              {showForm ? t('common.cancel') : (type === 'proveedor' ? t('thirdParties.newSupplier') : t('thirdParties.newClient'))}
             </Button>
           </Can>
         </div>
@@ -145,65 +146,65 @@ export default function ThirdPartiesPage() {
           <form onSubmit={submit} className="mb-4 border rounded p-3 bg-gray-50">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3 items-end">
               <Input
-                label="RUT (PDF, JPG, PNG)"
+                label={t('thirdParties.rut')}
                 type="file" accept=".pdf,.jpg,.jpeg,.png,.webp"
                 onChange={(e) => { setRutFile(e.target.files[0]); setScanNotice(''); }}
               />
               <Button type="button" variant="secondary" disabled={!rutFile || scanning} onClick={scanRutFile}>
-                {scanning ? 'Leyendo RUT… puede tardar unos segundos' : 'Leer RUT automáticamente'}
+                {scanning ? t('thirdParties.readingRut') : t('thirdParties.readRutAuto')}
               </Button>
             </div>
             {scanNotice && <p className="text-sm text-green-700 mb-3">{scanNotice}</p>}
             <p className="text-xs text-gray-400 mb-3">
-              La lectura automática es local (OCR + reglas de texto, sin IA externa): úsala como apoyo, revisa siempre los datos.
+              {t('thirdParties.scanNote')}
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <Input label="Nombre / Razón social" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-              <Input label="NIT" value={form.nit} onChange={(e) => setForm({ ...form, nit: e.target.value })} />
-              <Input label="Correo electrónico" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-              <Input label="Teléfono" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-              <Input label="Dirección" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-              <Input label="Persona de contacto" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
-              <TextArea label="Notas" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="col-span-full" rows={2} />
+              <Input label={t('thirdParties.fields.name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+              <Input label={t('thirdParties.fields.nit')} value={form.nit} onChange={(e) => setForm({ ...form, nit: e.target.value })} />
+              <Input label={t('thirdParties.fields.email')} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              <Input label={t('thirdParties.fields.phone')} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              <Input label={t('thirdParties.fields.address')} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              <Input label={t('thirdParties.fields.contactName')} value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
+              <TextArea label={t('thirdParties.fields.notes')} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="col-span-full" rows={2} />
               {form.type === 'proveedor' && (
                 <Input
-                  label="Certificación bancaria (PDF/imagen)"
+                  label={t('thirdParties.fields.bankCertification')}
                   type="file" accept=".pdf,.jpg,.jpeg,.png,.webp"
                   onChange={(e) => setBankFile(e.target.files[0])}
                   className="col-span-full sm:col-span-1"
                 />
               )}
-              <Button type="submit" className="col-span-full">{editingId ? 'Guardar cambios' : 'Guardar'}</Button>
+              <Button type="submit" className="col-span-full">{editingId ? t('thirdParties.saveChanges') : t('thirdParties.save')}</Button>
               <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
             </div>
           </form>
         )}
 
-        <Table columns={type === 'proveedor' ? ['Nombre', 'NIT', 'Correo', 'Teléfono', 'RUT', 'Cert. bancaria', ''] : ['Nombre', 'NIT', 'Correo', 'Teléfono', 'RUT', '']}>
+        <Table columns={type === 'proveedor' ? [t('thirdParties.table.name'), t('thirdParties.table.nit'), t('thirdParties.table.email'), t('thirdParties.table.phone'), t('thirdParties.table.rut'), t('thirdParties.table.bankCertification'), ''] : [t('thirdParties.table.name'), t('thirdParties.table.nit'), t('thirdParties.table.email'), t('thirdParties.table.phone'), t('thirdParties.table.rut'), '']}>
           {filtered.map((it) => (
             <tr key={it.id} className="border-b border-gray-100">
               <td className="py-1 pr-3">{it.name}</td>
               <td className="py-1 pr-3">{it.nit || '-'}</td>
               <td className="py-1 pr-3">{it.email || '-'}</td>
               <td className="py-1 pr-3">{it.phone || '-'}</td>
-              <td className="py-1 pr-3">{it.rutFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(it.rutFilePath)} target="_blank" rel="noreferrer">Ver</a> : '-'}</td>
+              <td className="py-1 pr-3">{it.rutFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(it.rutFilePath)} target="_blank" rel="noreferrer">{t('common.view')}</a> : '-'}</td>
               {type === 'proveedor' && (
                 <td className="py-1 pr-3">
-                  {it.bankCertificationFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(it.bankCertificationFilePath)} target="_blank" rel="noreferrer">Ver</a> : '-'}
+                  {it.bankCertificationFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(it.bankCertificationFilePath)} target="_blank" rel="noreferrer">{t('common.view')}</a> : '-'}
                 </td>
               )}
               <td className="py-1 pr-3 text-right">
                 <Can module="terceros" action="edit">
-                  <Button variant="secondary" onClick={() => startEdit(it)}>Editar</Button>
+                  <Button variant="secondary" onClick={() => startEdit(it)}>{t('common.edit')}</Button>
                 </Can>
                 <Can module="terceros" action="delete">
-                  <Button variant="danger" className="ml-2" onClick={() => remove(it.id)}>Eliminar</Button>
+                  <Button variant="danger" className="ml-2" onClick={() => remove(it.id)}>{t('common.delete')}</Button>
                 </Can>
               </td>
             </tr>
           ))}
-          {filtered.length === 0 && <tr><td colSpan={type === 'proveedor' ? 7 : 6} className="py-3 text-center text-gray-400">Sin {type === 'proveedor' ? 'proveedores' : 'clientes'} registrados.</td></tr>}
+          {filtered.length === 0 && <tr><td colSpan={type === 'proveedor' ? 7 : 6} className="py-3 text-center text-gray-400">{type === 'proveedor' ? t('thirdParties.emptySuppliers') : t('thirdParties.emptyClients')}</td></tr>}
         </Table>
       </Card>
     </div>

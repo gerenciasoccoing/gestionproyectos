@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { laborParamsApi } from '../../api';
-import { Card, Button, Input, Table, ErrorText, extractError, money } from '../../components/ui';
+import { Card, Button, Input, Table, ErrorText, extractError, money, formatDate } from '../../components/ui';
 
 const initialForm = {
   effectiveDate: '', smlv: '', auxTransporte: '', cesantiasDivisor: 360,
@@ -9,6 +10,7 @@ const initialForm = {
 };
 
 export default function LaborParametersPage() {
+  const { t } = useTranslation();
   const [params, setParams] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(initialForm);
@@ -31,32 +33,31 @@ export default function LaborParametersPage() {
   };
 
   return (
-    <Card title="Parámetros Laborales (Colombia)" actions={
-      <Button onClick={() => setShowForm((s) => !s)}>{showForm ? 'Cancelar' : '+ Nueva versión de parámetros'}</Button>
+    <Card title={t('admin.laborParameters.title')} actions={
+      <Button onClick={() => setShowForm((s) => !s)}>{showForm ? t('common.cancel') : t('admin.laborParameters.newVersion')}</Button>
     }>
       <p className="text-sm text-gray-500 mb-3">
-        Estos parámetros alimentan el cálculo de liquidación de prestaciones sociales. Se usa siempre la versión
-        vigente más reciente (por fecha de vigencia) al momento de calcular cada liquidación.
+        {t('admin.laborParameters.help')}
       </p>
       {showForm && (
         <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-          <Input label="Vigente desde" type="date" value={form.effectiveDate} onChange={(e) => setForm({ ...form, effectiveDate: e.target.value })} required />
-          <Input label="SMLV" type="number" min="0" step="0.01" value={form.smlv} onChange={(e) => setForm({ ...form, smlv: e.target.value })} required />
-          <Input label="Auxilio de transporte" type="number" min="0" step="0.01" value={form.auxTransporte} onChange={(e) => setForm({ ...form, auxTransporte: e.target.value })} />
-          <Input label="Tope aux. transporte (en SMLV)" type="number" min="0" step="0.01" value={form.topeAuxTransporteSalarios} onChange={(e) => setForm({ ...form, topeAuxTransporteSalarios: e.target.value })} />
-          <Input label="Divisor cesantías" type="number" min="1" step="0.01" value={form.cesantiasDivisor} onChange={(e) => setForm({ ...form, cesantiasDivisor: e.target.value })} />
-          <Input label="% intereses cesantías" type="number" min="0" step="0.01" value={form.interesesCesantiasPercent} onChange={(e) => setForm({ ...form, interesesCesantiasPercent: e.target.value })} />
-          <Input label="Divisor prima" type="number" min="1" step="0.01" value={form.primaDivisor} onChange={(e) => setForm({ ...form, primaDivisor: e.target.value })} />
-          <Input label="Divisor vacaciones" type="number" min="1" step="0.01" value={form.vacacionesDivisor} onChange={(e) => setForm({ ...form, vacacionesDivisor: e.target.value })} />
-          <Input label="Notas" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="col-span-full" />
-          <Button type="submit" className="col-span-full">Guardar nueva versión</Button>
+          <Input label={t('admin.laborParameters.effectiveDate')} type="date" value={form.effectiveDate} onChange={(e) => setForm({ ...form, effectiveDate: e.target.value })} required />
+          <Input label={t('admin.laborParameters.smlv')} type="number" min="0" step="0.01" value={form.smlv} onChange={(e) => setForm({ ...form, smlv: e.target.value })} required />
+          <Input label={t('admin.laborParameters.auxTransporte')} type="number" min="0" step="0.01" value={form.auxTransporte} onChange={(e) => setForm({ ...form, auxTransporte: e.target.value })} />
+          <Input label={t('admin.laborParameters.topeAuxTransporte')} type="number" min="0" step="0.01" value={form.topeAuxTransporteSalarios} onChange={(e) => setForm({ ...form, topeAuxTransporteSalarios: e.target.value })} />
+          <Input label={t('admin.laborParameters.cesantiasDivisor')} type="number" min="1" step="0.01" value={form.cesantiasDivisor} onChange={(e) => setForm({ ...form, cesantiasDivisor: e.target.value })} />
+          <Input label={t('admin.laborParameters.interesesCesantiasPercent')} type="number" min="0" step="0.01" value={form.interesesCesantiasPercent} onChange={(e) => setForm({ ...form, interesesCesantiasPercent: e.target.value })} />
+          <Input label={t('admin.laborParameters.primaDivisor')} type="number" min="1" step="0.01" value={form.primaDivisor} onChange={(e) => setForm({ ...form, primaDivisor: e.target.value })} />
+          <Input label={t('admin.laborParameters.vacacionesDivisor')} type="number" min="1" step="0.01" value={form.vacacionesDivisor} onChange={(e) => setForm({ ...form, vacacionesDivisor: e.target.value })} />
+          <Input label={t('admin.laborParameters.notes')} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="col-span-full" />
+          <Button type="submit" className="col-span-full">{t('admin.laborParameters.saveVersion')}</Button>
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}
-      <Table columns={['Vigente desde', 'SMLV', 'Aux. Transporte', '% Interés Cesantías', 'Notas']}>
+      <Table columns={[t('admin.laborParameters.table.effectiveDate'), t('admin.laborParameters.table.smlv'), t('admin.laborParameters.table.auxTransporte'), t('admin.laborParameters.table.interesesPercent'), t('admin.laborParameters.table.notes')]}>
         {params.map((p) => (
           <tr key={p.id} className="border-b border-gray-100">
-            <td className="py-1 pr-3">{p.effectiveDate}</td>
+            <td className="py-1 pr-3">{formatDate(p.effectiveDate)}</td>
             <td className="py-1 pr-3">{money(p.smlv)}</td>
             <td className="py-1 pr-3">{money(p.auxTransporte)}</td>
             <td className="py-1 pr-3">{Number(p.interesesCesantiasPercent)}%</td>

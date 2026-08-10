@@ -1,7 +1,35 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
+
+// La moneda es una configuración del negocio (ver CompanySettings), independiente del idioma de
+// la interfaz: se fija una sola vez al cargar la app (Layout.jsx) y money() la usa desde acá en
+// vez de recibirla por props en cada uno de sus ~20 usos en toda la app.
+const CURRENCY_FORMATS = {
+  COP: { locale: 'es-CO', currency: 'COP', maximumFractionDigits: 0 },
+  USD: { locale: 'en-US', currency: 'USD', maximumFractionDigits: 2 },
+  EUR: { locale: 'es-ES', currency: 'EUR', maximumFractionDigits: 2 },
+};
+let currentCurrency = 'COP';
+
+export function setCurrencyConfig(currency) {
+  if (CURRENCY_FORMATS[currency]) currentCurrency = currency;
+}
 
 export function money(n) {
-  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(n || 0));
+  const { locale, currency, maximumFractionDigits } = CURRENCY_FORMATS[currentCurrency];
+  return new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits }).format(Number(n || 0));
+}
+
+// Convierte una fecha ISO (AAAA-MM-DD, como las que devuelve la API) al formato del idioma
+// activo: DD/MM/AAAA en español, MM/DD/AAAA en inglés. Los valores no cambian, solo el orden en
+// que se muestran; si el valor no es una fecha ISO válida se devuelve tal cual.
+export function formatDate(isoDate) {
+  if (!isoDate) return '';
+  const match = String(isoDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return isoDate;
+  const [, year, month, day] = match;
+  return i18n.language === 'en' ? `${month}/${day}/${year}` : `${day}/${month}/${year}`;
 }
 
 export function Card({ title, actions, children, className = '' }) {
@@ -81,7 +109,9 @@ const SEARCH_SELECT_MAX_RESULTS = 50;
 // Combobox con filtro de texto para listas largas (ej. base de precios, APU). options es
 // [{ value, label }]. A diferencia de Select, escribir filtra las opciones en vez de saltar
 // a la que empieza con esa letra.
-export function SearchSelect({ label, className = '', options, value, onChange, placeholder = '-- seleccionar --', disabled = false }) {
+export function SearchSelect({ label, className = '', options, value, onChange, placeholder, disabled = false }) {
+  const { t } = useTranslation();
+  const effectivePlaceholder = placeholder ?? t('common.selectPlaceholder');
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(0);
@@ -133,7 +163,7 @@ export function SearchSelect({ label, className = '', options, value, onChange, 
         disabled={disabled}
         className="border border-gray-300 rounded px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400 w-full disabled:bg-gray-100"
         value={open ? query : (selected ? selected.label : '')}
-        placeholder={placeholder}
+        placeholder={effectivePlaceholder}
         onFocus={(e) => { setOpen(true); setQuery(''); setHighlighted(0); e.target.select(); }}
         onChange={(e) => { setQuery(e.target.value); setOpen(true); setHighlighted(0); }}
         onKeyDown={handleKeyDown}
@@ -144,7 +174,7 @@ export function SearchSelect({ label, className = '', options, value, onChange, 
             className={`px-2 py-1.5 text-sm text-gray-400 cursor-pointer hover:bg-blue-50 ${!value ? 'bg-blue-50' : ''}`}
             onMouseDown={(e) => { e.preventDefault(); selectOption({ value: '', label: '' }); }}
           >
-            {placeholder}
+            {effectivePlaceholder}
           </div>
           {shown.map((o, i) => (
             <div
@@ -156,10 +186,10 @@ export function SearchSelect({ label, className = '', options, value, onChange, 
               {o.label}
             </div>
           ))}
-          {shown.length === 0 && <div className="px-2 py-1.5 text-sm text-gray-400">Sin resultados.</div>}
+          {shown.length === 0 && <div className="px-2 py-1.5 text-sm text-gray-400">{t('common.noResults')}</div>}
           {filtered.length > SEARCH_SELECT_MAX_RESULTS && (
             <div className="px-2 py-1 text-xs text-gray-400 border-t border-gray-100">
-              Mostrando {SEARCH_SELECT_MAX_RESULTS} de {filtered.length} resultados — sigue escribiendo para filtrar más.
+              {t('common.showingResults', { shown: SEARCH_SELECT_MAX_RESULTS, total: filtered.length })}
             </div>
           )}
         </div>
@@ -214,5 +244,7 @@ export function ErrorText({ children }) {
 }
 
 export function extractError(err) {
-  return err?.response?.data?.message || err?.message || 'Ocurrió un error inesperado';
+  const raw = err?.response?.data?.message;
+  if (raw) return i18n.t(`errors.${raw}`, raw);
+  return err?.message || i18n.t('common.unexpectedError');
 }

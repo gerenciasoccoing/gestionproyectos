@@ -1,14 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { apuApi, priceItemsApi, companyApi } from '../../api';
 import { Card, Button, Input, Select, SearchSelect, Table, ErrorText, extractError, money } from '../../components/ui';
 import Can from '../../components/Can';
-
-const SECTION_DEFS = [
-  { category: 'material', title: 'Materiales' },
-  { category: 'herramienta', title: 'Herramientas y Equipos' },
-  { category: 'personal', title: 'Mano de Obra (Personal)' },
-  { category: 'transporte', title: 'Transporte' },
-];
 
 function emptyRow(category, defaultPrestacionalPercent) {
   if (category === 'personal') {
@@ -27,6 +21,13 @@ const emptyForm = { name: '', unit: '', code: '', otherCosts: '0' };
 const PAGE_SIZE = 50;
 
 export default function ApuPage() {
+  const { t } = useTranslation();
+  const SECTION_DEFS = [
+    { category: 'material', title: t('apu.sections.material') },
+    { category: 'herramienta', title: t('apu.sections.herramienta') },
+    { category: 'personal', title: t('apu.sections.personal') },
+    { category: 'transporte', title: t('apu.sections.transporte') },
+  ];
   const [apus, setApus] = useState([]);
   const [priceItems, setPriceItems] = useState([]);
   const [defaultPrestacionalPercent, setDefaultPrestacionalPercent] = useState(70);
@@ -59,8 +60,8 @@ export default function ApuPage() {
   const submitImport = async (e) => {
     e.preventDefault();
     setImportError(''); setImportResult(null);
-    if (!importFile) { setImportError('Debes seleccionar un archivo.'); return; }
-    if (!importForm.sourceLabel.trim()) { setImportError('Indica un nombre para este listado (ej. "Listado Abril 2026").'); return; }
+    if (!importFile) { setImportError(t('apu.importSection.missingFile')); return; }
+    if (!importForm.sourceLabel.trim()) { setImportError(t('apu.importSection.missingLabel')); return; }
     setImporting(true);
     try {
       const fd = new FormData();
@@ -230,44 +231,41 @@ export default function ApuPage() {
   };
 
   const remove = async (id) => {
-    if (!confirm('¿Eliminar este APU?')) return;
+    if (!confirm(t('apu.catalog.confirmDelete'))) return;
     await apuApi.remove(id);
     load();
   };
 
   return (
     <div>
-      <Card title="Importar / actualizar catálogo de APU desde Excel" actions={
+      <Card title={t('apu.importSection.title')} actions={
         <Can module="cotizaciones" action="create">
-          <Button onClick={() => setShowImport((s) => !s)}>{showImport ? 'Cancelar' : '+ Importar listado'}</Button>
+          <Button onClick={() => setShowImport((s) => !s)}>{showImport ? t('common.cancel') : t('apu.importSection.toggle')}</Button>
         </Can>
       }>
         {showImport && (
           <form onSubmit={submitImport} className="space-y-3">
             <p className="text-sm text-gray-600">
-              Sube el Excel oficial del listado de precios unitarios (hojas "Items de Presupuesto" + "Unitarios").
-              Un APU con código nuevo se crea; si el código ya existe y su costo directo cambió, se actualiza — sin
-              tocar los ítems de presupuesto ya agregados en proyectos existentes (su valor queda fijo, como siempre).
+              {t('apu.importSection.help')}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Input label="Nombre del listado (ej. Listado Abril 2026)" value={importForm.sourceLabel} onChange={(e) => setImportForm({ ...importForm, sourceLabel: e.target.value })} required />
-              <Input label="Fecha de vigencia (opcional)" type="date" value={importForm.effectiveDate} onChange={(e) => setImportForm({ ...importForm, effectiveDate: e.target.value })} />
-              <Input label="Archivo Excel (.xlsx / .xls)" type="file" accept=".xlsx,.xls" onChange={(e) => setImportFile(e.target.files[0])} />
+              <Input label={t('apu.importSection.sourceLabel')} value={importForm.sourceLabel} onChange={(e) => setImportForm({ ...importForm, sourceLabel: e.target.value })} required />
+              <Input label={t('apu.importSection.effectiveDate')} type="date" value={importForm.effectiveDate} onChange={(e) => setImportForm({ ...importForm, effectiveDate: e.target.value })} />
+              <Input label={t('apu.importSection.file')} type="file" accept=".xlsx,.xls" onChange={(e) => setImportFile(e.target.files[0])} />
             </div>
-            <Button type="submit" disabled={importing}>{importing ? 'Importando… puede tardar un momento' : 'Importar'}</Button>
+            <Button type="submit" disabled={importing}>{importing ? t('apu.importSection.submitting') : t('apu.importSection.submit')}</Button>
             <ErrorText>{importError}</ErrorText>
           </form>
         )}
         {importResult && (
           <div className="mt-4 border-t pt-3 text-sm space-y-2">
             <p className="font-medium text-green-700">
-              Importación "{importResult.sourceLabel}" completada: {importResult.created} APU creados,{' '}
-              {importResult.updated} actualizados, {importResult.unchanged} sin cambio de valor.
+              {t('apu.importSection.done', { label: importResult.sourceLabel, created: importResult.created, updated: importResult.updated, unchanged: importResult.unchanged })}
             </p>
             {importResult.changes.length > 0 ? (
               <div>
-                <p className="text-gray-600 mb-1">APU que cambiaron de valor (ordenados por mayor variación):</p>
-                <Table columns={['Código', 'Nombre', 'Valor anterior', 'Valor nuevo', '% Variación', 'Presupuestos que lo usan']}>
+                <p className="text-gray-600 mb-1">{t('apu.importSection.changesTitle')}</p>
+                <Table columns={[t('apu.importSection.changesTable.code'), t('apu.importSection.changesTable.name'), t('apu.importSection.changesTable.oldValue'), t('apu.importSection.changesTable.newValue'), t('apu.importSection.changesTable.deltaPercent'), t('apu.importSection.changesTable.budgetsUsing')]}>
                   {importResult.changes.map((c) => (
                     <tr key={c.apuId} className="border-b border-gray-100">
                       <td className="py-1 pr-3 text-gray-400">{c.code}</td>
@@ -279,9 +277,9 @@ export default function ApuPage() {
                       </td>
                       <td className="py-1 pr-3">
                         {c.affectedBudgetItemsCount > 0 ? (
-                          <span className="text-yellow-700">{c.affectedBudgetItemsCount} ítem(s) — su valor ya agregado NO cambia</span>
+                          <span className="text-yellow-700">{t('apu.importSection.affectedItems', { count: c.affectedBudgetItemsCount })}</span>
                         ) : (
-                          <span className="text-gray-400">Ninguno</span>
+                          <span className="text-gray-400">{t('apu.importSection.noneAffected')}</span>
                         )}
                       </td>
                     </tr>
@@ -289,25 +287,25 @@ export default function ApuPage() {
                 </Table>
               </div>
             ) : (
-              <p className="text-gray-500">Ningún APU existente cambió de valor.</p>
+              <p className="text-gray-500">{t('apu.importSection.noChanges')}</p>
             )}
           </div>
         )}
       </Card>
 
-    <Card title="Análisis de Precios Unitarios (APU)" actions={
+    <Card title={t('apu.catalog.title')} actions={
       <Can module="cotizaciones" action="create">
         <Button onClick={() => (showForm ? (setShowForm(false), resetForm()) : startCreate())}>
-          {showForm ? 'Cancelar' : '+ Nuevo APU'}
+          {showForm ? t('common.cancel') : t('apu.catalog.new')}
         </Button>
       </Can>
     }>
       {showForm && (
         <form onSubmit={submit} className="mb-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-            <Input label="Nombre del ítem/actividad" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-            <Input label="Unidad" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} required />
-            <Input label="Código" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+            <Input label={t('apu.catalog.itemName')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+            <Input label={t('apu.catalog.unit')} value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} required />
+            <Input label={t('apu.catalog.code')} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -359,28 +357,28 @@ export default function ApuPage() {
 
           <div className="mt-4 flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-t pt-3">
             <Input
-              label="Otros costos directos (opcional)"
+              label={t('apu.catalog.otherCosts')}
               type="number" min="0" step="0.01"
               value={form.otherCosts}
               onChange={(e) => setForm({ ...form, otherCosts: e.target.value })}
               className="max-w-xs"
             />
-            <p className="text-lg font-semibold text-gray-800">TOTAL COSTO DIRECTO: {money(totalDirectCost)}</p>
+            <p className="text-lg font-semibold text-gray-800">{t('apu.catalog.totalDirect', { amount: money(totalDirectCost) })}</p>
           </div>
 
           <div className="mt-3">
-            <Button type="submit">{editingId ? 'Guardar cambios' : 'Guardar APU'}</Button>
+            <Button type="submit">{editingId ? t('apu.catalog.saveChanges') : t('apu.catalog.save')}</Button>
             <ErrorText>{error}</ErrorText>
           </div>
         </form>
       )}
 
       <div className="flex flex-wrap gap-3 items-end mb-3">
-        <Input label="Buscar por nombre o código" value={search} onChange={(e) => setSearch(e.target.value)} className="w-64" />
-        <span className="text-sm text-gray-500 pb-1.5">{filtered.length} APU</span>
+        <Input label={t('apu.catalog.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} className="w-64" />
+        <span className="text-sm text-gray-500 pb-1.5">{t('apu.catalog.count', { count: filtered.length })}</span>
       </div>
 
-      <Table columns={['Código', 'Nombre', 'Unidad', 'Costo directo', '']}>
+      <Table columns={[t('apu.catalog.table.code'), t('apu.catalog.table.name'), t('apu.catalog.table.unit'), t('apu.catalog.table.directCost'), '']}>
         {pageApus.map((a) => (
           <tr key={a.id} className="border-b border-gray-100">
             <td className="py-1 pr-3 text-gray-400">{a.code || '-'}</td>
@@ -389,30 +387,30 @@ export default function ApuPage() {
             <td className="py-1 pr-3 font-semibold">{money(a.directCost)}</td>
             <td className="py-1 pr-3 text-right flex gap-2 justify-end">
               <Button variant="secondary" onClick={() => toggleComponents(a.id)}>
-                {expandedId === a.id ? 'Cerrar' : 'Componentes'}
+                {expandedId === a.id ? t('apu.catalog.close') : t('apu.catalog.components')}
               </Button>
               <Button variant="secondary" onClick={() => setExportId(exportId === a.id ? null : a.id)}>
-                {exportId === a.id ? 'Cerrar' : 'Exportar'}
+                {exportId === a.id ? t('apu.catalog.close') : t('apu.catalog.export')}
               </Button>
-              <Can module="cotizaciones" action="edit"><Button variant="secondary" onClick={() => startEdit(a)}>Editar</Button></Can>
-              <Can module="cotizaciones" action="delete"><Button variant="danger" onClick={() => remove(a.id)}>Eliminar</Button></Can>
+              <Can module="cotizaciones" action="edit"><Button variant="secondary" onClick={() => startEdit(a)}>{t('common.edit')}</Button></Can>
+              <Can module="cotizaciones" action="delete"><Button variant="danger" onClick={() => remove(a.id)}>{t('common.delete')}</Button></Can>
             </td>
           </tr>
         ))}
-        {filtered.length === 0 && <tr><td colSpan={5} className="py-2 text-center text-gray-400">Sin APU que coincidan.</td></tr>}
+        {filtered.length === 0 && <tr><td colSpan={5} className="py-2 text-center text-gray-400">{t('apu.catalog.empty')}</td></tr>}
       </Table>
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-3 text-sm">
-          <span className="text-gray-500">Página {currentPage} de {totalPages}</span>
+          <span className="text-gray-500">{t('apu.catalog.page', { current: currentPage, total: totalPages })}</span>
           <div className="flex gap-2">
-            <Button variant="secondary" disabled={currentPage <= 1} onClick={() => setPage((p) => p - 1)}>Anterior</Button>
-            <Button variant="secondary" disabled={currentPage >= totalPages} onClick={() => setPage((p) => p + 1)}>Siguiente</Button>
+            <Button variant="secondary" disabled={currentPage <= 1} onClick={() => setPage((p) => p - 1)}>{t('apu.catalog.previous')}</Button>
+            <Button variant="secondary" disabled={currentPage >= totalPages} onClick={() => setPage((p) => p + 1)}>{t('apu.catalog.next')}</Button>
           </div>
         </div>
       )}
 
-      {expandedId && !expandedApu && <p className="text-sm text-gray-400 mt-3">Cargando componentes…</p>}
+      {expandedId && !expandedApu && <p className="text-sm text-gray-400 mt-3">{t('apu.catalog.loadingComponents')}</p>}
       {expandedApu && <ApuComponents apu={expandedApu} />}
       {exportId && <ApuExportPanel apu={apus.find((a) => a.id === exportId)} />}
     </Card>
@@ -421,6 +419,7 @@ export default function ApuPage() {
 }
 
 function ApuExportPanel({ apu }) {
+  const { t } = useTranslation();
   const [aiu, setAiu] = useState({ adminPercent: '0', imprevistosPercent: '0', utilidadPercent: '0' });
   const [names, setNames] = useState({ elaboroNombre: '', revisoNombre: '' });
   const [downloading, setDownloading] = useState('');
@@ -444,22 +443,22 @@ function ApuExportPanel({ apu }) {
 
   return (
     <div className="mt-3 border-t pt-3">
-      <p className="font-medium text-sm mb-2">Exportar APU: {apu.name}</p>
+      <p className="font-medium text-sm mb-2">{t('apu.exportPanel.title', { name: apu.name })}</p>
       <p className="text-xs text-gray-500 mb-3">
-        El AIU y los nombres de firma se usan solo para este documento — no se guardan en el APU.
+        {t('apu.exportPanel.help')}
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-        <Input label="Administración (%)" type="number" min="0" step="0.01" value={aiu.adminPercent} onChange={(e) => setAiu({ ...aiu, adminPercent: e.target.value })} />
-        <Input label="Imprevistos (%)" type="number" min="0" step="0.01" value={aiu.imprevistosPercent} onChange={(e) => setAiu({ ...aiu, imprevistosPercent: e.target.value })} />
-        <Input label="Utilidad (%)" type="number" min="0" step="0.01" value={aiu.utilidadPercent} onChange={(e) => setAiu({ ...aiu, utilidadPercent: e.target.value })} />
+        <Input label={t('apu.exportPanel.admin')} type="number" min="0" step="0.01" value={aiu.adminPercent} onChange={(e) => setAiu({ ...aiu, adminPercent: e.target.value })} />
+        <Input label={t('apu.exportPanel.unforeseen')} type="number" min="0" step="0.01" value={aiu.imprevistosPercent} onChange={(e) => setAiu({ ...aiu, imprevistosPercent: e.target.value })} />
+        <Input label={t('apu.exportPanel.profit')} type="number" min="0" step="0.01" value={aiu.utilidadPercent} onChange={(e) => setAiu({ ...aiu, utilidadPercent: e.target.value })} />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-        <Input label="Elaboró y validó" value={names.elaboroNombre} onChange={(e) => setNames({ ...names, elaboroNombre: e.target.value })} />
-        <Input label="Revisó y Aprobó" value={names.revisoNombre} onChange={(e) => setNames({ ...names, revisoNombre: e.target.value })} />
+        <Input label={t('apu.exportPanel.elaborated')} value={names.elaboroNombre} onChange={(e) => setNames({ ...names, elaboroNombre: e.target.value })} />
+        <Input label={t('apu.exportPanel.reviewed')} value={names.revisoNombre} onChange={(e) => setNames({ ...names, revisoNombre: e.target.value })} />
       </div>
       <div className="flex gap-2 items-center">
-        <Button onClick={() => download('pdf')} disabled={!!downloading}>{downloading === 'pdf' ? 'Generando PDF…' : 'Descargar PDF'}</Button>
-        <Button variant="secondary" onClick={() => download('excel')} disabled={!!downloading}>{downloading === 'excel' ? 'Generando Excel…' : 'Descargar Excel'}</Button>
+        <Button onClick={() => download('pdf')} disabled={!!downloading}>{downloading === 'pdf' ? t('apu.exportPanel.generatingPdf') : t('common.downloadPdf')}</Button>
+        <Button variant="secondary" onClick={() => download('excel')} disabled={!!downloading}>{downloading === 'excel' ? t('apu.exportPanel.generatingExcel') : t('common.downloadExcel')}</Button>
       </div>
       <ErrorText>{error}</ErrorText>
     </div>
@@ -467,6 +466,7 @@ function ApuExportPanel({ apu }) {
 }
 
 function ApuSection({ def, rows, options, subtotal, collapsed, onToggle, onAdd, onUpdate, onRemove }) {
+  const { t } = useTranslation();
   return (
     <div className="border border-gray-200 rounded-lg">
       <div className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-t-lg">
@@ -475,13 +475,13 @@ function ApuSection({ def, rows, options, subtotal, collapsed, onToggle, onAdd, 
           {def.title}
         </button>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-600">Total: {money(subtotal)}</span>
+          <span className="text-sm text-gray-600">{t('apu.sectionUi.total', { amount: money(subtotal) })}</span>
           <Button type="button" variant="primary" className="!rounded-full !w-7 !h-7 !p-0 flex items-center justify-center" onClick={onAdd}>+</Button>
         </div>
       </div>
       {!collapsed && (
         <div className="p-3 space-y-2">
-          {rows.length === 0 && <p className="text-xs text-gray-400">Sin ítems. Usa "+" para agregar.</p>}
+          {rows.length === 0 && <p className="text-xs text-gray-400">{t('apu.sectionUi.empty')}</p>}
           {rows.map((row, idx) => (
             <SectionRow
               key={idx}
@@ -503,14 +503,15 @@ function priceItemLabel(p) {
 }
 
 function SectionRow({ category, row, options, onChange, onRemove }) {
+  const { t } = useTranslation();
   const selected = options.find((p) => p.id === row.priceItemId);
   const searchOptions = options.map((p) => ({ value: p.id, label: priceItemLabel(p) }));
 
   if (category === 'material') {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-start sm:items-end">
-        <SearchSelect label="Material" className="col-span-2 sm:col-span-6" options={searchOptions} value={row.priceItemId} onChange={(v) => onChange('priceItemId', v)} />
-        <Input label="Cantidad" className="col-span-1 sm:col-span-3" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
+        <SearchSelect label={t('apu.row.material')} className="col-span-2 sm:col-span-6" options={searchOptions} value={row.priceItemId} onChange={(v) => onChange('priceItemId', v)} />
+        <Input label={t('apu.row.quantity')} className="col-span-1 sm:col-span-3" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
         <div className="col-span-1 sm:col-span-2 text-sm text-gray-600 pb-1.5 self-end">{money((Number(row.quantity) || 0) * Number(selected?.currentValue || 0))}</div>
         <Button type="button" variant="danger" className="col-span-2 sm:col-span-1" onClick={onRemove}>×</Button>
       </div>
@@ -521,9 +522,9 @@ function SectionRow({ category, row, options, onChange, onRemove }) {
     const total = (Number(row.quantity) || 0) * (Number(row.yield) || 1) * Number(selected?.currentValue || 0);
     return (
       <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-start sm:items-end">
-        <SearchSelect label="Herramienta/Equipo" className="col-span-2 sm:col-span-5" options={searchOptions} value={row.priceItemId} onChange={(v) => onChange('priceItemId', v)} />
-        <Input label="Cantidad" className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
-        <Input label="Rendimiento" className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.yield} onChange={(e) => onChange('yield', e.target.value)} />
+        <SearchSelect label={t('apu.row.tool')} className="col-span-2 sm:col-span-5" options={searchOptions} value={row.priceItemId} onChange={(v) => onChange('priceItemId', v)} />
+        <Input label={t('apu.row.quantity')} className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
+        <Input label={t('apu.row.yield')} className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.yield} onChange={(e) => onChange('yield', e.target.value)} />
         <div className="col-span-1 sm:col-span-2 text-sm text-gray-600 pb-1.5 self-end">{money(total)}</div>
         <Button type="button" variant="danger" className="col-span-1 sm:col-span-1" onClick={onRemove}>×</Button>
       </div>
@@ -535,13 +536,13 @@ function SectionRow({ category, row, options, onChange, onRemove }) {
     const total = ((Number(row.quantity) || 0) * base * (1 + (Number(row.prestacionalPercent) || 0) / 100)) / (Number(row.yield) || 1);
     return (
       <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-start sm:items-end">
-        <SearchSelect label="Personal" className="col-span-2 sm:col-span-4" options={searchOptions} value={row.priceItemId} onChange={(v) => onChange('priceItemId', v)} />
-        <Input label="Cantidad" className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
-        <Input label="Rendimiento" className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.yield} onChange={(e) => onChange('yield', e.target.value)} />
-        <Input label="Valor base" className="col-span-1 sm:col-span-2" value={money(base)} readOnly disabled />
-        <Input label="% Prestacional" className="col-span-1 sm:col-span-1" type="number" min="0" step="0.01" value={row.prestacionalPercent} onChange={(e) => onChange('prestacionalPercent', e.target.value)} />
+        <SearchSelect label={t('apu.row.personnel')} className="col-span-2 sm:col-span-4" options={searchOptions} value={row.priceItemId} onChange={(v) => onChange('priceItemId', v)} />
+        <Input label={t('apu.row.quantity')} className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
+        <Input label={t('apu.row.yield')} className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.yield} onChange={(e) => onChange('yield', e.target.value)} />
+        <Input label={t('apu.row.baseValue')} className="col-span-1 sm:col-span-2" value={money(base)} readOnly disabled />
+        <Input label={t('apu.row.prestacionalPercent')} className="col-span-1 sm:col-span-1" type="number" min="0" step="0.01" value={row.prestacionalPercent} onChange={(e) => onChange('prestacionalPercent', e.target.value)} />
         <Button type="button" variant="danger" className="col-span-2 sm:col-span-1" onClick={onRemove}>×</Button>
-        <div className="col-span-full text-right text-sm text-gray-600 -mt-1">Valor ítem (con prestaciones): {money(total)}</div>
+        <div className="col-span-full text-right text-sm text-gray-600 -mt-1">{t('apu.row.itemValueWithPrest', { amount: money(total) })}</div>
       </div>
     );
   }
@@ -550,29 +551,29 @@ function SectionRow({ category, row, options, onChange, onRemove }) {
   const rate = row.priceItemId ? Number(selected?.currentValue || 0) : (Number(row.unitValue) || 0);
   return (
     <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-start sm:items-end">
-      <Select label="Modalidad" className="col-span-2 sm:col-span-3" value={row.transportMode} onChange={(e) => onChange('transportMode', e.target.value)}>
-        <option value="distancia_peso">Distancia y peso</option>
-        <option value="porcentaje_materiales">% sobre materiales</option>
+      <Select label={t('apu.row.modality')} className="col-span-2 sm:col-span-3" value={row.transportMode} onChange={(e) => onChange('transportMode', e.target.value)}>
+        <option value="distancia_peso">{t('apu.row.distanceWeight')}</option>
+        <option value="porcentaje_materiales">{t('apu.row.percentOfMaterials')}</option>
       </Select>
-      <SearchSelect label="Insumo (opcional)" className="col-span-2 sm:col-span-4" options={searchOptions} value={row.priceItemId} onChange={(v) => onChange('priceItemId', v)} placeholder="-- manual --" />
+      <SearchSelect label={t('apu.row.supplyOptional')} className="col-span-2 sm:col-span-4" options={searchOptions} value={row.priceItemId} onChange={(v) => onChange('priceItemId', v)} placeholder={t('apu.row.manualPlaceholder')} />
       {!row.priceItemId && (
-        <Input label="Descripción" className="col-span-2 sm:col-span-4" value={row.description} onChange={(e) => onChange('description', e.target.value)} />
+        <Input label={t('apu.row.description')} className="col-span-2 sm:col-span-4" value={row.description} onChange={(e) => onChange('description', e.target.value)} />
       )}
       {row.transportMode === 'distancia_peso' ? (
         <>
-          <Input label="Peso (kg)" className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
-          <Input label="Distancia (km)" className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.transportDistance} onChange={(e) => onChange('transportDistance', e.target.value)} />
+          <Input label={t('apu.row.weight')} className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.quantity} onChange={(e) => onChange('quantity', e.target.value)} />
+          <Input label={t('apu.row.distance')} className="col-span-1 sm:col-span-2" type="number" min="0" step="0.0001" value={row.transportDistance} onChange={(e) => onChange('transportDistance', e.target.value)} />
           {!row.priceItemId && (
-            <Input label="Valor por kg-km" className="col-span-2 sm:col-span-2" type="number" min="0" step="0.0001" value={row.unitValue} onChange={(e) => onChange('unitValue', e.target.value)} />
+            <Input label={t('apu.row.valuePerKgKm')} className="col-span-2 sm:col-span-2" type="number" min="0" step="0.0001" value={row.unitValue} onChange={(e) => onChange('unitValue', e.target.value)} />
           )}
         </>
       ) : (
-        <Input label="% sobre materiales" className="col-span-2 sm:col-span-2" type="number" min="0" step="0.01" value={row.transportPercent} onChange={(e) => onChange('transportPercent', e.target.value)} />
+        <Input label={t('apu.row.percentOverMaterials')} className="col-span-2 sm:col-span-2" type="number" min="0" step="0.01" value={row.transportPercent} onChange={(e) => onChange('transportPercent', e.target.value)} />
       )}
       <Button type="button" variant="danger" className="col-span-2 sm:col-span-1" onClick={onRemove}>×</Button>
       {row.transportMode === 'distancia_peso' && (
         <div className="col-span-full text-right text-sm text-gray-600 -mt-1">
-          Valor total: {money((Number(row.quantity) || 0) * (Number(row.transportDistance) || 0) * rate)}
+          {t('apu.row.totalValue', { amount: money((Number(row.quantity) || 0) * (Number(row.transportDistance) || 0) * rate) })}
         </div>
       )}
     </div>
@@ -580,16 +581,22 @@ function SectionRow({ category, row, options, onChange, onRemove }) {
 }
 
 function ApuComponents({ apu }) {
+  const { t } = useTranslation();
   if (!apu) return null;
   const label = (c) => {
     if (c.priceItem) return c.priceItem.name;
-    return c.description || '(sin descripción)';
+    return c.description || t('apu.components.noDescription');
   };
-  const categoryLabel = { material: 'Material', herramienta: 'Herramienta/Equipo', personal: 'Personal', transporte: 'Transporte' };
+  const categoryLabel = {
+    material: t('apu.components.categories.material'),
+    herramienta: t('apu.components.categories.herramienta'),
+    personal: t('apu.components.categories.personal'),
+    transporte: t('apu.components.categories.transporte'),
+  };
   return (
     <div className="mt-3 border-t pt-3">
-      <p className="font-medium text-sm mb-2">Componentes de: {apu.name}</p>
-      <Table columns={['Insumo', 'Sección', 'Cantidad', 'Rendimiento', 'Valor unitario']}>
+      <p className="font-medium text-sm mb-2">{t('apu.components.title', { name: apu.name })}</p>
+      <Table columns={[t('apu.components.table.supply'), t('apu.components.table.section'), t('apu.components.table.quantity'), t('apu.components.table.yield'), t('apu.components.table.unitValue')]}>
         {apu.components.map((c) => (
           <tr key={c.id} className="border-b border-gray-100">
             <td className="py-1 pr-3">{label(c)}</td>

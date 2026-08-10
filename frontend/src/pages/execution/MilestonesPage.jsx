@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { milestonesApi } from '../../api';
-import { Card, Button, Input, Select, Table, ErrorText, extractError, Badge } from '../../components/ui';
+import { Card, Button, Input, Select, Table, ErrorText, extractError, Badge, formatDate } from '../../components/ui';
 import Can from '../../components/Can';
 
 export default function MilestonesPage() {
+  const { t } = useTranslation();
   const { projectId } = useOutletContext();
   const [milestones, setMilestones] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -33,7 +35,7 @@ export default function MilestonesPage() {
   };
 
   const remove = async (id) => {
-    if (!confirm('¿Eliminar este hito?')) return;
+    if (!confirm(t('execution.milestones.confirmDelete'))) return;
     await milestonesApi.remove(projectId, id);
     load();
   };
@@ -41,44 +43,44 @@ export default function MilestonesPage() {
   const badgeColor = (status) => (status === 'cumplido' ? 'green' : status === 'atrasado' ? 'red' : 'yellow');
 
   return (
-    <Card title="Hitos" actions={
+    <Card title={t('execution.milestones.title')} actions={
       <Can module="ejecucion" action="create">
-        <Button onClick={() => setShowForm((s) => !s)}>{showForm ? 'Cancelar' : '+ Agregar hito'}</Button>
+        <Button onClick={() => setShowForm((s) => !s)}>{showForm ? t('common.cancel') : t('execution.milestones.add')}</Button>
       </Can>
     }>
       {showForm && (
         <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-          <Input label="Nombre del hito" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <Input label="Fecha planeada" type="date" value={form.plannedDate} onChange={(e) => setForm({ ...form, plannedDate: e.target.value })} required />
-          <Button type="submit">Guardar</Button>
+          <Input label={t('execution.milestones.name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          <Input label={t('execution.milestones.plannedDate')} type="date" value={form.plannedDate} onChange={(e) => setForm({ ...form, plannedDate: e.target.value })} required />
+          <Button type="submit">{t('common.save')}</Button>
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}
-      <Table columns={['Nombre', 'Planeada', 'Real', 'Estado', '']}>
+      <Table columns={[t('execution.milestones.table.name'), t('execution.milestones.table.planned'), t('execution.milestones.table.actual'), t('execution.milestones.table.status'), '']}>
         {milestones.map((m) => (
           <tr key={m.id} className="border-b border-gray-100">
             <td className="py-2 pr-3">{m.name}</td>
-            <td className="py-2 pr-3">{m.plannedDate}</td>
+            <td className="py-2 pr-3">{formatDate(m.plannedDate)}</td>
             <td className="py-2 pr-3">
-              <Can module="ejecucion" action="edit" fallback={m.actualDate || '-'}>
+              <Can module="ejecucion" action="edit" fallback={formatDate(m.actualDate) || '-'}>
                 <input type="date" defaultValue={m.actualDate || ''} onBlur={(e) => updateField(m.id, 'actualDate', e.target.value)} className="border rounded px-1 py-0.5 text-xs" />
               </Can>
             </td>
             <td className="py-2 pr-3">
-              <Can module="ejecucion" action="edit" fallback={<Badge color={badgeColor(m.status)}>{m.status}</Badge>}>
+              <Can module="ejecucion" action="edit" fallback={<Badge color={badgeColor(m.status)}>{t(`execution.milestones.status.${m.status}`, m.status)}</Badge>}>
                 <Select value={m.status} onChange={(e) => updateField(m.id, 'status', e.target.value)}>
-                  <option value="pendiente">pendiente</option>
-                  <option value="cumplido">cumplido</option>
-                  <option value="atrasado">atrasado</option>
+                  <option value="pendiente">{t('execution.milestones.status.pendiente')}</option>
+                  <option value="cumplido">{t('execution.milestones.status.cumplido')}</option>
+                  <option value="atrasado">{t('execution.milestones.status.atrasado')}</option>
                 </Select>
               </Can>
             </td>
             <td className="py-2 pr-3 text-right">
-              <Can module="ejecucion" action="delete"><Button variant="danger" onClick={() => remove(m.id)}>Eliminar</Button></Can>
+              <Can module="ejecucion" action="delete"><Button variant="danger" onClick={() => remove(m.id)}>{t('common.delete')}</Button></Can>
             </td>
           </tr>
         ))}
-        {milestones.length === 0 && <tr><td colSpan={5} className="py-3 text-center text-gray-400">Sin hitos registrados.</td></tr>}
+        {milestones.length === 0 && <tr><td colSpan={5} className="py-3 text-center text-gray-400">{t('execution.milestones.empty')}</td></tr>}
       </Table>
     </Card>
   );

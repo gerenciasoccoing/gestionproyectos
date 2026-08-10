@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { usersApi, rolesApi, projectsApi } from '../../api';
 import { Card, Button, Input, Table, Badge, ErrorText, extractError } from '../../components/ui';
 
 export default function UsersPage() {
+  const { t } = useTranslation();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -48,14 +50,14 @@ export default function UsersPage() {
   };
 
   return (
-    <Card title="Usuarios" actions={<Button onClick={() => setShowForm((s) => !s)}>{showForm ? 'Cancelar' : '+ Nuevo usuario'}</Button>}>
+    <Card title={t('admin.users.title')} actions={<Button onClick={() => setShowForm((s) => !s)}>{showForm ? t('common.cancel') : t('admin.users.new')}</Button>}>
       {showForm && (
         <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-          <Input label="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <Input label="Correo" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-          <Input label="Contraseña" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+          <Input label={t('admin.users.name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          <Input label={t('admin.users.email')} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+          <Input label={t('admin.users.password')} type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
           <div className="col-span-full">
-            <p className="text-sm text-gray-600 mb-1">Roles</p>
+            <p className="text-sm text-gray-600 mb-1">{t('admin.users.roles')}</p>
             <div className="flex gap-3 flex-wrap">
               {roles.map((r) => (
                 <label key={r.id} className="text-sm flex items-center gap-1">
@@ -65,11 +67,11 @@ export default function UsersPage() {
               ))}
             </div>
           </div>
-          <Button type="submit" className="col-span-full">Guardar</Button>
+          <Button type="submit" className="col-span-full">{t('admin.users.save')}</Button>
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}
-      <Table columns={['Nombre', 'Correo', 'Roles', 'Proyectos asignados', 'Activo']}>
+      <Table columns={[t('admin.users.table.name'), t('admin.users.table.email'), t('admin.users.table.roles'), t('admin.users.table.projects'), t('admin.users.table.active')]}>
         {users.map((u) => (
           <tr key={u.id} className="border-b border-gray-100 align-top">
             <td className="py-2 pr-3">{u.name}</td>
@@ -87,7 +89,7 @@ export default function UsersPage() {
             </td>
             <td className="py-2 pr-3">
               <Button variant={u.active ? 'secondary' : 'primary'} onClick={() => toggleActive(u)}>
-                {u.active ? 'Desactivar' : 'Activar'}
+                {u.active ? t('admin.users.deactivate') : t('admin.users.activate')}
               </Button>
             </td>
           </tr>

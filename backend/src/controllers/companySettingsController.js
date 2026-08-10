@@ -1,4 +1,5 @@
 const asyncHandler = require('../utils/asyncHandler');
+const ApiError = require('../utils/ApiError');
 const { CompanySettings } = require('../models');
 const { relativePath, UPLOAD_ROOT } = require('../middleware/upload');
 const path = require('path');
@@ -13,14 +14,20 @@ const get = asyncHandler(async (req, res) => {
   res.json(settings);
 });
 
+const CURRENCIES = ['COP', 'USD', 'EUR'];
+
 const update = asyncHandler(async (req, res) => {
   const settings = await getOrCreateSettings();
-  const { companyName, nit, address, phone, defaultPrestacionalPercent } = req.body;
+  const { companyName, nit, address, phone, defaultPrestacionalPercent, currency } = req.body;
   if (companyName !== undefined) settings.companyName = companyName;
   if (nit !== undefined) settings.nit = nit;
   if (address !== undefined) settings.address = address;
   if (phone !== undefined) settings.phone = phone;
   if (defaultPrestacionalPercent !== undefined) settings.defaultPrestacionalPercent = defaultPrestacionalPercent;
+  if (currency !== undefined) {
+    if (!CURRENCIES.includes(currency)) throw new ApiError(400, `currency debe ser una de: ${CURRENCIES.join(', ')}`);
+    settings.currency = currency;
+  }
   if (req.file) settings.logoPath = relativePath(req.file);
   await settings.save();
   res.json(settings);
