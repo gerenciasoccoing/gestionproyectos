@@ -12,7 +12,7 @@ export default function BudgetProgressPage() {
   const [apus, setApus] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [showItemForm, setShowItemForm] = useState(false);
-  const [itemForm, setItemForm] = useState({ apuId: '', description: '', unit: '', quantity: '', unitCost: '' });
+  const [itemForm, setItemForm] = useState({ apuId: '', description: '', notes: '', unit: '', quantity: '', unitCost: '' });
   const [aiuForm, setAiuForm] = useState({ adminPercent: '0', imprevistosPercent: '0', utilidadPercent: '0' });
   const [aiuSaved, setAiuSaved] = useState(false);
   const [error, setError] = useState('');
@@ -70,7 +70,7 @@ export default function BudgetProgressPage() {
       const payload = { ...itemForm };
       if (!payload.apuId) delete payload.apuId;
       await budgetApi.addItem(projectId, b.id, payload);
-      setItemForm({ apuId: '', description: '', unit: '', quantity: '', unitCost: '' });
+      setItemForm({ apuId: '', description: '', notes: '', unit: '', quantity: '', unitCost: '' });
       setShowItemForm(false);
       load();
     } catch (err) {
@@ -78,9 +78,17 @@ export default function BudgetProgressPage() {
     }
   };
 
+  // La Descripción de un ítem basado en APU es siempre el nombre del APU (no se pide ni se
+  // duplica a mano); solo se pide como texto libre cuando el ítem es manual (sin APU).
   const onApuChange = (apuId) => {
     const apu = apus.find((a) => a.id === apuId);
-    setItemForm((f) => ({ ...f, apuId, unit: apu ? apu.unit : f.unit, unitCost: apu ? apu.unitCost.toFixed(2) : f.unitCost }));
+    setItemForm((f) => ({
+      ...f,
+      apuId,
+      description: apu ? apu.name : '',
+      unit: apu ? apu.unit : f.unit,
+      unitCost: apu ? apu.unitCost.toFixed(2) : f.unitCost,
+    }));
   };
 
   const submitImport = async (e) => {
@@ -213,7 +221,7 @@ export default function BudgetProgressPage() {
                   {exportDownloading === 'pdf' ? 'Generando PDF…' : 'Descargar PDF'}
                 </Button>
                 <Button variant="secondary" onClick={() => downloadExport('excel')} disabled={!!exportDownloading}>
-                  {exportDownloading === 'excel' ? 'Generando Excel…' : 'Descargar Excel (sin logo)'}
+                  {exportDownloading === 'excel' ? 'Generando Excel…' : 'Descargar Excel'}
                 </Button>
               </div>
               <ErrorText>{exportError}</ErrorText>
@@ -230,13 +238,18 @@ export default function BudgetProgressPage() {
         {showItemForm && (
           <form onSubmit={submitItem} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
             <SearchSelect
-              label="APU (opcional)"
-              options={apus.map((a) => ({ value: a.id, label: `${a.name} (${money(a.unitCost)}/${a.unit})` }))}
+              label="APU (opcional, busca por código o nombre)"
+              options={apus.map((a) => ({ value: a.id, label: `${a.code ? `${a.code} - ` : ''}${a.name} (${money(a.unitCost)}/${a.unit})` }))}
               value={itemForm.apuId}
               onChange={onApuChange}
               placeholder="-- Ítem manual (sin APU) --"
             />
-            <Input label="Descripción" value={itemForm.description} onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })} required />
+            {itemForm.apuId ? (
+              <Input label="Descripción (del APU seleccionado)" value={itemForm.description} disabled />
+            ) : (
+              <Input label="Descripción" value={itemForm.description} onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })} required />
+            )}
+            <Input label="Nota (opcional)" value={itemForm.notes} onChange={(e) => setItemForm({ ...itemForm, notes: e.target.value })} />
             <Input label="Unidad" value={itemForm.unit} onChange={(e) => setItemForm({ ...itemForm, unit: e.target.value })} required />
             <Input label="Cantidad presupuestada" type="number" min="0" step="0.01" value={itemForm.quantity} onChange={(e) => setItemForm({ ...itemForm, quantity: e.target.value })} required />
             <Input label="Valor unitario" type="number" min="0" step="0.01" value={itemForm.unitCost} onChange={(e) => setItemForm({ ...itemForm, unitCost: e.target.value })} disabled={!!itemForm.apuId} required />
@@ -248,7 +261,10 @@ export default function BudgetProgressPage() {
         <Table columns={['Descripción', 'Cant. Presup.', 'Ejecutado', '% Avance', 'Vr. Unit.', 'Vr. Total', 'Vr. Ejecutado', '']}>
           {items.map((it) => (
             <tr key={it.id} className="border-b border-gray-100">
-              <td className="py-2 pr-3">{it.description} <span className="text-gray-400">({it.unit})</span></td>
+              <td className="py-2 pr-3">
+                {it.description} <span className="text-gray-400">({it.unit})</span>
+                {it.notes && <div className="text-xs text-gray-400">Nota: {it.notes}</div>}
+              </td>
               <td className="py-2 pr-3">{Number(it.quantity)}</td>
               <td className="py-2 pr-3">{it.accumulatedQty}</td>
               <td className="py-2 pr-3">

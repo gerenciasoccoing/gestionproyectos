@@ -6,6 +6,9 @@ module.exports = (sequelize) => {
     budgetId: { type: DataTypes.UUID, allowNull: false },
     apuId: { type: DataTypes.UUID, allowNull: true },
     description: { type: DataTypes.STRING, allowNull: false },
+    // Aclaración opcional del usuario, independiente de la descripción (que cuando el ítem viene
+    // de un APU se autocompleta con el nombre del APU y no debe pedirse ni duplicarse a mano).
+    notes: { type: DataTypes.STRING, allowNull: true },
     unit: { type: DataTypes.STRING, allowNull: false },
     quantity: { type: DataTypes.DECIMAL(18, 4), allowNull: false, validate: { min: 0 } },
     unitCost: { type: DataTypes.DECIMAL(18, 2), allowNull: false, validate: { min: 0 } },

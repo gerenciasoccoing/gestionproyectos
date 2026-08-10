@@ -246,8 +246,9 @@ const exportExcel = asyncHandler(async (req, res) => {
   });
   if (!apu) throw new ApiError(404, 'APU no encontrado');
   const { aiu, elaboroNombre, revisoNombre, itemLabel } = parseExportParams(req.body);
+  const company = await getSettingsForPdf();
 
-  const buffer = generateApuExcelBuffer({ apu, aiu, elaboroNombre, revisoNombre, itemLabel });
+  const buffer = await generateApuExcelBuffer({ apu, aiu, elaboroNombre, revisoNombre, itemLabel, company, exportDate: req.body.exportDate });
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="apu-${(apu.code || apu.id).replace(/[^a-zA-Z0-9-_]/g, '_')}.xlsx"`);
   res.send(buffer);

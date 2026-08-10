@@ -55,23 +55,28 @@ const addItem = asyncHandler(async (req, res) => {
   const budget = await Budget.findOne({ where: { id: req.params.budgetId, projectId: req.params.projectId } });
   if (!budget) throw new ApiError(404, 'Presupuesto no encontrado');
 
-  const { apuId, description, unit, quantity } = req.body;
-  if (!description || !unit || quantity === undefined) {
-    throw new ApiError(400, 'description, unit y quantity son obligatorios');
-  }
+  const { apuId, notes, unit, quantity } = req.body;
+  if (!unit || quantity === undefined) throw new ApiError(400, 'unit y quantity son obligatorios');
   if (Number(quantity) < 0) throw new ApiError(400, 'La cantidad no puede ser negativa');
 
+  // La descripción del ítem es siempre la del APU elegido (no se pide ni se duplica a mano); solo
+  // se pide como texto libre para ítems manuales, sin APU asociado.
+  let description = req.body.description;
   let unitCost = req.body.unitCost || 0;
   if (apuId) {
     const result = await computeApuUnitCost(apuId);
     if (!result) throw new ApiError(404, 'APU no encontrado');
+    description = result.apu.name;
     unitCost = applyBudgetAiu(result.directCost, budget);
+  } else if (!description) {
+    throw new ApiError(400, 'description es obligatoria para un ítem manual (sin APU)');
   }
 
   const item = await BudgetItem.create({
     budgetId: budget.id,
     apuId: apuId || null,
     description,
+    notes: notes || null,
     unit,
     quantity,
     unitCost,
@@ -131,7 +136,8 @@ const exportPdf = asyncHandler(async (req, res) => {
 
 const exportExcel = asyncHandler(async (req, res) => {
   const ctx = await buildBudgetExportContext(req.params.projectId, req.body);
-  const buffer = generateBudgetWithApuAnnexExcelBuffer(ctx);
+  const company = await getSettingsForPdf();
+  const buffer = await generateBudgetWithApuAnnexExcelBuffer({ ...ctx, company, exportDate: req.body.exportDate });
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="presupuesto-${(ctx.project?.name || 'proyecto').replace(/[^a-zA-Z0-9-_]/g, '_')}.xlsx"`);
   res.send(buffer);

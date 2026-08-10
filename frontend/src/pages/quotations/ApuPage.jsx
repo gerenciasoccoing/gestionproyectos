@@ -459,7 +459,7 @@ function ApuExportPanel({ apu }) {
       </div>
       <div className="flex gap-2 items-center">
         <Button onClick={() => download('pdf')} disabled={!!downloading}>{downloading === 'pdf' ? 'Generando PDF…' : 'Descargar PDF'}</Button>
-        <Button variant="secondary" onClick={() => download('excel')} disabled={!!downloading}>{downloading === 'excel' ? 'Generando Excel…' : 'Descargar Excel (sin logo)'}</Button>
+        <Button variant="secondary" onClick={() => download('excel')} disabled={!!downloading}>{downloading === 'excel' ? 'Generando Excel…' : 'Descargar Excel'}</Button>
       </div>
       <ErrorText>{error}</ErrorText>
     </div>
