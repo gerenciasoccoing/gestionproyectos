@@ -189,6 +189,8 @@ export const quotationsApi = {
   addItem: (id, data) => client.post(`/quotations/${id}/items`, data).then((r) => r.data),
   removeItem: (id, itemId) => client.delete(`/quotations/${id}/items/${itemId}`),
   convert: (id) => client.post(`/quotations/${id}/convert`).then((r) => r.data),
+  exportBudgetPdf: (id, data) => postAndDownload(`/quotations/${id}/export-pdf`, data, 'presupuesto.pdf'),
+  exportBudgetExcel: (id, data) => postAndDownload(`/quotations/${id}/export-excel`, data, 'presupuesto.xlsx'),
   pdfUrl: (id) => {
     const base = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api');
     const token = localStorage.getItem('token');

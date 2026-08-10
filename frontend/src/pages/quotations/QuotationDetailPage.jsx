@@ -10,10 +10,15 @@ export default function QuotationDetailPage() {
   const [data, setData] = useState(null);
   const [apus, setApus] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ apuId: '', description: '', unit: '', quantity: '' });
+  const [form, setForm] = useState({ apuId: '', description: '', notes: '', unit: '', quantity: '' });
   const [aiuForm, setAiuForm] = useState(null);
   const [aiuSaved, setAiuSaved] = useState(false);
   const [error, setError] = useState('');
+
+  const [showExport, setShowExport] = useState(false);
+  const [exportNames, setExportNames] = useState({ elaboroNombre: '', revisoNombre: '' });
+  const [exportDownloading, setExportDownloading] = useState('');
+  const [exportError, setExportError] = useState('');
 
   const load = () => quotationsApi.get(id).then((d) => {
     setData(d);
@@ -45,9 +50,12 @@ export default function QuotationDetailPage() {
     }
   };
 
+  // La Descripción de un ítem basado en APU es siempre el nombre del APU (no se pide ni se
+  // duplica a mano); solo se pide como texto libre cuando el ítem es manual (sin APU), igual que
+  // en el presupuesto de Proyectos.
   const onApuChange = (apuId) => {
     const apu = apus.find((a) => a.id === apuId);
-    setForm((f) => ({ ...f, apuId, unit: apu ? apu.unit : f.unit }));
+    setForm((f) => ({ ...f, apuId, description: apu ? apu.name : '', unit: apu ? apu.unit : f.unit }));
   };
 
   const submitItem = async (e) => {
@@ -57,11 +65,24 @@ export default function QuotationDetailPage() {
       const payload = { ...form };
       if (!payload.apuId) delete payload.apuId;
       await quotationsApi.addItem(id, payload);
-      setForm({ apuId: '', description: '', unit: '', quantity: '' });
+      setForm({ apuId: '', description: '', notes: '', unit: '', quantity: '' });
       setShowForm(false);
       load();
     } catch (err) {
       setError(extractError(err));
+    }
+  };
+
+  const downloadExport = async (format) => {
+    setExportError('');
+    setExportDownloading(format);
+    try {
+      if (format === 'pdf') await quotationsApi.exportBudgetPdf(id, exportNames);
+      else await quotationsApi.exportBudgetExcel(id, exportNames);
+    } catch (err) {
+      setExportError(extractError(err));
+    } finally {
+      setExportDownloading('');
     }
   };
 
@@ -139,13 +160,18 @@ export default function QuotationDetailPage() {
         {showForm && (
           <form onSubmit={submitItem} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             <SearchSelect
-              label="APU"
-              options={apus.map((a) => ({ value: a.id, label: `${a.name} (${money(a.unitCost)}/${a.unit})` }))}
+              label="APU (busca por código o nombre)"
+              options={apus.map((a) => ({ value: a.id, label: `${a.code ? `${a.code} - ` : ''}${a.name} (${money(a.unitCost)}/${a.unit})` }))}
               value={form.apuId}
               onChange={onApuChange}
               placeholder="-- ítem manual --"
             />
-            <Input label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required />
+            {form.apuId ? (
+              <Input label="Descripción (del APU seleccionado)" value={form.description} disabled />
+            ) : (
+              <Input label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required />
+            )}
+            <Input label="Nota (opcional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             <Input label="Unidad" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} required />
             <Input label="Cantidad" type="number" min="0" step="0.01" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} required />
             <Button type="submit" className="col-span-full">Agregar</Button>
@@ -155,7 +181,10 @@ export default function QuotationDetailPage() {
         <Table columns={['Descripción', 'Unidad', 'Cantidad', 'Vr. Unit.', 'Vr. Total', '']}>
           {items.map((it) => (
             <tr key={it.id} className="border-b border-gray-100">
-              <td className="py-1 pr-3">{it.description}</td>
+              <td className="py-1 pr-3">
+                {it.description}
+                {it.notes && <div className="text-xs text-gray-400">Nota: {it.notes}</div>}
+              </td>
               <td className="py-1 pr-3">{it.unit}</td>
               <td className="py-1 pr-3">{Number(it.quantity)}</td>
               <td className="py-1 pr-3">{money(it.unitCost)}</td>
@@ -171,6 +200,35 @@ export default function QuotationDetailPage() {
         </Table>
         <p className="text-right font-bold mt-2">Total: {money(total)}</p>
       </Card>
+
+      {budget && items.length > 0 && (
+        <Card title="Exportar presupuesto con anexo de APU" actions={
+          <Button onClick={() => setShowExport((s) => !s)}>{showExport ? 'Cancelar' : '+ Exportar'}</Button>
+        }>
+          {showExport && (
+            <div>
+              <p className="text-sm text-gray-600 mb-3">
+                Genera el resumen del presupuesto junto con la ficha detallada de cada APU usado (con el mismo
+                formato de "modelo_apu.xlsx" y el AIU de esta cotización). Los nombres de firma se repiten en cada
+                página de APU y no se guardan como datos del sistema.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                <Input label="Elaboró y validó" value={exportNames.elaboroNombre} onChange={(e) => setExportNames({ ...exportNames, elaboroNombre: e.target.value })} />
+                <Input label="Revisó y Aprobó" value={exportNames.revisoNombre} onChange={(e) => setExportNames({ ...exportNames, revisoNombre: e.target.value })} />
+              </div>
+              <div className="flex gap-2 items-center">
+                <Button onClick={() => downloadExport('pdf')} disabled={!!exportDownloading}>
+                  {exportDownloading === 'pdf' ? 'Generando PDF…' : 'Descargar PDF'}
+                </Button>
+                <Button variant="secondary" onClick={() => downloadExport('excel')} disabled={!!exportDownloading}>
+                  {exportDownloading === 'excel' ? 'Generando Excel…' : 'Descargar Excel'}
+                </Button>
+              </div>
+              <ErrorText>{exportError}</ErrorText>
+            </div>
+          )}
+        </Card>
+      )}
 
       <div className="flex flex-wrap gap-3">
         <a href={quotationsApi.pdfUrl(id)} target="_blank" rel="noreferrer">

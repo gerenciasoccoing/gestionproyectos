@@ -1,9 +1,11 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { Quotation, Budget, BudgetItem } = require('../models');
-const { computeApuUnitCost, applyBudgetAiu } = require('../services/budgetService');
+const { computeApuUnitCost, resolveBudgetItemFields } = require('../services/budgetService');
 const { getQuotationWithBudget, convertQuotationToProject } = require('../services/quotationService');
-const { generateQuotationPdf } = require('../services/pdfService');
+const { buildApuDataByIdMap } = require('../services/apuExportService');
+const { generateQuotationPdf, generateBudgetWithApuAnnexPdf } = require('../services/pdfService');
+const { generateBudgetWithApuAnnexExcelBuffer } = require('../services/apuExcelExportService');
 const { getSettingsForPdf } = require('./companySettingsController');
 
 // Extrae y valida el AIU discriminado (Administración/Imprevistos/Utilidad) del body.
@@ -92,26 +94,12 @@ const addItem = asyncHandler(async (req, res) => {
   let budget = await Budget.findOne({ where: { quotationId: quotation.id }, order: [['version', 'DESC']] });
   if (!budget) budget = await Budget.create({ quotationId: quotation.id, version: 1, type: 'inicial' });
 
-  const { apuId, description, unit, quantity } = req.body;
-  if (!description || !unit || quantity === undefined) throw new ApiError(400, 'description, unit y quantity son obligatorios');
-  if (Number(quantity) < 0) throw new ApiError(400, 'La cantidad no puede ser negativa');
-
-  let unitCost = req.body.unitCost || 0;
-  if (apuId) {
-    const result = await computeApuUnitCost(apuId);
-    if (!result) throw new ApiError(404, 'APU no encontrado');
-    unitCost = applyBudgetAiu(result.directCost, budget);
-  }
-
-  const item = await BudgetItem.create({
-    budgetId: budget.id,
-    apuId: apuId || null,
-    description,
-    unit,
-    quantity,
-    unitCost,
-    totalCost: Number(quantity) * Number(unitCost),
-  });
+  // Misma lógica que el presupuesto de Proyectos (ver budgetController.addItem): la Descripción
+  // se toma del APU elegido, no se pide a mano; solo es obligatoria como texto libre para ítems
+  // manuales sin APU.
+  const { apuId, description, notes, unit, quantity, unitCost } = req.body;
+  const fields = await resolveBudgetItemFields({ budget, apuId, description, notes, unit, quantity, unitCost });
+  const item = await BudgetItem.create(fields);
   res.status(201).json(item);
 });
 
@@ -154,10 +142,48 @@ const exportPdf = asyncHandler(async (req, res) => {
   doc.pipe(res);
 });
 
+// Presupuesto de la cotización + anexo con la ficha completa de cada APU referenciado, en el
+// mismo formato ("modelo_apu.xlsx") y con el mismo generador que la exportación de Presupuesto
+// de Proyectos (ver budgetController.buildBudgetExportContext): ambos flujos comparten
+// buildApuDataByIdMap y drawApuAnalysis/writeApuSheet para no duplicar ni desincronizar el
+// formato. Distinto del PDF de propuesta ejecutiva (exportPdf arriba), que es un documento
+// resumido pensado para el cliente, no para justificar el costo con el desglose técnico.
+async function buildQuotationExportContext(quotationId, body) {
+  const { quotation, budget } = await getQuotationWithBudget(quotationId);
+  if (!quotation) throw new ApiError(404, 'Cotización no encontrada');
+  if (!budget) throw new ApiError(404, 'Esta cotización no tiene un presupuesto');
+  const items = (budget.items || []).map((it) => it.toJSON());
+  const apuDataById = await buildApuDataByIdMap(items, budget);
+  const project = { name: quotation.projectNameProposed };
+
+  const { elaboroNombre, revisoNombre } = body;
+  return { project, budget, items, apuDataById, elaboroNombre, revisoNombre };
+}
+
+const exportBudgetPdf = asyncHandler(async (req, res) => {
+  const ctx = await buildQuotationExportContext(req.params.id, req.body);
+  const company = await getSettingsForPdf();
+  const doc = generateBudgetWithApuAnnexPdf({ ...ctx, company });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="presupuesto-${ctx.project.name.replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf"`);
+  doc.pipe(res);
+});
+
+const exportBudgetExcel = asyncHandler(async (req, res) => {
+  const ctx = await buildQuotationExportContext(req.params.id, req.body);
+  const company = await getSettingsForPdf();
+  const buffer = await generateBudgetWithApuAnnexExcelBuffer({ ...ctx, company, exportDate: req.body.exportDate });
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="presupuesto-${ctx.project.name.replace(/[^a-zA-Z0-9-_]/g, '_')}.xlsx"`);
+  res.send(buffer);
+});
+
 // Conversión en un solo paso: crea el proyecto y le asigna el mismo presupuesto como línea base (atómico).
 const convert = asyncHandler(async (req, res) => {
   const project = await convertQuotationToProject(req.params.id, req.user.id);
   res.status(201).json(project);
 });
 
-module.exports = { list, get, create, update, remove, addItem, removeItem, updateAiu, exportPdf, convert };
+module.exports = {
+  list, get, create, update, remove, addItem, removeItem, updateAiu, exportPdf, exportBudgetPdf, exportBudgetExcel, convert,
+};

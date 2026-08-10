@@ -1,4 +1,5 @@
 const { computeSectionCosts } = require('./budgetService');
+const { APU, APUComponent, PriceItem } = require('../models');
 
 function componentUnitValue(c) {
   if (c.priceItem) return Number(c.priceItem.currentValue);
@@ -124,4 +125,19 @@ function buildApuExportData(apu, aiu = {}) {
   };
 }
 
-module.exports = { buildApuExportData };
+// Arma el mapa APU -> ficha de exportación para todos los ítems de un presupuesto que tengan un
+// APU asociado, con el AIU de ese presupuesto. Compartido por la exportación de Presupuesto
+// (Proyectos, en budgetController) y la de Cotizaciones (quotationController): ambas generan el
+// mismo anexo de APU con el mismo generador (drawApuAnalysis / writeApuSheet), sin duplicar esta
+// consulta ni el armado de los datos en dos lugares distintos.
+async function buildApuDataByIdMap(items, budget) {
+  const apuIds = [...new Set(items.filter((it) => it.apuId).map((it) => it.apuId))];
+  const apus = await APU.findAll({
+    where: { id: apuIds },
+    include: [{ model: APUComponent, as: 'components', include: [{ model: PriceItem, as: 'priceItem' }] }],
+  });
+  const aiu = { adminPercent: budget.adminPercent, imprevistosPercent: budget.imprevistosPercent, utilidadPercent: budget.utilidadPercent };
+  return new Map(apus.map((apu) => [apu.id, buildApuExportData(apu, aiu)]));
+}
+
+module.exports = { buildApuExportData, buildApuDataByIdMap };

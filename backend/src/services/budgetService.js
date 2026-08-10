@@ -1,3 +1,4 @@
+const ApiError = require('../utils/ApiError');
 const { Budget, BudgetItem, APU, APUComponent, PriceItem, ProgressEntry } = require('../models');
 
 // Valor unitario efectivo de un componente: el de su insumo de la base de precios,
@@ -94,4 +95,39 @@ async function getBudgetItemsWithProgress(projectId) {
   return { budget, items };
 }
 
-module.exports = { computeApuUnitCost, computeSectionCosts, applyBudgetAiu, getCurrentBudgetForProject, getBudgetItemsWithProgress };
+// Valida y resuelve los campos de un ítem de presupuesto antes de crearlo. La Descripción se
+// toma siempre del APU elegido (no se pide ni se duplica a mano); solo se pide como texto libre
+// para ítems manuales, sin APU asociado. Compartido por el presupuesto de Proyectos
+// (budgetController) y el de Cotizaciones (quotationController) para que ambos flujos se
+// comporten siempre igual y una corrección futura no tenga que aplicarse dos veces.
+async function resolveBudgetItemFields({ budget, apuId, description, notes, unit, quantity, unitCost }) {
+  if (!unit || quantity === undefined) throw new ApiError(400, 'unit y quantity son obligatorios');
+  if (Number(quantity) < 0) throw new ApiError(400, 'La cantidad no puede ser negativa');
+
+  let resolvedDescription = description;
+  let resolvedUnitCost = unitCost || 0;
+  if (apuId) {
+    const result = await computeApuUnitCost(apuId);
+    if (!result) throw new ApiError(404, 'APU no encontrado');
+    resolvedDescription = result.apu.name;
+    resolvedUnitCost = applyBudgetAiu(result.directCost, budget);
+  } else if (!resolvedDescription) {
+    throw new ApiError(400, 'description es obligatoria para un ítem manual (sin APU)');
+  }
+
+  return {
+    budgetId: budget.id,
+    apuId: apuId || null,
+    description: resolvedDescription,
+    notes: notes || null,
+    unit,
+    quantity,
+    unitCost: resolvedUnitCost,
+    totalCost: Number(quantity) * Number(resolvedUnitCost),
+  };
+}
+
+module.exports = {
+  computeApuUnitCost, computeSectionCosts, applyBudgetAiu, getCurrentBudgetForProject, getBudgetItemsWithProgress,
+  resolveBudgetItemFields,
+};

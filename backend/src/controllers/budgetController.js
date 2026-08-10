@@ -1,11 +1,9 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const {
-  Budget, BudgetItem, APU, APUComponent, PriceItem, Project,
-} = require('../models');
-const { computeApuUnitCost, applyBudgetAiu, getBudgetItemsWithProgress } = require('../services/budgetService');
+const { Budget, BudgetItem, Project } = require('../models');
+const { getBudgetItemsWithProgress, resolveBudgetItemFields } = require('../services/budgetService');
 const { importBudgetFromWorkbook } = require('../services/budgetImportService');
-const { buildApuExportData } = require('../services/apuExportService');
+const { buildApuDataByIdMap } = require('../services/apuExportService');
 const { generateBudgetWithApuAnnexPdf } = require('../services/pdfService');
 const { generateBudgetWithApuAnnexExcelBuffer } = require('../services/apuExcelExportService');
 const { getSettingsForPdf } = require('./companySettingsController');
@@ -55,33 +53,9 @@ const addItem = asyncHandler(async (req, res) => {
   const budget = await Budget.findOne({ where: { id: req.params.budgetId, projectId: req.params.projectId } });
   if (!budget) throw new ApiError(404, 'Presupuesto no encontrado');
 
-  const { apuId, notes, unit, quantity } = req.body;
-  if (!unit || quantity === undefined) throw new ApiError(400, 'unit y quantity son obligatorios');
-  if (Number(quantity) < 0) throw new ApiError(400, 'La cantidad no puede ser negativa');
-
-  // La descripción del ítem es siempre la del APU elegido (no se pide ni se duplica a mano); solo
-  // se pide como texto libre para ítems manuales, sin APU asociado.
-  let description = req.body.description;
-  let unitCost = req.body.unitCost || 0;
-  if (apuId) {
-    const result = await computeApuUnitCost(apuId);
-    if (!result) throw new ApiError(404, 'APU no encontrado');
-    description = result.apu.name;
-    unitCost = applyBudgetAiu(result.directCost, budget);
-  } else if (!description) {
-    throw new ApiError(400, 'description es obligatoria para un ítem manual (sin APU)');
-  }
-
-  const item = await BudgetItem.create({
-    budgetId: budget.id,
-    apuId: apuId || null,
-    description,
-    notes: notes || null,
-    unit,
-    quantity,
-    unitCost,
-    totalCost: Number(quantity) * Number(unitCost),
-  });
+  const { apuId, description, notes, unit, quantity, unitCost } = req.body;
+  const fields = await resolveBudgetItemFields({ budget, apuId, description, notes, unit, quantity, unitCost });
+  const item = await BudgetItem.create(fields);
   res.status(201).json(item);
 });
 
@@ -112,14 +86,7 @@ async function buildBudgetExportContext(projectId, body) {
   const { budget, items } = await getBudgetItemsWithProgress(projectId);
   if (!budget) throw new ApiError(404, 'Este proyecto no tiene un presupuesto');
   const project = await Project.findByPk(projectId);
-
-  const apuIds = [...new Set(items.filter((it) => it.apuId).map((it) => it.apuId))];
-  const apus = await APU.findAll({
-    where: { id: apuIds },
-    include: [{ model: APUComponent, as: 'components', include: [{ model: PriceItem, as: 'priceItem' }] }],
-  });
-  const aiu = { adminPercent: budget.adminPercent, imprevistosPercent: budget.imprevistosPercent, utilidadPercent: budget.utilidadPercent };
-  const apuDataById = new Map(apus.map((apu) => [apu.id, buildApuExportData(apu, aiu)]));
+  const apuDataById = await buildApuDataByIdMap(items, budget);
 
   const { elaboroNombre, revisoNombre } = body;
   return { project, budget, items, apuDataById, elaboroNombre, revisoNombre };

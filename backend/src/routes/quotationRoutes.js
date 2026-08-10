@@ -14,6 +14,8 @@ router.delete('/:id', requirePermission('cotizaciones', 'delete'), quotationCont
 router.post('/:id/items', requirePermission('cotizaciones', 'edit'), quotationController.addItem);
 router.delete('/:id/items/:itemId', requirePermission('cotizaciones', 'edit'), quotationController.removeItem);
 router.get('/:id/pdf', requirePermission('cotizaciones', 'view'), quotationController.exportPdf);
+router.post('/:id/export-pdf', requirePermission('cotizaciones', 'view'), quotationController.exportBudgetPdf);
+router.post('/:id/export-excel', requirePermission('cotizaciones', 'view'), quotationController.exportBudgetExcel);
 router.post('/:id/convert', requirePermission('cotizaciones', 'edit'), quotationController.convert);
 
 module.exports = router;
