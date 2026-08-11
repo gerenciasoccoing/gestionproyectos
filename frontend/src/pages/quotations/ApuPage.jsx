@@ -17,6 +17,25 @@ function emptyRow(category, defaultPrestacionalPercent) {
   return { priceItemId: '', quantity: '1' }; // material
 }
 
+// El "valor base" de un insumo de mano de obra ya incluye prestaciones sociales (así se carga
+// desde el catálogo oficial). El "Jornal día" se obtiene dividiendo ese valor base entre
+// (1 + %prestaciones); TOTAL+PREST se recalcula multiplicando el jornal por (1 + %prestaciones),
+// lo que con cantidad=1 siempre devuelve el valor base original (mismo criterio que el backend,
+// ver budgetService.laborBreakdown).
+function laborBreakdown(valorBase, prestacionalPercent, quantity = 1) {
+  const p = (Number(prestacionalPercent) || 0) / 100;
+  const jornalDia = valorBase / (1 + p);
+  const totalPrest = (Number(quantity) || 0) * (jornalDia + jornalDia * p);
+  return { jornalDia, totalPrest };
+}
+
+function laborRowTotal(row, priceItem) {
+  const base = Number(priceItem?.currentValue || 0);
+  const { totalPrest } = laborBreakdown(base, row.prestacionalPercent, row.quantity);
+  const rend = Number(row.yield) || 1;
+  return totalPrest / rend;
+}
+
 const emptyForm = { name: '', unit: '', code: '', otherCosts: '0' };
 const PAGE_SIZE = 50;
 
@@ -30,7 +49,7 @@ export default function ApuPage() {
   ];
   const [apus, setApus] = useState([]);
   const [priceItems, setPriceItems] = useState([]);
-  const [defaultPrestacionalPercent, setDefaultPrestacionalPercent] = useState(70);
+  const [defaultPrestacionalPercent, setDefaultPrestacionalPercent] = useState(85);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -54,7 +73,7 @@ export default function ApuPage() {
   useEffect(() => {
     load();
     priceItemsApi.list().then(setPriceItems);
-    companyApi.get().then((s) => setDefaultPrestacionalPercent(Number(s.defaultPrestacionalPercent ?? 70)));
+    companyApi.get().then((s) => setDefaultPrestacionalPercent(Number(s.defaultPrestacionalPercent ?? 85)));
   }, []);
 
   const submitImport = async (e) => {
@@ -178,12 +197,7 @@ export default function ApuPage() {
     [sections.herramienta, priceItems]
   );
   const personalSubtotal = useMemo(
-    () => sections.personal.reduce((sum, r) => {
-      const base = Number(priceById(r.priceItemId)?.currentValue || 0);
-      const conPrestacional = base * (1 + (Number(r.prestacionalPercent) || 0) / 100);
-      const rend = Number(r.yield) || 1;
-      return sum + ((Number(r.quantity) || 0) * conPrestacional) / rend;
-    }, 0),
+    () => sections.personal.reduce((sum, r) => sum + laborRowTotal(r, priceById(r.priceItemId)), 0),
     [sections.personal, priceItems]
   );
   const transporteSubtotal = useMemo(
@@ -533,7 +547,8 @@ function SectionRow({ category, row, options, onChange, onRemove }) {
 
   if (category === 'personal') {
     const base = Number(selected?.currentValue || 0);
-    const total = ((Number(row.quantity) || 0) * base * (1 + (Number(row.prestacionalPercent) || 0) / 100)) / (Number(row.yield) || 1);
+    const { jornalDia } = laborBreakdown(base, row.prestacionalPercent);
+    const total = laborRowTotal(row, selected);
     return (
       <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-start sm:items-end">
         <SearchSelect label={t('apu.row.personnel')} className="col-span-2 sm:col-span-4" options={searchOptions} value={row.priceItemId} onChange={(v) => onChange('priceItemId', v)} />
@@ -542,7 +557,8 @@ function SectionRow({ category, row, options, onChange, onRemove }) {
         <Input label={t('apu.row.baseValue')} className="col-span-1 sm:col-span-2" value={money(base)} readOnly disabled />
         <Input label={t('apu.row.prestacionalPercent')} className="col-span-1 sm:col-span-1" type="number" min="0" step="0.01" value={row.prestacionalPercent} onChange={(e) => onChange('prestacionalPercent', e.target.value)} />
         <Button type="button" variant="danger" className="col-span-2 sm:col-span-1" onClick={onRemove}>×</Button>
-        <div className="col-span-full text-right text-sm text-gray-600 -mt-1">{t('apu.row.itemValueWithPrest', { amount: money(total) })}</div>
+        <Input label={t('apu.row.jornalDia')} className="col-span-1 sm:col-span-2" value={money(jornalDia)} readOnly disabled />
+        <div className="col-span-full sm:col-span-10 text-right text-sm text-gray-600 self-end pb-1.5">{t('apu.row.itemValueWithPrest', { amount: money(total) })}</div>
       </div>
     );
   }

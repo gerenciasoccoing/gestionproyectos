@@ -1,4 +1,4 @@
-const { computeSectionCosts } = require('./budgetService');
+const { computeSectionCosts, laborBreakdown } = require('./budgetService');
 const { APU, APUComponent, PriceItem } = require('../models');
 
 function componentUnitValue(c) {
@@ -56,20 +56,19 @@ function buildApuExportData(apu, aiu = {}) {
   const personal = components
     .filter((c) => c.category === 'personal')
     .map((c) => {
-      const jornal = componentUnitValue(c);
       const prestPercent = Number(c.prestacionalPercent || 0);
-      const totalPrest = jornal * (1 + prestPercent / 100);
-      const rend = Number(c.yield) || 1;
       const cant = Number(c.quantity);
+      const { jornalDia, totalPrest } = laborBreakdown(componentUnitValue(c), prestPercent, cant);
+      const rend = Number(c.yield) || 1;
       return {
         code: c.priceItem?.code || '-',
         description: c.priceItem?.name || '-',
         cant,
-        jornal,
+        jornal: jornalDia,
         prestPercent,
         totalPrest,
         rend,
-        parcial: (cant * totalPrest) / rend,
+        parcial: totalPrest / rend,
       };
     });
 

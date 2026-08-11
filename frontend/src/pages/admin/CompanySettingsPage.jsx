@@ -7,7 +7,7 @@ import { fileUrl } from '../../api/client';
 export default function CompanySettingsPage() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState(null);
-  const [form, setForm] = useState({ companyName: '', nit: '', address: '', phone: '', defaultPrestacionalPercent: '70', currency: 'COP' });
+  const [form, setForm] = useState({ companyName: '', nit: '', address: '', phone: '', defaultPrestacionalPercent: '85', currency: 'COP' });
   const [logo, setLogo] = useState(null);
   const [error, setError] = useState('');
   const [ok, setOk] = useState(false);
@@ -20,7 +20,7 @@ export default function CompanySettingsPage() {
         nit: s.nit || '',
         address: s.address || '',
         phone: s.phone || '',
-        defaultPrestacionalPercent: String(s.defaultPrestacionalPercent ?? 70),
+        defaultPrestacionalPercent: String(s.defaultPrestacionalPercent ?? 85),
         currency: s.currency || 'COP',
       });
     });

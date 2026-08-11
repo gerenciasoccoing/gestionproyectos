@@ -8,11 +8,25 @@ function componentUnitValue(component) {
   return Number(component.unitValue || 0);
 }
 
+// El "valor base" de un insumo de mano de obra (PriceItem.currentValue) ya incluye prestaciones
+// sociales (así se carga desde el catálogo oficial). El "Jornal día" que se muestra en el APU se
+// obtiene entonces dividiendo ese valor base entre (1 + %prestaciones), y "TOTAL+PREST" se vuelve
+// a calcular multiplicando el jornal por (1 + %prestaciones): con cantidad=1 esto siempre devuelve
+// el valor base original, sin importar el % de prestaciones usado para la descomposición (es
+// reversible por construcción). Centralizado acá porque budgetService, apuExportService y el
+// formulario de ApuPage.jsx necesitan la misma fórmula.
+function laborBreakdown(valorBase, prestacionalPercent, quantity = 1) {
+  const p = Number(prestacionalPercent || 0) / 100;
+  const jornalDia = valorBase / (1 + p);
+  const totalPrest = Number(quantity) * (jornalDia + jornalDia * p);
+  return { jornalDia, totalPrest };
+}
+
 // Costo directo del APU = suma de las 4 secciones (Materiales, Herramientas y Equipos,
 // Mano de Obra, Transporte) más otros costos directos sin sección propia, según:
 //   Materiales:   Σ cantidad * (1 + %desperdicio/100) * valor unitario
 //   Herramientas: Σ cantidad * rendimiento * valor unitario
-//   Personal:     Σ (cantidad * valor unitario * (1 + %prestacional/100)) / rendimiento
+//   Personal:     Σ TOTAL+PREST (ver laborBreakdown) / rendimiento
 //   Transporte:   por distancia*peso*tarifa, o % sobre el subtotal de Materiales
 function computeSectionCosts(components) {
   const materials = components.filter((c) => c.category === 'material');
@@ -29,9 +43,9 @@ function computeSectionCosts(components) {
     0
   );
   const personalCost = personal.reduce((sum, c) => {
-    const valorConPrestacional = componentUnitValue(c) * (1 + Number(c.prestacionalPercent || 0) / 100);
+    const { totalPrest } = laborBreakdown(componentUnitValue(c), c.prestacionalPercent, c.quantity);
     const rendimiento = Number(c.yield) || 1;
-    return sum + (Number(c.quantity) * valorConPrestacional) / rendimiento;
+    return sum + totalPrest / rendimiento;
   }, 0);
   const transporteCost = transporte.reduce((sum, c) => {
     if (c.transportMode === 'porcentaje_materiales') {
@@ -128,6 +142,6 @@ async function resolveBudgetItemFields({ budget, apuId, description, notes, unit
 }
 
 module.exports = {
-  computeApuUnitCost, computeSectionCosts, applyBudgetAiu, getCurrentBudgetForProject, getBudgetItemsWithProgress,
-  resolveBudgetItemFields,
+  computeApuUnitCost, computeSectionCosts, laborBreakdown, applyBudgetAiu, getCurrentBudgetForProject,
+  getBudgetItemsWithProgress, resolveBudgetItemFields,
 };

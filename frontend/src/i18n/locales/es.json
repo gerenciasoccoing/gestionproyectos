@@ -773,6 +773,7 @@
       "yield": "Rendimiento",
       "personnel": "Personal",
       "baseValue": "Valor base",
+      "jornalDia": "Jornal día",
       "prestacionalPercent": "% Prestacional",
       "itemValueWithPrest": "Valor ítem (con prestaciones): {{amount}}",
       "modality": "Modalidad",

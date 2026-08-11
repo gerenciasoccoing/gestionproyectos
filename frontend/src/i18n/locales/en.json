@@ -773,6 +773,7 @@
       "yield": "Yield",
       "personnel": "Personnel",
       "baseValue": "Base value",
+      "jornalDia": "Daily wage",
       "prestacionalPercent": "% Benefits",
       "itemValueWithPrest": "Item value (with benefits): {{amount}}",
       "modality": "Mode",

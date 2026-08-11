@@ -209,8 +209,10 @@ function writeApuSheet(ws, data, { itemLabel, elaboroNombre, revisoNombre, compa
   setCell(ws, `I${r}`, { formula: `ROUND(SUM(I${materiales.dataStart}:I${despRow}),2)` }, { bold: true, numFmt: CURRENCY_FMT });
   r += 2;
 
-  // III. Mano de Obra — PREST. se escribe como multiplicador (1 + %prestacional/100), igual
-  // convención que la plantilla, para que TOTAL+PREST = CANT.*JORNAL*PREST. sea una fórmula real.
+  // III. Mano de Obra — JORNAL DIA ya viene calculado (ver apuExportService/laborBreakdown) como
+  // valor base / (1 + %prestacional), y PREST. se escribe como multiplicador (1 + %prestacional/100),
+  // igual convención que la plantilla, para que TOTAL+PREST = CANT.*JORNAL*PREST. sea una fórmula
+  // real y (con cantidad=1) vuelva a dar el valor base original.
   const personal = writeSection(
     'III.MANO DE OBRA',
     [

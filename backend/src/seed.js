@@ -51,7 +51,12 @@ async function seed() {
     });
   }
 
-  await CompanySettings.findOrCreate({ where: {}, defaults: { companyName: 'Mi Empresa Constructora' } });
+  const [companySettings] = await CompanySettings.findOrCreate({ where: {}, defaults: { companyName: 'Mi Empresa Constructora' } });
+  // El default de % prestaciones subió de 70% a 85%: si la instancia ya tenía guardado el valor
+  // viejo (nunca personalizado a mano), se actualiza; si alguien ya lo cambió a otra cosa, se respeta.
+  if (Number(companySettings.defaultPrestacionalPercent) === 70) {
+    await companySettings.update({ defaultPrestacionalPercent: 85 });
+  }
 
   console.log('Seed completado.');
   console.log(`Usuario admin: ${adminEmail} / contraseña: ${adminPassword}`);

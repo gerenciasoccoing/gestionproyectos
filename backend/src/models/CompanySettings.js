@@ -11,7 +11,7 @@ module.exports = (sequelize) => {
     phone: { type: DataTypes.STRING },
     // Factor prestacional (%) sugerido por defecto al agregar mano de obra a un APU.
     // Editable por ítem al momento de seleccionar el insumo de personal.
-    defaultPrestacionalPercent: { type: DataTypes.DECIMAL(6, 2), allowNull: false, defaultValue: 70 },
+    defaultPrestacionalPercent: { type: DataTypes.DECIMAL(6, 2), allowNull: false, defaultValue: 85 },
     // Moneda en que se muestran los valores en toda la app (no convierte montos, solo cambia el
     // símbolo/formato de presentación); independiente del idioma de la interfaz.
     currency: { type: DataTypes.ENUM('COP', 'USD', 'EUR'), allowNull: false, defaultValue: 'COP' },
