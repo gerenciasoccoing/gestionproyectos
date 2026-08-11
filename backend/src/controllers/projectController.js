@@ -42,7 +42,10 @@ const update = asyncHandler(async (req, res) => {
   const project = await Project.findByPk(req.params.id);
   if (!project) throw new ApiError(404, 'Proyecto no encontrado');
   const { name, client, clientId, description, status } = req.body;
-  if (name !== undefined) project.name = name;
+  if (name !== undefined) {
+    if (!name.trim()) throw new ApiError(400, 'El nombre del proyecto es obligatorio');
+    project.name = name;
+  }
   if (client !== undefined) project.client = client;
   if (clientId !== undefined) project.clientId = clientId || null;
   if (description !== undefined) project.description = description;

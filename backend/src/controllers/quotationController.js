@@ -1,7 +1,7 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { Quotation, Budget, BudgetItem } = require('../models');
-const { computeApuUnitCost, resolveBudgetItemFields } = require('../services/budgetService');
+const { computeApuUnitCost, resolveBudgetItemFields, updateBudgetItemQuantity } = require('../services/budgetService');
 const { getQuotationWithBudget, convertQuotationToProject } = require('../services/quotationService');
 const { buildApuDataByIdMap } = require('../services/apuExportService');
 const { generateQuotationPdf, generateBudgetWithApuAnnexPdf } = require('../services/pdfService');
@@ -64,7 +64,10 @@ const update = asyncHandler(async (req, res) => {
   const { clientName, clientId, projectNameProposed, date, validityDays, paymentTerms, status } = req.body;
   if (clientName !== undefined) quotation.clientName = clientName;
   if (clientId !== undefined) quotation.clientId = clientId || null;
-  if (projectNameProposed !== undefined) quotation.projectNameProposed = projectNameProposed;
+  if (projectNameProposed !== undefined) {
+    if (!projectNameProposed.trim()) throw new ApiError(400, 'clientName, projectNameProposed y date son obligatorios');
+    quotation.projectNameProposed = projectNameProposed;
+  }
   if (date !== undefined) quotation.date = date;
   if (validityDays !== undefined) quotation.validityDays = validityDays;
   if (paymentTerms !== undefined) quotation.paymentTerms = paymentTerms;
@@ -101,6 +104,21 @@ const addItem = asyncHandler(async (req, res) => {
   const fields = await resolveBudgetItemFields({ budget, apuId, description, notes, unit, quantity, unitCost });
   const item = await BudgetItem.create(fields);
   res.status(201).json(item);
+});
+
+// Edita la cantidad de un ítem ya agregado al presupuesto de la cotización (misma lógica que
+// budgetController.updateItem en Proyectos: el valor unitario queda fijo, solo se recalcula el total).
+const updateItem = asyncHandler(async (req, res) => {
+  const quotation = await Quotation.findByPk(req.params.id);
+  if (!quotation) throw new ApiError(404, 'Cotización no encontrada');
+  if (quotation.status === 'convertida') throw new ApiError(400, 'La cotización ya fue convertida y no puede editarse');
+  const item = await BudgetItem.findOne({
+    where: { id: req.params.itemId },
+    include: [{ association: 'Budget' }],
+  });
+  if (!item || item.Budget.quotationId !== req.params.id) throw new ApiError(404, 'Ítem no encontrado');
+  await updateBudgetItemQuantity(item, req.body.quantity);
+  res.json(item);
 });
 
 const removeItem = asyncHandler(async (req, res) => {
@@ -185,5 +203,5 @@ const convert = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  list, get, create, update, remove, addItem, removeItem, updateAiu, exportPdf, exportBudgetPdf, exportBudgetExcel, convert,
+  list, get, create, update, remove, addItem, updateItem, removeItem, updateAiu, exportPdf, exportBudgetPdf, exportBudgetExcel, convert,
 };

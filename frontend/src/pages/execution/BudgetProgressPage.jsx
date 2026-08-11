@@ -15,6 +15,10 @@ export default function BudgetProgressPage() {
   const [expandedId, setExpandedId] = useState(null);
   const [showItemForm, setShowItemForm] = useState(false);
   const [itemForm, setItemForm] = useState({ apuId: '', description: '', notes: '', unit: '', quantity: '', unitCost: '' });
+  const [editingQtyId, setEditingQtyId] = useState(null);
+  const [qtyDraft, setQtyDraft] = useState('');
+  const [qtyError, setQtyError] = useState('');
+  const [savingQty, setSavingQty] = useState(false);
   const [aiuForm, setAiuForm] = useState({ adminPercent: '0', imprevistosPercent: '0', utilidadPercent: '0' });
   const [aiuSaved, setAiuSaved] = useState(false);
   const [error, setError] = useState('');
@@ -113,6 +117,26 @@ export default function BudgetProgressPage() {
       setImportError(extractError(err));
     } finally {
       setImporting(false);
+    }
+  };
+
+  const startEditQty = (it) => {
+    setEditingQtyId(it.id);
+    setQtyDraft(String(it.quantity));
+    setQtyError('');
+  };
+
+  const saveQty = async (it) => {
+    setQtyError('');
+    setSavingQty(true);
+    try {
+      await budgetApi.updateItem(projectId, it.budgetId, it.id, { quantity: qtyDraft });
+      setEditingQtyId(null);
+      load();
+    } catch (err) {
+      setQtyError(extractError(err));
+    } finally {
+      setSavingQty(false);
     }
   };
 
@@ -253,14 +277,30 @@ export default function BudgetProgressPage() {
           </form>
         )}
 
-        <Table columns={[t('execution.budget.items.table.description'), t('execution.budget.items.table.budgetedQty'), t('execution.budget.items.table.executed'), t('execution.budget.items.table.percent'), t('execution.budget.items.table.unitValue'), t('execution.budget.items.table.total'), t('execution.budget.items.table.executedValue'), '']}>
+        <Table columns={[t('execution.budget.items.table.code'), t('execution.budget.items.table.description'), t('execution.budget.items.table.budgetedQty'), t('execution.budget.items.table.executed'), t('execution.budget.items.table.percent'), t('execution.budget.items.table.unitValue'), t('execution.budget.items.table.total'), t('execution.budget.items.table.executedValue'), '']}>
           {items.map((it) => (
             <tr key={it.id} className="border-b border-gray-100">
+              <td className="py-2 pr-3 text-gray-400">{it.APU?.code || '-'}</td>
               <td className="py-2 pr-3">
                 {it.description} <span className="text-gray-400">({it.unit})</span>
                 {it.notes && <div className="text-xs text-gray-400">{t('execution.budget.items.noteLabel')}: {it.notes}</div>}
               </td>
-              <td className="py-2 pr-3">{Number(it.quantity)}</td>
+              <td className="py-2 pr-3">
+                {editingQtyId === it.id ? (
+                  <div className="flex items-center gap-1">
+                    <Input type="number" min="0" step="0.01" value={qtyDraft} onChange={(e) => setQtyDraft(e.target.value)} className="w-24" autoFocus />
+                    <Button variant="secondary" disabled={savingQty} onClick={() => saveQty(it)}>{t('common.save')}</Button>
+                    <Button variant="ghost" onClick={() => setEditingQtyId(null)}>{t('common.cancel')}</Button>
+                  </div>
+                ) : (
+                  <span className="inline-flex items-center gap-2">
+                    {Number(it.quantity)}
+                    <Can module="ejecucion" action="edit">
+                      <button type="button" className="text-blue-600 hover:underline text-xs" onClick={() => startEditQty(it)}>{t('common.edit')}</button>
+                    </Can>
+                  </span>
+                )}
+              </td>
               <td className="py-2 pr-3">{it.accumulatedQty}</td>
               <td className="py-2 pr-3">
                 <div className="w-24 bg-gray-200 rounded h-2">
@@ -278,8 +318,9 @@ export default function BudgetProgressPage() {
               </td>
             </tr>
           ))}
-          {items.length === 0 && <tr><td colSpan={8} className="py-3 text-center text-gray-400">{t('execution.budget.items.empty')}</td></tr>}
+          {items.length === 0 && <tr><td colSpan={9} className="py-3 text-center text-gray-400">{t('execution.budget.items.empty')}</td></tr>}
         </Table>
+        <ErrorText>{qtyError}</ErrorText>
       </Card>
 
       {expandedId && (

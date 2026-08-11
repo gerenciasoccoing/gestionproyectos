@@ -1,7 +1,7 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { Budget, BudgetItem, Project } = require('../models');
-const { getBudgetItemsWithProgress, resolveBudgetItemFields } = require('../services/budgetService');
+const { getBudgetItemsWithProgress, resolveBudgetItemFields, updateBudgetItemQuantity } = require('../services/budgetService');
 const { importBudgetFromWorkbook } = require('../services/budgetImportService');
 const { buildApuDataByIdMap } = require('../services/apuExportService');
 const { generateBudgetWithApuAnnexPdf } = require('../services/pdfService');
@@ -59,6 +59,15 @@ const addItem = asyncHandler(async (req, res) => {
   res.status(201).json(item);
 });
 
+// Edita la cantidad de un ítem ya agregado al presupuesto (el valor unitario y el APU/descripción
+// quedan fijos, igual que al agregarlo); recalcula su totalCost.
+const updateItem = asyncHandler(async (req, res) => {
+  const item = await BudgetItem.findOne({ where: { id: req.params.itemId, budgetId: req.params.budgetId } });
+  if (!item) throw new ApiError(404, 'Ítem de presupuesto no encontrado');
+  await updateBudgetItemQuantity(item, req.body.quantity);
+  res.json(item);
+});
+
 const removeItem = asyncHandler(async (req, res) => {
   const item = await BudgetItem.findOne({ where: { id: req.params.itemId, budgetId: req.params.budgetId } });
   if (!item) throw new ApiError(404, 'Ítem de presupuesto no encontrado');
@@ -111,5 +120,5 @@ const exportExcel = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  getProjectBudget, createBudgetVersion, updateBudget, addItem, removeItem, importFromFile, exportPdf, exportExcel,
+  getProjectBudget, createBudgetVersion, updateBudget, addItem, updateItem, removeItem, importFromFile, exportPdf, exportExcel,
 };

@@ -1,12 +1,12 @@
 const ApiError = require('../utils/ApiError');
-const { sequelize, Quotation, Budget, BudgetItem, Project, ProjectUser } = require('../models');
+const { sequelize, Quotation, Budget, BudgetItem, APU, Project, ProjectUser } = require('../models');
 
 async function getQuotationWithBudget(quotationId) {
   const quotation = await Quotation.findByPk(quotationId);
   if (!quotation) return null;
   const budget = await Budget.findOne({
     where: { quotationId },
-    include: [{ model: BudgetItem, as: 'items' }],
+    include: [{ model: BudgetItem, as: 'items', include: [{ model: APU, attributes: ['id', 'code', 'name'] }] }],
     order: [['version', 'DESC']],
   });
   return { quotation, budget };

@@ -345,27 +345,29 @@ async function generateBudgetWithApuAnnexExcelBuffer({ project, items, apuDataBy
   const logoImageId = embedLogo(workbook, company);
 
   const summary = workbook.addWorksheet('Resumen');
-  summary.columns = [{ width: 45 }, { width: 10 }, { width: 12 }, { width: 16 }, { width: 16 }];
-  mergeAndStyle(summary, 'A1:E1', 'PRESUPUESTO', { bold: true, size: 14, border: null, fill: null });
-  mergeAndStyle(summary, 'A2:E2', project?.name || '', { size: 11, border: null, fill: null });
+  summary.columns = [{ width: 14 }, { width: 40 }, { width: 10 }, { width: 12 }, { width: 16 }, { width: 16 }];
+  mergeAndStyle(summary, 'A1:F1', 'PRESUPUESTO', { bold: true, size: 14, border: null, fill: null });
+  mergeAndStyle(summary, 'A2:F2', project?.name || '', { size: 11, border: null, fill: null });
   const headerRow = 4;
-  ['Descripción', 'Unidad', 'Cantidad', 'Vr. Unitario', 'Vr. Total'].forEach((label, i) => {
-    setCell(summary, `${String.fromCharCode(65 + i)}${headerRow}`, label, { bold: true, align: i === 0 ? 'left' : 'center' });
+  ['Código', 'Descripción', 'Unidad', 'Cantidad', 'Vr. Unitario', 'Vr. Total'].forEach((label, i) => {
+    setCell(summary, `${String.fromCharCode(65 + i)}${headerRow}`, label, { bold: true, align: i <= 1 ? 'left' : 'center' });
   });
   let row = headerRow + 1;
   let total = 0;
   items.forEach((it) => {
-    setCell(summary, `A${row}`, it.description, { align: 'left', border: BOX_BORDER });
-    setCell(summary, `B${row}`, it.unit, { border: BOX_BORDER });
-    setCell(summary, `C${row}`, Number(it.quantity), { numFmt: QTY_FMT, border: BOX_BORDER });
-    setCell(summary, `D${row}`, Number(it.unitCost), { numFmt: CURRENCY_FMT, border: BOX_BORDER });
-    setCell(summary, `E${row}`, Number(it.totalCost), { numFmt: CURRENCY_FMT, border: BOX_BORDER });
+    const apuCode = it.apuId ? (apuDataById.get(it.apuId)?.apu.code || '-') : '-';
+    setCell(summary, `A${row}`, apuCode, { align: 'left', border: BOX_BORDER });
+    setCell(summary, `B${row}`, it.description, { align: 'left', border: BOX_BORDER });
+    setCell(summary, `C${row}`, it.unit, { border: BOX_BORDER });
+    setCell(summary, `D${row}`, Number(it.quantity), { numFmt: QTY_FMT, border: BOX_BORDER });
+    setCell(summary, `E${row}`, Number(it.unitCost), { numFmt: CURRENCY_FMT, border: BOX_BORDER });
+    setCell(summary, `F${row}`, Number(it.totalCost), { numFmt: CURRENCY_FMT, border: BOX_BORDER });
     total += Number(it.totalCost);
     row += 1;
   });
   row += 1;
-  mergeAndStyle(summary, `A${row}:D${row}`, 'TOTAL PRESUPUESTO', { bold: true, align: 'right', border: null, fill: null });
-  setCell(summary, `E${row}`, total, { bold: true, numFmt: CURRENCY_FMT, border: null });
+  mergeAndStyle(summary, `A${row}:E${row}`, 'TOTAL PRESUPUESTO', { bold: true, align: 'right', border: null, fill: null });
+  setCell(summary, `F${row}`, total, { bold: true, numFmt: CURRENCY_FMT, border: null });
 
   const used = new Set(['Resumen']);
   items.filter((it) => it.apuId && apuDataById.has(it.apuId)).forEach((item) => {

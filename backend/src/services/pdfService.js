@@ -324,8 +324,9 @@ function generateBudgetWithApuAnnexPdf({ project, budget, items, apuDataById, el
 
   sectionTitle(doc, 'Resumen de ítems');
   const tableTop = doc.y + 5;
-  const colX = { desc: 50, unit: 260, qty: 305, unitCost: 365, total: 460 };
+  const colX = { code: 50, desc: 105, unit: 275, qty: 313, unitCost: 365, total: 460 };
   doc.font('Helvetica-Bold').fontSize(9);
+  doc.text('Código', colX.code, tableTop);
   doc.text('Descripción', colX.desc, tableTop);
   doc.text('Unidad', colX.unit, tableTop);
   doc.text('Cant.', colX.qty, tableTop);
@@ -338,7 +339,9 @@ function generateBudgetWithApuAnnexPdf({ project, budget, items, apuDataById, el
   let total = 0;
   items.forEach((item) => {
     if (y > 720) { doc.addPage(); y = 50; }
-    doc.text(item.description, colX.desc, y, { width: 200 });
+    const apuCode = item.apuId ? (apuDataById.get(item.apuId)?.apu.code || '-') : '-';
+    doc.text(apuCode, colX.code, y, { width: 50 });
+    doc.text(item.description, colX.desc, y, { width: 160 });
     doc.text(item.unit, colX.unit, y);
     doc.text(String(item.quantity), colX.qty, y);
     doc.text(money(item.unitCost), colX.unitCost, y);

@@ -81,7 +81,7 @@ function applyBudgetAiu(directCost, budget) {
 async function getCurrentBudgetForProject(projectId) {
   return Budget.findOne({
     where: { projectId },
-    include: [{ model: BudgetItem, as: 'items' }],
+    include: [{ model: BudgetItem, as: 'items', include: [{ model: APU, attributes: ['id', 'code', 'name'] }] }],
     order: [['version', 'DESC']],
   });
 }
@@ -141,7 +141,21 @@ async function resolveBudgetItemFields({ budget, apuId, description, notes, unit
   };
 }
 
+// Actualiza la cantidad de un ítem de presupuesto ya agregado (compartido por Proyectos y
+// Cotizaciones, igual que resolveBudgetItemFields). El valor unitario no se recalcula: queda fijo
+// al momento de agregar el ítem, igual que el resto del flujo (ver comentario en budgetController).
+async function updateBudgetItemQuantity(item, quantity) {
+  if (quantity === undefined || quantity === null || quantity === '') {
+    throw new ApiError(400, 'quantity es obligatorio');
+  }
+  if (Number(quantity) < 0) throw new ApiError(400, 'La cantidad no puede ser negativa');
+  item.quantity = quantity;
+  item.totalCost = Number(quantity) * Number(item.unitCost);
+  await item.save();
+  return item;
+}
+
 module.exports = {
   computeApuUnitCost, computeSectionCosts, laborBreakdown, applyBudgetAiu, getCurrentBudgetForProject,
-  getBudgetItemsWithProgress, resolveBudgetItemFields,
+  getBudgetItemsWithProgress, resolveBudgetItemFields, updateBudgetItemQuantity,
 };

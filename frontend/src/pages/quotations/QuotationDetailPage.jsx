@@ -16,6 +16,14 @@ export default function QuotationDetailPage() {
   const [aiuForm, setAiuForm] = useState(null);
   const [aiuSaved, setAiuSaved] = useState(false);
   const [error, setError] = useState('');
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const [nameError, setNameError] = useState('');
+  const [savingName, setSavingName] = useState(false);
+  const [editingQtyId, setEditingQtyId] = useState(null);
+  const [qtyDraft, setQtyDraft] = useState('');
+  const [qtyError, setQtyError] = useState('');
+  const [savingQty, setSavingQty] = useState(false);
 
   const [showExport, setShowExport] = useState(false);
   const [exportNames, setExportNames] = useState({ elaboroNombre: '', revisoNombre: '' });
@@ -88,6 +96,26 @@ export default function QuotationDetailPage() {
     }
   };
 
+  const startEditQty = (it) => {
+    setEditingQtyId(it.id);
+    setQtyDraft(String(it.quantity));
+    setQtyError('');
+  };
+
+  const saveQty = async (it) => {
+    setQtyError('');
+    setSavingQty(true);
+    try {
+      await quotationsApi.updateItem(id, it.id, { quantity: qtyDraft });
+      setEditingQtyId(null);
+      load();
+    } catch (err) {
+      setQtyError(extractError(err));
+    } finally {
+      setSavingQty(false);
+    }
+  };
+
   const removeItem = async (itemId) => {
     if (!confirm(t('quotations.detail.confirmRemoveItem'))) return;
     await quotationsApi.removeItem(id, itemId);
@@ -104,13 +132,49 @@ export default function QuotationDetailPage() {
     }
   };
 
+  const startEditName = () => {
+    setNameDraft(quotation.projectNameProposed);
+    setNameError('');
+    setEditingName(true);
+  };
+
+  const saveName = async (e) => {
+    e.preventDefault();
+    setNameError('');
+    setSavingName(true);
+    try {
+      await quotationsApi.update(id, { projectNameProposed: nameDraft.trim() });
+      setEditingName(false);
+      load();
+    } catch (err) {
+      setNameError(extractError(err));
+    } finally {
+      setSavingName(false);
+    }
+  };
+
   return (
     <div>
       <Link to="/quotations" className="text-sm text-blue-600 hover:underline">{t('quotations.detail.back')}</Link>
-      <div className="flex items-center gap-3 mt-2 mb-4">
-        <h1 className="text-xl font-bold">{quotation.projectNameProposed}</h1>
-        <Badge color={isConverted ? 'green' : 'gray'}>{t(`enums.quotationStatus.${quotation.status}`, quotation.status)}</Badge>
-      </div>
+      {editingName ? (
+        <form onSubmit={saveName} className="flex items-center flex-wrap gap-2 mt-2 mb-1">
+          <Input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} required autoFocus className="max-w-sm" />
+          <Button type="submit" disabled={savingName}>{t('common.save')}</Button>
+          <Button type="button" variant="secondary" onClick={() => setEditingName(false)}>{t('common.cancel')}</Button>
+        </form>
+      ) : (
+        <div className="flex items-center gap-3 mt-2 mb-1">
+          <h1 className="text-xl font-bold">{quotation.projectNameProposed}</h1>
+          <Badge color={isConverted ? 'green' : 'gray'}>{t(`enums.quotationStatus.${quotation.status}`, quotation.status)}</Badge>
+          {!isConverted && (
+            <Can module="cotizaciones" action="edit">
+              <Button variant="secondary" onClick={startEditName}>{t('common.edit')}</Button>
+            </Can>
+          )}
+        </div>
+      )}
+      {editingName && <ErrorText>{nameError}</ErrorText>}
+      <div className="mb-4" />
 
       <Card title={t('quotations.detail.data')}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm">
@@ -180,15 +244,33 @@ export default function QuotationDetailPage() {
             <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
           </form>
         )}
-        <Table columns={[t('quotations.detail.table.description'), t('quotations.detail.table.unit'), t('quotations.detail.table.quantity'), t('quotations.detail.table.unitValue'), t('quotations.detail.table.total'), '']}>
+        <Table columns={[t('quotations.detail.table.code'), t('quotations.detail.table.description'), t('quotations.detail.table.unit'), t('quotations.detail.table.quantity'), t('quotations.detail.table.unitValue'), t('quotations.detail.table.total'), '']}>
           {items.map((it) => (
             <tr key={it.id} className="border-b border-gray-100">
+              <td className="py-1 pr-3 text-gray-400">{it.APU?.code || '-'}</td>
               <td className="py-1 pr-3">
                 {it.description}
                 {it.notes && <div className="text-xs text-gray-400">{t('quotations.detail.noteLabel')}: {it.notes}</div>}
               </td>
               <td className="py-1 pr-3">{it.unit}</td>
-              <td className="py-1 pr-3">{Number(it.quantity)}</td>
+              <td className="py-1 pr-3">
+                {editingQtyId === it.id ? (
+                  <div className="flex items-center gap-1">
+                    <Input type="number" min="0" step="0.01" value={qtyDraft} onChange={(e) => setQtyDraft(e.target.value)} className="w-24" autoFocus />
+                    <Button variant="secondary" disabled={savingQty} onClick={() => saveQty(it)}>{t('common.save')}</Button>
+                    <Button variant="ghost" onClick={() => setEditingQtyId(null)}>{t('common.cancel')}</Button>
+                  </div>
+                ) : (
+                  <span className="inline-flex items-center gap-2">
+                    {Number(it.quantity)}
+                    {!isConverted && (
+                      <Can module="cotizaciones" action="edit">
+                        <button type="button" className="text-blue-600 hover:underline text-xs" onClick={() => startEditQty(it)}>{t('common.edit')}</button>
+                      </Can>
+                    )}
+                  </span>
+                )}
+              </td>
               <td className="py-1 pr-3">{money(it.unitCost)}</td>
               <td className="py-1 pr-3">{money(it.totalCost)}</td>
               <td className="py-1 pr-3 text-right">
@@ -198,8 +280,9 @@ export default function QuotationDetailPage() {
               </td>
             </tr>
           ))}
-          {items.length === 0 && <tr><td colSpan={6} className="py-2 text-center text-gray-400">{t('quotations.detail.empty')}</td></tr>}
+          {items.length === 0 && <tr><td colSpan={7} className="py-2 text-center text-gray-400">{t('quotations.detail.empty')}</td></tr>}
         </Table>
+        <ErrorText>{qtyError}</ErrorText>
         <p className="text-right font-bold mt-2">{t('quotations.detail.total')}: {money(total)}</p>
       </Card>
 

@@ -177,6 +177,7 @@
         "unitValue": "Valor unitario",
         "save": "Guardar ítem",
         "table": {
+          "code": "Código",
           "description": "Descripción",
           "budgetedQty": "Cant. Presup.",
           "executed": "Ejecutado",
@@ -626,6 +627,7 @@
       "quantity": "Cantidad",
       "add": "Agregar",
       "table": {
+        "code": "Código",
         "description": "Descripción",
         "unit": "Unidad",
         "quantity": "Cantidad",
@@ -1062,6 +1064,7 @@
     "object, value, signedDate y endDate son obligatorios": "object, value, signedDate y endDate son obligatorios",
     "otherCosts no puede ser negativo": "otherCosts no puede ser negativo",
     "priceItemId y yield son obligatorios": "priceItemId y yield son obligatorios",
+    "quantity es obligatorio": "quantity es obligatorio",
     "smlv no puede ser negativo": "smlv no puede ser negativo",
     "sourceLabel es obligatorio (ej. \"Listado Abril 2026\")": "sourceLabel es obligatorio (ej. \"Listado Abril 2026\")",
     "supplier y date son obligatorios": "supplier y date son obligatorios",

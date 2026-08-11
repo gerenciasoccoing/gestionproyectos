@@ -12,6 +12,7 @@ router.put('/:id', requirePermission('cotizaciones', 'edit'), quotationControlle
 router.put('/:id/budget-aiu', requirePermission('cotizaciones', 'edit'), quotationController.updateAiu);
 router.delete('/:id', requirePermission('cotizaciones', 'delete'), quotationController.remove);
 router.post('/:id/items', requirePermission('cotizaciones', 'edit'), quotationController.addItem);
+router.put('/:id/items/:itemId', requirePermission('cotizaciones', 'edit'), quotationController.updateItem);
 router.delete('/:id/items/:itemId', requirePermission('cotizaciones', 'edit'), quotationController.removeItem);
 router.get('/:id/pdf', requirePermission('cotizaciones', 'view'), quotationController.exportPdf);
 router.post('/:id/export-pdf', requirePermission('cotizaciones', 'view'), quotationController.exportBudgetPdf);

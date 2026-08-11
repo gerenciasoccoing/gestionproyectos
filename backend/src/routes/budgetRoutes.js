@@ -23,6 +23,7 @@ router.post('/', requirePermission('ejecucion', 'create'), budgetController.crea
 router.put('/:budgetId', requirePermission('ejecucion', 'edit'), budgetController.updateBudget);
 router.post('/import', requirePermission('ejecucion', 'create'), importUpload.single('file'), budgetController.importFromFile);
 router.post('/:budgetId/items', requirePermission('ejecucion', 'create'), budgetController.addItem);
+router.put('/:budgetId/items/:itemId', requirePermission('ejecucion', 'edit'), budgetController.updateItem);
 router.delete('/:budgetId/items/:itemId', requirePermission('ejecucion', 'delete'), budgetController.removeItem);
 router.post('/export-pdf', requirePermission('ejecucion', 'view'), budgetController.exportPdf);
 router.post('/export-excel', requirePermission('ejecucion', 'view'), budgetController.exportExcel);
