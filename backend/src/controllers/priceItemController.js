@@ -4,6 +4,7 @@ const ApiError = require('../utils/ApiError');
 const { sequelize, PriceItem, PriceHistory } = require('../models');
 const { parseExcelSafely } = require('../services/excelParseService');
 const { importPriceItemsFromRows } = require('../services/priceImportService');
+const { recomputeApuCostsForPriceItems } = require('../services/budgetService');
 
 const list = asyncHandler(async (req, res) => {
   const items = await PriceItem.findAll({ order: [['name', 'ASC']] });
@@ -49,6 +50,8 @@ const updateValue = asyncHandler(async (req, res) => {
       value: currentValue,
       effectiveDate: effectiveDate || new Date().toISOString().slice(0, 10),
     }, { transaction: t });
+    // El nuevo precio puede afectar el costo cacheado de cualquier APU que use este insumo.
+    await recomputeApuCostsForPriceItems([item.id], t);
   });
   res.json(item);
 });

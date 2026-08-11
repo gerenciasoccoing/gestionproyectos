@@ -4,7 +4,7 @@ const {
   sequelize, APU, APUComponent, PriceItem, PriceListImport, APUPriceHistory, BudgetItem,
 } = require('../models');
 const { parseBudgetWorkbook, collectInsumos, upsertPriceItems, computeBlockDirectCost } = require('./budgetImportService');
-const { computeSectionCosts } = require('./budgetService');
+const { computeSectionCosts, recomputeApuCostsForPriceItems } = require('./budgetService');
 
 const BATCH_SIZE = 500;
 
@@ -150,6 +150,11 @@ async function importApuCatalog({ buffer, sourceLabel, effectiveDate, fileName, 
     for (const batch of chunk(newApuRows, BATCH_SIZE)) await APU.bulkCreate(batch, { transaction: t });
     for (const batch of chunk(newComponentRows, BATCH_SIZE)) await APUComponent.bulkCreate(batch, { transaction: t });
     for (const batch of chunk(historyRows, BATCH_SIZE)) await APUPriceHistory.bulkCreate(batch, { transaction: t });
+
+    // Recalcula y persiste el costo cacheado (APU.directCost) de todo APU que use alguno de los
+    // insumos tocados por esta importación: cubre tanto los APU recién creados/actualizados como
+    // cualquier otro APU del catálogo que comparta un insumo cuyo precio cambió acá.
+    await recomputeApuCostsForPriceItems([...priceItemIdByCode.values()], t);
 
     priceListImport.apusCreated = created;
     priceListImport.apusUpdated = updated;

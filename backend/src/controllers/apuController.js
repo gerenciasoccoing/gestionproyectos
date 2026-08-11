@@ -1,7 +1,7 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { sequelize, APU, APUComponent, PriceItem, PriceListImport, APUPriceHistory } = require('../models');
-const { computeApuUnitCost, computeSectionCosts } = require('../services/budgetService');
+const { computeApuUnitCost, recomputeAndPersistApuCost } = require('../services/budgetService');
 const { importApuCatalog } = require('../services/apuCatalogImportService');
 const { generateApuPdf } = require('../services/pdfService');
 const { generateApuExcelBuffer } = require('../services/apuExcelExportService');
@@ -83,22 +83,16 @@ function sanitizeComponent(raw, index) {
   return component;
 }
 
-// Costo por APU calculado en memoria a partir de un único query con todos los componentes
-// (evita N+1: antes recalculaba cada APU con una consulta propia vía computeApuUnitCost,
-// lo que agota el pool de conexiones con miles de APU, ej. tras una importación masiva).
-// No incluye el detalle de componentes en la respuesta (puede haber miles de APU con varios
-// componentes cada uno): para eso está GET /apus/:id, que sí los trae.
+// Lee el costo directo ya cacheado en APU.directCost (ver budgetService.recomputeAndPersistApuCost)
+// en vez de recalcularlo leyendo todos los componentes de cada APU: con miles de APU y varios
+// componentes cada uno, ese JOIN (antes hecho en cada consulta, aunque fuera un solo query) era el
+// cuello de botella real de esta pantalla. No incluye el detalle de componentes en la respuesta:
+// para eso está GET /apus/:id, que sí los trae.
 const list = asyncHandler(async (req, res) => {
-  const apus = await APU.findAll({
-    include: [{ model: APUComponent, as: 'components', include: [{ model: PriceItem, as: 'priceItem' }] }],
-    order: [['name', 'ASC']],
-  });
+  const apus = await APU.findAll({ order: [['name', 'ASC']] });
   const withCosts = apus.map((apu) => {
-    const sections = computeSectionCosts(apu.components);
-    const componentsCost = sections.materialsCost + sections.herramientasCost + sections.personalCost + sections.transporteCost;
-    const directCost = componentsCost + Number(apu.otherCosts || 0);
-    const { components, ...json } = apu.toJSON();
-    return { ...json, directCost, unitCost: directCost };
+    const directCost = Number(apu.directCost);
+    return { ...apu.toJSON(), directCost, unitCost: directCost };
   });
   res.json(withCosts);
 });
@@ -127,7 +121,7 @@ const create = asyncHandler(async (req, res) => {
     return created;
   });
 
-  const result = await computeApuUnitCost(apu.id);
+  const result = await recomputeAndPersistApuCost(apu.id);
   res.status(201).json({ ...result.apu.toJSON(), directCost: result.directCost, unitCost: result.unitCost, sections: result.sections });
 });
 
@@ -158,7 +152,7 @@ const update = asyncHandler(async (req, res) => {
     }
   });
 
-  const result = await computeApuUnitCost(apu.id);
+  const result = await recomputeAndPersistApuCost(apu.id);
   res.json({ ...result.apu.toJSON(), directCost: result.directCost, unitCost: result.unitCost, sections: result.sections });
 });
 
@@ -176,6 +170,7 @@ const addComponent = asyncHandler(async (req, res) => {
   if (!priceItemId || yieldValue === undefined) throw new ApiError(400, 'priceItemId y yield son obligatorios');
   if (Number(yieldValue) < 0) throw new ApiError(400, 'yield no puede ser negativo');
   const component = await APUComponent.create({ apuId: apu.id, priceItemId, yield: yieldValue });
+  await recomputeAndPersistApuCost(apu.id);
   res.status(201).json(component);
 });
 
@@ -183,6 +178,7 @@ const removeComponent = asyncHandler(async (req, res) => {
   const component = await APUComponent.findOne({ where: { id: req.params.componentId, apuId: req.params.id } });
   if (!component) throw new ApiError(404, 'Componente no encontrado');
   await component.destroy();
+  await recomputeAndPersistApuCost(req.params.id);
   res.status(204).send();
 });
 

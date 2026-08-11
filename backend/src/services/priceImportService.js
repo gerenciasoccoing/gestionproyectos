@@ -1,4 +1,5 @@
 const { sequelize, PriceItem, PriceHistory } = require('../models');
+const { recomputeApuCostsForPriceItems } = require('./budgetService');
 
 const VALID_TYPES = ['material', 'mano_obra', 'equipo'];
 const BATCH_SIZE = 500;
@@ -117,6 +118,9 @@ async function importPriceItemsFromRows(rows, effectiveDate) {
       );
       result.updated += batch.length;
     }
+
+    // Cualquiera de los ítems actualizados puede afectar el costo cacheado de los APU que lo usan.
+    await recomputeApuCostsForPriceItems(toUpdate.map((u) => u.existingItem.id), t);
   });
 
   return result;

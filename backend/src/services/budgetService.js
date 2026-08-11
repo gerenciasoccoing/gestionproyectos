@@ -1,5 +1,5 @@
 const ApiError = require('../utils/ApiError');
-const { Budget, BudgetItem, APU, APUComponent, PriceItem, ProgressEntry } = require('../models');
+const { sequelize, Budget, BudgetItem, APU, APUComponent, PriceItem, ProgressEntry } = require('../models');
 
 // Valor unitario efectivo de un componente: el de su insumo de la base de precios,
 // o la tarifa manual (unitValue) cuando no referencia uno (ej. tarifa de transporte).
@@ -69,6 +69,52 @@ async function computeApuUnitCost(apuId) {
   const componentsCost = sections.materialsCost + sections.herramientasCost + sections.personalCost + sections.transporteCost;
   const directCost = componentsCost + Number(apu.otherCosts || 0);
   return { apu, directCost, unitCost: directCost, sections: { ...sections, otherCosts: Number(apu.otherCosts || 0) } };
+}
+
+// Recalcula el costo directo de UN APU (tras crearlo/editarlo o agregar/quitar un componente
+// suyo) y lo persiste en APU.directCost, el valor cacheado que lee el listado (ver
+// apuController.list). Devuelve lo mismo que computeApuUnitCost para no duplicar la respuesta.
+async function recomputeAndPersistApuCost(apuId) {
+  const result = await computeApuUnitCost(apuId);
+  if (!result) return null;
+  await result.apu.update({ directCost: result.directCost });
+  return result;
+}
+
+// Recalcula y persiste APU.directCost para todos los APU que usan alguno de los insumos dados
+// (tras cambiar su precio, manual o por importación masiva de Base de Precios). Se hace en lote
+// (2 SELECT + 1 UPSERT) en vez de un computeApuUnitCost por APU, porque un solo insumo compartido
+// (ej. "Cemento gris") puede aparecer en cientos o miles de APU.
+async function recomputeApuCostsForPriceItems(priceItemIds, transaction) {
+  if (!priceItemIds || !priceItemIds.length) return;
+  const affected = await APUComponent.findAll({
+    where: { priceItemId: priceItemIds },
+    attributes: ['apuId'],
+    group: ['apuId'],
+    transaction,
+  });
+  const apuIds = affected.map((r) => r.apuId);
+  if (!apuIds.length) return;
+
+  const apus = await APU.findAll({
+    where: { id: apuIds },
+    include: [{ model: APUComponent, as: 'components', include: [{ model: PriceItem, as: 'priceItem' }] }],
+    transaction,
+  });
+  // Update masivo vía SQL crudo (no bulkCreate+updateOnDuplicate: eso hace un INSERT ... ON
+  // CONFLICT que exige valores para columnas NOT NULL como name/unit, que acá no tenemos ni
+  // queremos tocar).
+  const values = apus
+    .map((apu) => {
+      const sections = computeSectionCosts(apu.components);
+      const directCost = sections.materialsCost + sections.herramientasCost + sections.personalCost + sections.transporteCost + Number(apu.otherCosts || 0);
+      return `(${sequelize.escape(apu.id)}, ${directCost})`;
+    })
+    .join(',');
+  await sequelize.query(
+    `UPDATE "APUs" AS a SET "directCost" = v.dc FROM (VALUES ${values}) AS v(id, dc) WHERE a.id = v.id::uuid`,
+    { transaction }
+  );
 }
 
 // AIU discriminado del presupuesto (Administración + Imprevistos + Utilidad), aplicado
@@ -156,6 +202,6 @@ async function updateBudgetItemQuantity(item, quantity) {
 }
 
 module.exports = {
-  computeApuUnitCost, computeSectionCosts, laborBreakdown, applyBudgetAiu, getCurrentBudgetForProject,
-  getBudgetItemsWithProgress, resolveBudgetItemFields, updateBudgetItemQuantity,
+  computeApuUnitCost, computeSectionCosts, laborBreakdown, recomputeAndPersistApuCost, recomputeApuCostsForPriceItems,
+  applyBudgetAiu, getCurrentBudgetForProject, getBudgetItemsWithProgress, resolveBudgetItemFields, updateBudgetItemQuantity,
 };

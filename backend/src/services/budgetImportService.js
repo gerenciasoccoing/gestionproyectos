@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { sequelize, Budget, BudgetItem, APU, APUComponent, PriceItem, PriceHistory } = require('../models');
 const ApiError = require('../utils/ApiError');
+const { recomputeApuCostsForPriceItems } = require('./budgetService');
 
 const BATCH_SIZE = 500;
 
@@ -226,6 +227,10 @@ async function importBudgetFromWorkbook({ projectId, buffer, aiu, type = 'inicia
     for (const batch of chunk(apuRows, BATCH_SIZE)) await APU.bulkCreate(batch, { transaction: t });
     for (const batch of chunk(componentRows, BATCH_SIZE)) await APUComponent.bulkCreate(batch, { transaction: t });
     for (const batch of chunk(budgetItemRows, BATCH_SIZE)) await BudgetItem.bulkCreate(batch, { transaction: t });
+
+    // Persiste el costo cacheado (APU.directCost) de los APU recién creados y de cualquier otro
+    // APU del catálogo que comparta un insumo cuyo precio se acaba de actualizar acá.
+    await recomputeApuCostsForPriceItems([...idMap.values()], t);
 
     return {
       budgetId: budget.id,

@@ -13,6 +13,12 @@ module.exports = (sequelize) => {
     // Se suman al costo directo del APU (que ya no incluye AIU: el AIU se define al crear
     // el presupuesto y se aplica sobre este costo directo, ver Budget.adminPercent/etc).
     otherCosts: { type: DataTypes.DECIMAL(18, 2), allowNull: false, defaultValue: 0, validate: { min: 0 } },
+    // Costo directo cacheado (suma de las 4 secciones + otherCosts, ver budgetService.computeSectionCosts).
+    // Recalculado y persistido cada vez que cambian los componentes de ESTE APU o el precio de
+    // algún insumo que use (ver budgetService.recomputeAndPersistApuCost/recomputeApuCostsForPriceItems),
+    // para que el listado de APU (miles de filas) no tenga que reconstruirlo leyendo todos los
+    // componentes en cada consulta — antes era el cuello de botella principal de /api/apus.
+    directCost: { type: DataTypes.DECIMAL(18, 2), allowNull: false, defaultValue: 0, validate: { min: 0 } },
     // Último lote de listado de precios que creó o actualizó este APU (null si es 100% manual).
     lastPriceListImportId: { type: DataTypes.UUID, allowNull: true },
   });
