@@ -131,6 +131,25 @@ export const thirdPartiesApi = {
   scanRut: (formData) => client.post('/third-parties/scan-rut', formData).then((r) => r.data),
 };
 
+export const inventoryItemsApi = {
+  list: (params) => client.get('/inventory-items', { params }).then((r) => r.data),
+  get: (id) => client.get(`/inventory-items/${id}`).then((r) => r.data),
+  history: (id) => client.get(`/inventory-items/${id}/history`).then((r) => r.data),
+  create: (formData) => client.post('/inventory-items', formData).then((r) => r.data),
+  update: (id, formData) => client.put(`/inventory-items/${id}`, formData).then((r) => r.data),
+  remove: (id) => client.delete(`/inventory-items/${id}`),
+};
+
+export const inventoryCheckoutsApi = {
+  list: (params) => client.get('/inventory-checkouts', { params }).then((r) => r.data),
+  get: (id) => client.get(`/inventory-checkouts/${id}`).then((r) => r.data),
+  create: (data) => client.post('/inventory-checkouts', data).then((r) => r.data),
+  checkin: (id, data) => client.post(`/inventory-checkouts/${id}/checkin`, data).then((r) => r.data),
+  justify: (id, itemId, data) => client.post(`/inventory-checkouts/${id}/items/${itemId}/justify`, data).then((r) => r.data),
+  notifySalida: (id, numero) => client.post(`/inventory-checkouts/${id}/notify-salida`, { numero }).then((r) => r.data),
+  notifyEntrada: (id, numero, checkinIds) => client.post(`/inventory-checkouts/${id}/notify-entrada`, { numero, checkinIds }).then((r) => r.data),
+};
+
 export const risksApi = {
   list: (pid) => client.get(`/projects/${pid}/risks`).then((r) => r.data),
   create: (pid, data) => client.post(`/projects/${pid}/risks`, data).then((r) => r.data),

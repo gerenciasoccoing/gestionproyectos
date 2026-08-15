@@ -27,6 +27,10 @@ import ApuPage from './pages/quotations/ApuPage';
 
 import ThirdPartiesPage from './pages/thirdparties/ThirdPartiesPage';
 
+import InventoryLayout from './pages/inventory/InventoryLayout';
+import InventoryCatalogPage from './pages/inventory/InventoryCatalogPage';
+import InventoryCheckoutsPage from './pages/inventory/InventoryCheckoutsPage';
+
 import AdminLayout from './pages/admin/AdminLayout';
 import UsersPage from './pages/admin/UsersPage';
 import RolesPage from './pages/admin/RolesPage';
@@ -46,6 +50,12 @@ export default function App() {
         <Route path="price-book" element={<PriceBookPage />} />
         <Route path="apus" element={<ApuPage />} />
         <Route path="third-parties" element={<ThirdPartiesPage />} />
+
+        <Route path="inventory" element={<ProtectedRoute module="inventario" action="view"><InventoryLayout /></ProtectedRoute>}>
+          <Route index element={<Navigate to="catalog" replace />} />
+          <Route path="catalog" element={<InventoryCatalogPage />} />
+          <Route path="checkouts" element={<InventoryCheckoutsPage />} />
+        </Route>
 
         <Route path="admin" element={<ProtectedRoute module="admin" action="view"><AdminLayout /></ProtectedRoute>}>
           <Route index element={<Navigate to="users" replace />} />

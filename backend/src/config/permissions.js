@@ -12,6 +12,7 @@ const MODULES = [
   'informes',
   'cotizaciones',
   'terceros',
+  'inventario',
 ];
 
 const ACTIONS = ['view', 'create', 'edit', 'delete'];
@@ -37,6 +38,9 @@ const DEFAULT_ROLE_PERMISSIONS = {
     'gastos:create',
     'informes:view',
     'terceros:view',
+    'inventario:view',
+    'inventario:create',
+    'inventario:edit',
   ],
   financiero: [
     'proyectos:view',

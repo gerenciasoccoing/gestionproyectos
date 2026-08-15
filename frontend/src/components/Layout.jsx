@@ -42,6 +42,9 @@ export default function Layout() {
                   {l.label}
                 </Link>
               ))}
+              <Can module="inventario" action="view">
+                <Link to="/inventory" className="text-sm text-gray-300 hover:text-white hover:bg-white/5 px-3 py-1.5 rounded-md transition-colors">{t('nav.inventory')}</Link>
+              </Can>
               <Can module="admin" action="view">
                 <Link to="/admin" className="text-sm text-gray-300 hover:text-white hover:bg-white/5 px-3 py-1.5 rounded-md transition-colors">{t('nav.admin')}</Link>
               </Can>
@@ -76,6 +79,11 @@ export default function Layout() {
                 {l.label}
               </Link>
             ))}
+            <Can module="inventario" action="view">
+              <Link to="/inventory" onClick={() => setMenuOpen(false)} className="text-sm text-gray-300 hover:text-white hover:bg-white/5 px-3 py-2 rounded-md transition-colors">
+                {t('nav.inventory')}
+              </Link>
+            </Can>
             <Can module="admin" action="view">
               <Link to="/admin" onClick={() => setMenuOpen(false)} className="text-sm text-gray-300 hover:text-white hover:bg-white/5 px-3 py-2 rounded-md transition-colors">
                 {t('nav.admin')}

@@ -38,6 +38,10 @@ const modelDefiners = [
   require('./ThirdParty'),
   require('./PriceListImport'),
   require('./APUPriceHistory'),
+  require('./InventoryItem'),
+  require('./InventoryCheckout'),
+  require('./InventoryCheckoutItem'),
+  require('./InventoryCheckin'),
 ];
 
 const models = {};

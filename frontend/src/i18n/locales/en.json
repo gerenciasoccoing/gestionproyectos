@@ -39,6 +39,7 @@
     "priceBook": "Price Book",
     "apu": "Unit Price Analysis",
     "thirdParties": "Suppliers and Clients",
+    "inventory": "Inventory",
     "admin": "Administration",
     "logout": "Log out",
     "logoutShort": "Log out",
@@ -576,6 +577,127 @@
     "duplicateNitSupplier": "A supplier is already registered with this Tax ID: \"{{name}}\". Verify it's not a duplicate.",
     "duplicateNitClient": "A client is already registered with this Tax ID: \"{{name}}\". Verify it's not a duplicate."
   },
+  "inventory": {
+    "title": "Inventory",
+    "tabs": {
+      "catalog": "Catalog",
+      "checkouts": "Checkouts and Returns"
+    },
+    "trackingTypes": {
+      "serializado": "Serialized unit",
+      "cantidad": "By quantity (stock)"
+    },
+    "statuses": {
+      "disponible": "Available",
+      "en_prestamo": "Checked out",
+      "mantenimiento": "In maintenance",
+      "baja": "Decommissioned",
+      "activa": "Active",
+      "cerrada": "Closed"
+    },
+    "conditions": {
+      "bueno": "Good",
+      "dañado": "Damaged",
+      "incompleto": "Incomplete"
+    },
+    "catalog": {
+      "title": "Equipment and tools catalog",
+      "newItem": "+ New item",
+      "fields": {
+        "name": "Name",
+        "code": "Code/Reference",
+        "category": "Category",
+        "trackingType": "Tracking type",
+        "stockQuantity": "Stock quantity",
+        "value": "Value (optional)",
+        "photo": "Photo (optional)",
+        "notes": "Notes"
+      },
+      "searchPlaceholder": "Search by name or code...",
+      "table": {
+        "photo": "Photo",
+        "code": "Code",
+        "name": "Name",
+        "category": "Category",
+        "status": "Status",
+        "value": "Value"
+      },
+      "availableOf": "Available: {{available}} / {{total}}",
+      "history": "History",
+      "empty": "No items registered.",
+      "confirmDelete": "Delete this item from the catalog?",
+      "historyTitle": "Movement history: {{name}}",
+      "historyTable": {
+        "date": "Date",
+        "destination": "Destination",
+        "responsible": "Responsible",
+        "quantity": "Quantity",
+        "returned": "Returned",
+        "status": "Status"
+      },
+      "resolved": "Resolved",
+      "pendingQty": "Pending: {{qty}}",
+      "noHistory": "This item has no movements yet."
+    },
+    "checkouts": {
+      "title": "Checkouts and Returns",
+      "newCheckout": "+ New checkout",
+      "fields": {
+        "project": "Project (optional)",
+        "destinationText": "Destination / site / place",
+        "checkoutDate": "Checkout date and time",
+        "responsibleEmployee": "Responsible (employee)",
+        "responsibleThirdParty": "Responsible (supplier/client)",
+        "responsibleName": "Responsible (free text name)",
+        "notes": "Notes",
+        "item": "Item",
+        "quantity": "Quantity"
+      },
+      "noProjectPlaceholder": "-- no project --",
+      "nonePlaceholder": "-- none --",
+      "selectProjectFirst": "-- select a project first --",
+      "responsibleNameHelp": "If not in employees or third parties",
+      "items": "Items going out",
+      "serializedNote": "Quantity: 1 (serialized unit)",
+      "addItem": "+ Add item",
+      "save": "Register checkout",
+      "notifySalidaTitle": "Send checkout report via WhatsApp",
+      "notifyEntradaTitle": "Send return report via WhatsApp",
+      "whatsappNumber": "WhatsApp number (with country code)",
+      "sendWhatsapp": "Send",
+      "sendSuccess": "Message sent successfully.",
+      "sendFailed": "Could not send",
+      "filterStatus": "Filter by status",
+      "allStatuses": "All",
+      "table": {
+        "destination": "Destination",
+        "responsible": "Responsible",
+        "date": "Date",
+        "status": "Status",
+        "items": "Items"
+      },
+      "detail": "Detail",
+      "empty": "No checkouts registered.",
+      "detailTitle": "Checkout: {{destination}}",
+      "detailTable": {
+        "item": "Item",
+        "quantity": "Quantity",
+        "returned": "Returned",
+        "justified": "Justified",
+        "pending": "Pending",
+        "action": "Action"
+      },
+      "resolved": "Resolved",
+      "conditionPlaceholder": "-- condition on return --",
+      "resultingStatusPlaceholder": "-- resulting status --",
+      "registerReturn": "Register return",
+      "justifyQuantity": "Qty. to justify",
+      "justifyNote": "Reason",
+      "registerJustify": "Justify missing",
+      "returnRequired": "Indicate quantity, condition, and resulting status",
+      "justifyRequired": "Indicate the quantity and the reason"
+    }
+  },
   "quotations": {
     "list": {
       "title": "Quotations",
@@ -979,7 +1101,23 @@
     "Acta no encontrada": "Minute not found",
     "Cada ítem requiere name, unit, quantityOrdered y unitPrice": "Each item requires name, unit, quantityOrdered and unitPrice",
     "Cantidad y precio unitario no pueden ser negativos": "Quantity and unit price cannot be negative",
+    "category es obligatoria": "category is required",
+    "code es obligatorio": "code is required",
     "Componente no encontrado": "Component not found",
+    "Debe incluir al menos un equipo en la salida": "Must include at least one item in the checkout",
+    "Debe indicar al menos un equipo a devolver": "Must indicate at least one item to return",
+    "Debe indicar el motivo de la justificación": "Must indicate the reason for the justification",
+    "Debe indicar la persona responsable (empleado, tercero o nombre)": "Must indicate the responsible person (employee, third party, or name)",
+    "Debe indicar un destino (proyecto o texto libre)": "Must indicate a destination (project or free text)",
+    "Equipo no encontrado": "Item not found",
+    "Esta salida ya está cerrada": "This checkout is already closed",
+    "La cantidad a devolver debe ser mayor a 0": "The quantity to return must be greater than 0",
+    "Línea de salida no encontrada en esta salida": "Checkout line not found in this checkout",
+    "No se puede eliminar un equipo con historial de movimientos (tuvo salidas registradas). Puedes marcarlo como \"dado de baja\" en su lugar.": "Cannot delete an item with movement history (it had registered checkouts). You can mark it as \"decommissioned\" instead.",
+    "No se puede eliminar un equipo que está actualmente en préstamo": "Cannot delete an item that is currently checked out",
+    "quantity debe ser mayor a 0": "quantity must be greater than 0",
+    "Salida de inventario no encontrada": "Inventory checkout not found",
+    "stockQuantity es obligatorio y no puede ser negativo para equipos de tipo \"cantidad\"": "stockQuantity is required and cannot be negative for \"quantity\"-type items",
     "Contrato no encontrado": "Contract not found",
     "Cotización no encontrada": "Quotation not found",
     "Credenciales inválidas": "Invalid credentials",

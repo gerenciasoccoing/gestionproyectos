@@ -39,6 +39,7 @@
     "priceBook": "Base de Precios",
     "apu": "APU",
     "thirdParties": "Proveedores y Clientes",
+    "inventory": "Inventario",
     "admin": "Administración",
     "logout": "Cerrar sesión",
     "logoutShort": "Salir",
@@ -576,6 +577,127 @@
     "duplicateNitSupplier": "Ya existe un proveedor registrado con este NIT: \"{{name}}\". Verifica que no sea un duplicado.",
     "duplicateNitClient": "Ya existe un cliente registrado con este NIT: \"{{name}}\". Verifica que no sea un duplicado."
   },
+  "inventory": {
+    "title": "Inventario",
+    "tabs": {
+      "catalog": "Catálogo",
+      "checkouts": "Salidas y Entradas"
+    },
+    "trackingTypes": {
+      "serializado": "Unidad serializada",
+      "cantidad": "Por cantidad (stock)"
+    },
+    "statuses": {
+      "disponible": "Disponible",
+      "en_prestamo": "En préstamo",
+      "mantenimiento": "En mantenimiento",
+      "baja": "Dado de baja",
+      "activa": "Activa",
+      "cerrada": "Cerrada"
+    },
+    "conditions": {
+      "bueno": "Bueno",
+      "dañado": "Dañado",
+      "incompleto": "Incompleto"
+    },
+    "catalog": {
+      "title": "Catálogo de equipos y herramientas",
+      "newItem": "+ Nuevo equipo",
+      "fields": {
+        "name": "Nombre",
+        "code": "Código/Referencia",
+        "category": "Categoría",
+        "trackingType": "Tipo de seguimiento",
+        "stockQuantity": "Cantidad en stock",
+        "value": "Valor (opcional)",
+        "photo": "Foto (opcional)",
+        "notes": "Notas"
+      },
+      "searchPlaceholder": "Buscar por nombre o código...",
+      "table": {
+        "photo": "Foto",
+        "code": "Código",
+        "name": "Nombre",
+        "category": "Categoría",
+        "status": "Estado",
+        "value": "Valor"
+      },
+      "availableOf": "Disponible: {{available}} / {{total}}",
+      "history": "Historial",
+      "empty": "Sin equipos registrados.",
+      "confirmDelete": "¿Eliminar este equipo del catálogo?",
+      "historyTitle": "Historial de movimientos: {{name}}",
+      "historyTable": {
+        "date": "Fecha",
+        "destination": "Destino",
+        "responsible": "Responsable",
+        "quantity": "Cantidad",
+        "returned": "Devuelto",
+        "status": "Estado"
+      },
+      "resolved": "Resuelto",
+      "pendingQty": "Pendiente: {{qty}}",
+      "noHistory": "Este equipo aún no tiene movimientos."
+    },
+    "checkouts": {
+      "title": "Salidas y Entradas",
+      "newCheckout": "+ Nueva salida",
+      "fields": {
+        "project": "Proyecto (opcional)",
+        "destinationText": "Destino / obra / lugar",
+        "checkoutDate": "Fecha y hora de salida",
+        "responsibleEmployee": "Responsable (empleado)",
+        "responsibleThirdParty": "Responsable (proveedor/cliente)",
+        "responsibleName": "Responsable (nombre libre)",
+        "notes": "Notas",
+        "item": "Equipo",
+        "quantity": "Cantidad"
+      },
+      "noProjectPlaceholder": "-- sin proyecto --",
+      "nonePlaceholder": "-- ninguno --",
+      "selectProjectFirst": "-- selecciona un proyecto primero --",
+      "responsibleNameHelp": "Si no está en empleados ni terceros",
+      "items": "Equipos que salen",
+      "serializedNote": "Cantidad: 1 (unidad serializada)",
+      "addItem": "+ Agregar equipo",
+      "save": "Registrar salida",
+      "notifySalidaTitle": "Enviar reporte de salida por WhatsApp",
+      "notifyEntradaTitle": "Enviar reporte de devolución por WhatsApp",
+      "whatsappNumber": "Número de WhatsApp (con código de país)",
+      "sendWhatsapp": "Enviar",
+      "sendSuccess": "Mensaje enviado correctamente.",
+      "sendFailed": "No se pudo enviar",
+      "filterStatus": "Filtrar por estado",
+      "allStatuses": "Todas",
+      "table": {
+        "destination": "Destino",
+        "responsible": "Responsable",
+        "date": "Fecha",
+        "status": "Estado",
+        "items": "Equipos"
+      },
+      "detail": "Detalle",
+      "empty": "Sin salidas registradas.",
+      "detailTitle": "Salida: {{destination}}",
+      "detailTable": {
+        "item": "Equipo",
+        "quantity": "Cantidad",
+        "returned": "Devuelto",
+        "justified": "Justificado",
+        "pending": "Pendiente",
+        "action": "Acción"
+      },
+      "resolved": "Resuelto",
+      "conditionPlaceholder": "-- estado en que regresa --",
+      "resultingStatusPlaceholder": "-- queda como --",
+      "registerReturn": "Registrar devolución",
+      "justifyQuantity": "Cant. a justificar",
+      "justifyNote": "Motivo",
+      "registerJustify": "Justificar faltante",
+      "returnRequired": "Indica cantidad, estado y a qué queda el equipo",
+      "justifyRequired": "Indica la cantidad y el motivo"
+    }
+  },
   "quotations": {
     "list": {
       "title": "Cotizaciones",
@@ -979,7 +1101,23 @@
     "Acta no encontrada": "Acta no encontrada",
     "Cada ítem requiere name, unit, quantityOrdered y unitPrice": "Cada ítem requiere name, unit, quantityOrdered y unitPrice",
     "Cantidad y precio unitario no pueden ser negativos": "Cantidad y precio unitario no pueden ser negativos",
+    "category es obligatoria": "category es obligatoria",
+    "code es obligatorio": "code es obligatorio",
     "Componente no encontrado": "Componente no encontrado",
+    "Debe incluir al menos un equipo en la salida": "Debe incluir al menos un equipo en la salida",
+    "Debe indicar al menos un equipo a devolver": "Debe indicar al menos un equipo a devolver",
+    "Debe indicar el motivo de la justificación": "Debe indicar el motivo de la justificación",
+    "Debe indicar la persona responsable (empleado, tercero o nombre)": "Debe indicar la persona responsable (empleado, tercero o nombre)",
+    "Debe indicar un destino (proyecto o texto libre)": "Debe indicar un destino (proyecto o texto libre)",
+    "Equipo no encontrado": "Equipo no encontrado",
+    "Esta salida ya está cerrada": "Esta salida ya está cerrada",
+    "La cantidad a devolver debe ser mayor a 0": "La cantidad a devolver debe ser mayor a 0",
+    "Línea de salida no encontrada en esta salida": "Línea de salida no encontrada en esta salida",
+    "No se puede eliminar un equipo con historial de movimientos (tuvo salidas registradas). Puedes marcarlo como \"dado de baja\" en su lugar.": "No se puede eliminar un equipo con historial de movimientos (tuvo salidas registradas). Puedes marcarlo como \"dado de baja\" en su lugar.",
+    "No se puede eliminar un equipo que está actualmente en préstamo": "No se puede eliminar un equipo que está actualmente en préstamo",
+    "quantity debe ser mayor a 0": "quantity debe ser mayor a 0",
+    "Salida de inventario no encontrada": "Salida de inventario no encontrada",
+    "stockQuantity es obligatorio y no puede ser negativo para equipos de tipo \"cantidad\"": "stockQuantity es obligatorio y no puede ser negativo para equipos de tipo \"cantidad\"",
     "Contrato no encontrado": "Contrato no encontrado",
     "Cotización no encontrada": "Cotización no encontrada",
     "Credenciales inválidas": "Credenciales inválidas",
