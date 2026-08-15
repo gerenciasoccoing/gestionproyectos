@@ -695,7 +695,16 @@
       "justifyNote": "Reason",
       "registerJustify": "Justify missing",
       "returnRequired": "Indicate quantity, condition, and resulting status",
-      "justifyRequired": "Indicate the quantity and the reason"
+      "justifyRequired": "Indicate the quantity and the reason",
+      "confirmation": {
+        "columnLabel": "Confirmation",
+        "salidaLabel": "Receipt confirmation",
+        "entradaLabel": "Return confirmations",
+        "pending": "Pending",
+        "confirmed": "Confirmed ({{date}})",
+        "expired": "Expired",
+        "copyLink": "Copy link"
+      }
     }
   },
   "quotations": {
@@ -1109,10 +1118,16 @@
     "Debe indicar el motivo de la justificación": "Must indicate the reason for the justification",
     "Debe indicar la persona responsable (empleado, tercero o nombre)": "Must indicate the responsible person (employee, third party, or name)",
     "Debe indicar un destino (proyecto o texto libre)": "Must indicate a destination (project or free text)",
+    "Enlace de confirmación no encontrado o inválido": "Confirmation link not found or invalid",
     "Equipo no encontrado": "Item not found",
     "Esta salida ya está cerrada": "This checkout is already closed",
+    "Este enlace de confirmación venció. Contacta al administrador para gestionarlo manualmente.": "This confirmation link has expired. Contact the administrator to handle it manually.",
+    "Este movimiento ya fue confirmado anteriormente.": "This movement was already confirmed earlier.",
+    "confirmationId es obligatorio": "confirmationId is required",
     "La cantidad a devolver debe ser mayor a 0": "The quantity to return must be greater than 0",
     "Línea de salida no encontrada en esta salida": "Checkout line not found in this checkout",
+    "No se encontró el enlace de confirmación indicado en esta salida": "The specified confirmation link was not found in this checkout",
+    "No se encontraron los checkins de este lote de devolución": "The checkins for this return batch were not found",
     "No se puede eliminar un equipo con historial de movimientos (tuvo salidas registradas). Puedes marcarlo como \"dado de baja\" en su lugar.": "Cannot delete an item with movement history (it had registered checkouts). You can mark it as \"decommissioned\" instead.",
     "No se puede eliminar un equipo que está actualmente en préstamo": "Cannot delete an item that is currently checked out",
     "quantity debe ser mayor a 0": "quantity must be greater than 0",
@@ -1216,5 +1231,21 @@
     "Ítem de presupuesto no encontrado": "Budget item not found",
     "Ítem de presupuesto no encontrado en este proyecto": "Budget item not found in this project",
     "Ítem no encontrado": "Item not found"
+  },
+  "publicConfirmation": {
+    "titleSalida": "Confirm equipment receipt",
+    "titleEntrada": "Confirm equipment return",
+    "buttonSalida": "Confirm equipment receipt",
+    "buttonEntrada": "Confirm equipment return",
+    "confirming": "Confirming...",
+    "destino": "Destination",
+    "responsable": "Responsible",
+    "fecha": "Date",
+    "autorizadoPor": "Authorized/delivered by",
+    "equipos": "Equipment",
+    "alreadyConfirmed": "This movement was already confirmed on {{date}}.",
+    "expired": "This link has expired. Contact the administrator to handle it manually.",
+    "notFound": "Confirmation link not found or invalid.",
+    "confirmFailed": "Could not register the confirmation."
   }
 }

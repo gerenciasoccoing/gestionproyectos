@@ -32,6 +32,14 @@ export function formatDate(isoDate) {
   return i18n.language === 'en' ? `${month}/${day}/${year}` : `${day}/${month}/${year}`;
 }
 
+// Fecha+hora completa (para timestamps como confirmación de recepción/devolución), respetando el
+// idioma activo vía Intl en vez del recorte manual de formatDate (que solo maneja fechas AAAA-MM-DD).
+export function formatDateTime(isoDateTime) {
+  if (!isoDateTime) return '';
+  const locale = i18n.language === 'en' ? 'en-US' : 'es-CO';
+  return new Date(isoDateTime).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' });
+}
+
 export function Card({ title, actions, children, className = '' }) {
   return (
     <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4 ${className}`}>

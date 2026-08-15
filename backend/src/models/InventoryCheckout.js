@@ -27,6 +27,7 @@ module.exports = (sequelize) => {
     InventoryCheckout.belongsTo(models.ThirdParty, { foreignKey: 'responsibleThirdPartyId', as: 'responsibleThirdParty' });
     InventoryCheckout.belongsTo(models.User, { foreignKey: 'authorizedByUserId', as: 'authorizedByUser' });
     InventoryCheckout.hasMany(models.InventoryCheckoutItem, { foreignKey: 'checkoutId', as: 'items', onDelete: 'CASCADE' });
+    InventoryCheckout.hasMany(models.InventoryConfirmation, { foreignKey: 'checkoutId', as: 'confirmations', onDelete: 'CASCADE' });
   };
 
   return InventoryCheckout;

@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
+import ConfirmationPage from './pages/public/ConfirmationPage';
 import ProjectsListPage from './pages/ProjectsListPage';
 import ProjectLayout from './pages/ProjectLayout';
 
@@ -41,6 +42,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/confirm/:token" element={<ConfirmationPage />} />
 
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<ProjectsListPage />} />

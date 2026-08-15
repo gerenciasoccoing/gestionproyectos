@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { inventoryCheckoutsApi, inventoryItemsApi, projectsApi, thirdPartiesApi, employeesApi } from '../../api';
-import { Card, Button, Input, Select, SearchSelect, TextArea, Table, Badge, ErrorText, extractError, formatDate } from '../../components/ui';
+import { Card, Button, Input, Select, SearchSelect, TextArea, Table, Badge, ErrorText, extractError, formatDate, formatDateTime } from '../../components/ui';
 import Can from '../../components/Can';
 
 const STATUS_COLORS = { activa: 'yellow', cerrada: 'green' };
@@ -19,6 +19,23 @@ function destinoLabel(checkout) {
 }
 function responsableLabel(checkout) {
   return checkout.responsibleEmployee?.name || checkout.responsibleThirdParty?.name || checkout.responsibleName || '-';
+}
+
+function isConfirmationExpired(confirmation) {
+  return confirmation.status === 'pendiente' && new Date() > new Date(confirmation.expiresAt);
+}
+
+// Insignia de estado de confirmación (Pendiente / Confirmado con fecha / Vencido) para que el
+// admin vea de un vistazo, sin entrar al detalle, si la persona responsable ya confirmó.
+function ConfirmationBadge({ confirmation, t }) {
+  if (!confirmation) return <span className="text-gray-300">-</span>;
+  if (confirmation.status === 'confirmado') {
+    return <Badge color="green">{t('inventory.checkouts.confirmation.confirmed', { date: formatDateTime(confirmation.confirmedAt) })}</Badge>;
+  }
+  if (isConfirmationExpired(confirmation)) {
+    return <Badge color="red">{t('inventory.checkouts.confirmation.expired')}</Badge>;
+  }
+  return <Badge color="yellow">{t('inventory.checkouts.confirmation.pending')}</Badge>;
 }
 
 export default function InventoryCheckoutsPage() {
@@ -86,7 +103,7 @@ export default function InventoryCheckoutsPage() {
     try {
       const res = notify.kind === 'salida'
         ? await inventoryCheckoutsApi.notifySalida(notify.checkoutId, notify.numero)
-        : await inventoryCheckoutsApi.notifyEntrada(notify.checkoutId, notify.numero, notify.checkinIds);
+        : await inventoryCheckoutsApi.notifyEntrada(notify.checkoutId, notify.numero, notify.confirmationId);
       setNotify({ ...notify, preview: res.preview, result: res });
     } catch (err) {
       setNotify({ ...notify, result: { ok: false, error: extractError(err) } });
@@ -192,23 +209,28 @@ export default function InventoryCheckoutsPage() {
 
         <Table columns={[
           t('inventory.checkouts.table.destination'), t('inventory.checkouts.table.responsible'),
-          t('inventory.checkouts.table.date'), t('inventory.checkouts.table.status'), t('inventory.checkouts.table.items'), '',
+          t('inventory.checkouts.table.date'), t('inventory.checkouts.table.status'), t('inventory.checkouts.table.items'),
+          t('inventory.checkouts.confirmation.columnLabel'), '',
         ]}>
-          {checkouts.map((c) => (
-            <tr key={c.id} className="border-b border-gray-100">
-              <td className="py-1 pr-3">{destinoLabel(c)}</td>
-              <td className="py-1 pr-3">{responsableLabel(c)}</td>
-              <td className="py-1 pr-3">{formatDate(c.checkoutDate?.slice(0, 10))}</td>
-              <td className="py-1 pr-3"><Badge color={STATUS_COLORS[c.status]}>{t(`inventory.statuses.${c.status}`)}</Badge></td>
-              <td className="py-1 pr-3">{c.items?.length || 0}</td>
-              <td className="py-1 pr-3 text-right">
-                <Button variant="secondary" onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
-                  {expandedId === c.id ? t('common.close') : t('inventory.checkouts.detail')}
-                </Button>
-              </td>
-            </tr>
-          ))}
-          {checkouts.length === 0 && <tr><td colSpan={6} className="py-3 text-center text-gray-400">{t('inventory.checkouts.empty')}</td></tr>}
+          {checkouts.map((c) => {
+            const salidaConfirmation = (c.confirmations || []).find((cf) => cf.kind === 'salida');
+            return (
+              <tr key={c.id} className="border-b border-gray-100">
+                <td className="py-1 pr-3">{destinoLabel(c)}</td>
+                <td className="py-1 pr-3">{responsableLabel(c)}</td>
+                <td className="py-1 pr-3">{formatDate(c.checkoutDate?.slice(0, 10))}</td>
+                <td className="py-1 pr-3"><Badge color={STATUS_COLORS[c.status]}>{t(`inventory.statuses.${c.status}`)}</Badge></td>
+                <td className="py-1 pr-3">{c.items?.length || 0}</td>
+                <td className="py-1 pr-3"><ConfirmationBadge confirmation={salidaConfirmation} t={t} /></td>
+                <td className="py-1 pr-3 text-right">
+                  <Button variant="secondary" onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}>
+                    {expandedId === c.id ? t('common.close') : t('inventory.checkouts.detail')}
+                  </Button>
+                </td>
+              </tr>
+            );
+          })}
+          {checkouts.length === 0 && <tr><td colSpan={7} className="py-3 text-center text-gray-400">{t('inventory.checkouts.empty')}</td></tr>}
         </Table>
       </Card>
 
@@ -216,7 +238,7 @@ export default function InventoryCheckoutsPage() {
         <CheckoutDetail
           checkoutId={expandedId}
           onChange={load}
-          onNotifyEntrada={(checkoutId, checkinIds) => setNotify({ checkoutId, kind: 'entrada', numero: '', preview: '', result: null, checkinIds })}
+          onNotifyEntrada={(checkoutId, confirmationId) => setNotify({ checkoutId, kind: 'entrada', numero: '', preview: '', result: null, confirmationId })}
         />
       )}
     </div>
@@ -251,7 +273,7 @@ function CheckoutDetail({ checkoutId, onChange, onNotifyEntrada }) {
       setReturnForms((f) => ({ ...f, [checkoutItemId]: {} }));
       load();
       onChange();
-      onNotifyEntrada(checkoutId, res.checkins.map((c) => c.id));
+      onNotifyEntrada(checkoutId, res.confirmation.id);
     } catch (err) {
       setError(extractError(err));
     }
@@ -274,9 +296,45 @@ function CheckoutDetail({ checkoutId, onChange, onNotifyEntrada }) {
     }
   };
 
+  const salidaConfirmation = (checkout.confirmations || []).find((cf) => cf.kind === 'salida');
+  const entradaConfirmations = (checkout.confirmations || []).filter((cf) => cf.kind === 'entrada');
+  const confirmLink = (token) => `${window.location.origin}/confirm/${token}`;
+
   return (
     <Card title={t('inventory.checkouts.detailTitle', { destination: destinoLabel(checkout) })}>
       {checkout.notes && <p className="text-sm text-gray-500 mb-3">{t('inventory.checkouts.fields.notes')}: {checkout.notes}</p>}
+
+      <div className="mb-3 flex items-center gap-2 flex-wrap">
+        <span className="text-sm text-gray-500">{t('inventory.checkouts.confirmation.salidaLabel')}:</span>
+        <ConfirmationBadge confirmation={salidaConfirmation} t={t} />
+        {salidaConfirmation && salidaConfirmation.status !== 'confirmado' && (
+          <Button type="button" variant="ghost" className="text-xs"
+            onClick={() => navigator.clipboard?.writeText(confirmLink(salidaConfirmation.token))}>
+            {t('inventory.checkouts.confirmation.copyLink')}
+          </Button>
+        )}
+      </div>
+
+      {entradaConfirmations.length > 0 && (
+        <div className="mb-3">
+          <p className="text-sm text-gray-500 mb-1">{t('inventory.checkouts.confirmation.entradaLabel')}:</p>
+          <div className="flex flex-col gap-1">
+            {entradaConfirmations.map((cf) => (
+              <div key={cf.id} className="flex items-center gap-2 flex-wrap">
+                <ConfirmationBadge confirmation={cf} t={t} />
+                <span className="text-xs text-gray-400">{formatDateTime(cf.createdAt)}</span>
+                {cf.status !== 'confirmado' && (
+                  <Button type="button" variant="ghost" className="text-xs"
+                    onClick={() => navigator.clipboard?.writeText(confirmLink(cf.token))}>
+                    {t('inventory.checkouts.confirmation.copyLink')}
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <Table columns={[
         t('inventory.checkouts.detailTable.item'), t('inventory.checkouts.detailTable.quantity'),
         t('inventory.checkouts.detailTable.returned'), t('inventory.checkouts.detailTable.justified'),

@@ -695,7 +695,16 @@
       "justifyNote": "Motivo",
       "registerJustify": "Justificar faltante",
       "returnRequired": "Indica cantidad, estado y a qué queda el equipo",
-      "justifyRequired": "Indica la cantidad y el motivo"
+      "justifyRequired": "Indica la cantidad y el motivo",
+      "confirmation": {
+        "columnLabel": "Confirmación",
+        "salidaLabel": "Confirmación de recepción",
+        "entradaLabel": "Confirmaciones de devolución",
+        "pending": "Pendiente",
+        "confirmed": "Confirmado ({{date}})",
+        "expired": "Vencido",
+        "copyLink": "Copiar enlace"
+      }
     }
   },
   "quotations": {
@@ -1109,10 +1118,16 @@
     "Debe indicar el motivo de la justificación": "Debe indicar el motivo de la justificación",
     "Debe indicar la persona responsable (empleado, tercero o nombre)": "Debe indicar la persona responsable (empleado, tercero o nombre)",
     "Debe indicar un destino (proyecto o texto libre)": "Debe indicar un destino (proyecto o texto libre)",
+    "Enlace de confirmación no encontrado o inválido": "Enlace de confirmación no encontrado o inválido",
     "Equipo no encontrado": "Equipo no encontrado",
     "Esta salida ya está cerrada": "Esta salida ya está cerrada",
+    "Este enlace de confirmación venció. Contacta al administrador para gestionarlo manualmente.": "Este enlace de confirmación venció. Contacta al administrador para gestionarlo manualmente.",
+    "Este movimiento ya fue confirmado anteriormente.": "Este movimiento ya fue confirmado anteriormente.",
+    "confirmationId es obligatorio": "confirmationId es obligatorio",
     "La cantidad a devolver debe ser mayor a 0": "La cantidad a devolver debe ser mayor a 0",
     "Línea de salida no encontrada en esta salida": "Línea de salida no encontrada en esta salida",
+    "No se encontró el enlace de confirmación indicado en esta salida": "No se encontró el enlace de confirmación indicado en esta salida",
+    "No se encontraron los checkins de este lote de devolución": "No se encontraron los checkins de este lote de devolución",
     "No se puede eliminar un equipo con historial de movimientos (tuvo salidas registradas). Puedes marcarlo como \"dado de baja\" en su lugar.": "No se puede eliminar un equipo con historial de movimientos (tuvo salidas registradas). Puedes marcarlo como \"dado de baja\" en su lugar.",
     "No se puede eliminar un equipo que está actualmente en préstamo": "No se puede eliminar un equipo que está actualmente en préstamo",
     "quantity debe ser mayor a 0": "quantity debe ser mayor a 0",
@@ -1216,5 +1231,21 @@
     "Ítem de presupuesto no encontrado": "Ítem de presupuesto no encontrado",
     "Ítem de presupuesto no encontrado en este proyecto": "Ítem de presupuesto no encontrado en este proyecto",
     "Ítem no encontrado": "Ítem no encontrado"
+  },
+  "publicConfirmation": {
+    "titleSalida": "Confirmar recepción del equipo",
+    "titleEntrada": "Confirmar devolución del equipo",
+    "buttonSalida": "Confirmar recepción del equipo",
+    "buttonEntrada": "Confirmar devolución del equipo",
+    "confirming": "Confirmando...",
+    "destino": "Destino",
+    "responsable": "Responsable",
+    "fecha": "Fecha",
+    "autorizadoPor": "Autorizó/entregó",
+    "equipos": "Equipos",
+    "alreadyConfirmed": "Este movimiento ya fue confirmado el {{date}}.",
+    "expired": "Este enlace venció. Contacta al administrador para gestionarlo manualmente.",
+    "notFound": "Enlace de confirmación no encontrado o inválido.",
+    "confirmFailed": "No se pudo registrar la confirmación."
   }
 }

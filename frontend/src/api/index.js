@@ -147,7 +147,15 @@ export const inventoryCheckoutsApi = {
   checkin: (id, data) => client.post(`/inventory-checkouts/${id}/checkin`, data).then((r) => r.data),
   justify: (id, itemId, data) => client.post(`/inventory-checkouts/${id}/items/${itemId}/justify`, data).then((r) => r.data),
   notifySalida: (id, numero) => client.post(`/inventory-checkouts/${id}/notify-salida`, { numero }).then((r) => r.data),
-  notifyEntrada: (id, numero, checkinIds) => client.post(`/inventory-checkouts/${id}/notify-entrada`, { numero, checkinIds }).then((r) => r.data),
+  notifyEntrada: (id, numero, confirmationId) => client.post(`/inventory-checkouts/${id}/notify-entrada`, { numero, confirmationId }).then((r) => r.data),
+};
+
+// Endpoints públicos (sin autenticación) para el enlace de confirmación de recepción/devolución
+// enviado por WhatsApp. Se usa el mismo cliente axios: si hay un token viejo en localStorage se
+// envía igual, pero el backend no lo exige en estas rutas.
+export const inventoryConfirmationsApi = {
+  get: (token) => client.get(`/inventory-confirmations/${token}`).then((r) => r.data),
+  confirm: (token) => client.post(`/inventory-confirmations/${token}/confirm`).then((r) => r.data),
 };
 
 export const risksApi = {

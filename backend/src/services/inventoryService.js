@@ -1,8 +1,14 @@
+const crypto = require('crypto');
 const ApiError = require('../utils/ApiError');
 const {
-  sequelize, InventoryItem, InventoryCheckout, InventoryCheckoutItem, InventoryCheckin,
+  sequelize, InventoryItem, InventoryCheckout, InventoryCheckoutItem, InventoryCheckin, InventoryConfirmation,
   Project, Employee, ThirdParty, User,
 } = require('../models');
+
+// Cuántas horas queda vigente un enlace de confirmación antes de considerarse vencido (ver
+// isExpired). Configurable porque distintos clientes pueden necesitar más o menos margen según
+// cuánto tarde en llegarles el WhatsApp y responder.
+const CONFIRMATION_HOURS = Number(process.env.INVENTORY_CONFIRMATION_HOURS || 48);
 
 const CHECKOUT_ITEM_INCLUDE = { model: InventoryItem };
 const CHECKOUT_DETAIL_INCLUDE = [
@@ -18,7 +24,28 @@ const CHECKOUT_DETAIL_INCLUDE = [
       { model: InventoryCheckin, as: 'checkins', include: [{ model: User, as: 'receivedByUser', attributes: ['id', 'name', 'email'] }] },
     ],
   },
+  { model: InventoryConfirmation, as: 'confirmations' },
 ];
+
+// Token opaco de 192 bits, independiente de cualquier id interno (no expone ni permite inferir
+// UUID de otras filas), para el enlace público de confirmación.
+function generateToken() {
+  return crypto.randomBytes(24).toString('base64url');
+}
+
+async function createConfirmation({ kind, checkoutId, checkinIds }, transaction) {
+  return InventoryConfirmation.create({
+    token: generateToken(),
+    kind,
+    checkoutId,
+    checkinIds: checkinIds || null,
+    expiresAt: new Date(Date.now() + CONFIRMATION_HOURS * 3600 * 1000),
+  }, { transaction });
+}
+
+function isExpired(confirmation) {
+  return confirmation.status === 'pendiente' && new Date() > new Date(confirmation.expiresAt);
+}
 
 // Cuánto de un ítem "cantidad" está disponible ahora mismo: lo que hay en stock, menos lo dado de
 // baja/en mantenimiento, menos lo reservado en líneas de salidas todavía activas (sin devolver ni
@@ -98,6 +125,10 @@ async function createCheckout({ projectId, destinationText, responsibleEmployeeI
         await dbItem.save({ transaction: t });
       }
     }
+
+    // Un único enlace de confirmación de recepción para toda la salida (se genera siempre, se use
+    // o no el envío por WhatsApp, para que el admin pueda copiarlo/reenviarlo manualmente si hace falta).
+    await createConfirmation({ kind: 'salida', checkoutId: checkout.id }, t);
 
     return getCheckoutWithDetails(checkout.id, t);
   });
@@ -192,7 +223,15 @@ async function createCheckins(checkoutId, { returns, receivedByUserId, createdBy
     }
 
     await maybeCloseCheckout(checkoutId, t);
-    return { checkout: await getCheckoutWithDetails(checkoutId, t), checkins: createdCheckins };
+
+    // Un enlace de confirmación de devolución por cada lote de entrada (no por checkout completo:
+    // una salida puede tener varias devoluciones parciales, cada una con su propio enlace).
+    const confirmation = await createConfirmation(
+      { kind: 'entrada', checkoutId, checkinIds: createdCheckins.map((c) => c.id) },
+      t
+    );
+
+    return { checkout: await getCheckoutWithDetails(checkoutId, t), checkins: createdCheckins, confirmation };
   });
 }
 
@@ -264,7 +303,75 @@ async function getItemHistory(inventoryItemId) {
   return { item, lines };
 }
 
+// Carga un enlace de confirmación por su token, con lo necesario para armar el resumen público
+// (buildPublicSummary). No valida vigencia acá: eso lo decide quien llama (get vs. confirm tratan
+// el vencimiento distinto — get lo muestra, confirm lo rechaza).
+async function getConfirmationByToken(token) {
+  const confirmation = await InventoryConfirmation.findOne({
+    where: { token },
+    include: [{ model: InventoryCheckout, as: 'checkout', include: CHECKOUT_DETAIL_INCLUDE }],
+  });
+  if (!confirmation) throw new ApiError(404, 'Enlace de confirmación no encontrado o inválido');
+  return confirmation;
+}
+
+// Confirma un enlace (idempotente-seguro: si ya estaba confirmado o venció, rechaza en vez de
+// reconfirmar). No registra "quién" más allá del responsable ya conocido del movimiento (el
+// enlace se asume enviado solo a esa persona); solo queda el timestamp de confirmación.
+async function confirmToken(token) {
+  return sequelize.transaction(async (t) => {
+    const confirmation = await InventoryConfirmation.findOne({ where: { token }, transaction: t, lock: t.LOCK.UPDATE });
+    if (!confirmation) throw new ApiError(404, 'Enlace de confirmación no encontrado o inválido');
+    if (confirmation.status === 'confirmado') throw new ApiError(409, 'Este movimiento ya fue confirmado anteriormente.');
+    if (new Date() > new Date(confirmation.expiresAt)) throw new ApiError(410, 'Este enlace de confirmación venció. Contacta al administrador para gestionarlo manualmente.');
+    confirmation.status = 'confirmado';
+    confirmation.confirmedAt = new Date();
+    await confirmation.save({ transaction: t });
+    return confirmation;
+  });
+}
+
+// Resumen mínimo para la página pública: solo lo del movimiento correspondiente a este enlace
+// (nunca otros equipos, salidas o usuarios). Para 'entrada', filtra los checkins de este lote
+// específico (checkinIds), no todos los que tenga la salida.
+function buildPublicSummary(confirmation) {
+  const checkout = confirmation.checkout;
+  const destino = checkout.Project?.name || checkout.destinationText || '-';
+  const responsable = checkout.responsibleEmployee?.name || checkout.responsibleThirdParty?.name || checkout.responsibleName || '-';
+
+  const summary = {
+    kind: confirmation.kind,
+    status: confirmation.status,
+    expired: isExpired(confirmation),
+    confirmedAt: confirmation.confirmedAt,
+    expiresAt: confirmation.expiresAt,
+    destino,
+    responsable,
+  };
+
+  if (confirmation.kind === 'salida') {
+    summary.fecha = checkout.checkoutDate;
+    summary.autorizadoPor = checkout.authorizedByUser?.name || '-';
+    summary.items = checkout.items.map((it) => ({ name: it.InventoryItem.name, code: it.InventoryItem.code, quantity: Number(it.quantity) }));
+  } else {
+    const checkinIdSet = new Set(confirmation.checkinIds || []);
+    const relevantCheckins = [];
+    checkout.items.forEach((it) => {
+      it.checkins.forEach((c) => {
+        if (checkinIdSet.has(c.id)) relevantCheckins.push({ checkin: c, item: it.InventoryItem });
+      });
+    });
+    summary.fecha = relevantCheckins[0]?.checkin.checkinDate || confirmation.createdAt;
+    summary.items = relevantCheckins.map(({ checkin, item }) => ({
+      name: item.name, code: item.code, quantity: Number(checkin.quantity), condition: checkin.condition, resultingStatus: checkin.resultingStatus,
+    }));
+  }
+
+  return summary;
+}
+
 module.exports = {
   computeAvailableQuantity, assertItemAvailable, createCheckout, getCheckoutWithDetails,
-  createCheckins, justifyMissing, getItemHistory, pendingQuantity,
+  createCheckins, justifyMissing, getItemHistory, pendingQuantity, isExpired,
+  getConfirmationByToken, confirmToken, buildPublicSummary,
 };

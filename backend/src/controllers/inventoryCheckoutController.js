@@ -1,10 +1,18 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { InventoryCheckout, InventoryCheckoutItem, InventoryCheckin } = require('../models');
+const { InventoryCheckout, InventoryCheckoutItem, InventoryCheckin, InventoryConfirmation } = require('../models');
 const {
   createCheckout, getCheckoutWithDetails, createCheckins, justifyMissing,
 } = require('../services/inventoryService');
 const { sendWhatsAppMessage, buildSalidaReportText, buildEntradaReportText } = require('../services/whatsappService');
+
+// Base pública del frontend (sin barra final) para construir el enlace de confirmación que se
+// envía por WhatsApp. Configurable porque el dominio real de producción no es el de desarrollo.
+const FRONTEND_PUBLIC_URL = (process.env.FRONTEND_PUBLIC_URL || 'http://localhost:5173').replace(/\/$/, '');
+
+function confirmUrlFor(confirmation) {
+  return confirmation ? `${FRONTEND_PUBLIC_URL}/confirm/${confirmation.token}` : null;
+}
 
 const DETAIL_INCLUDE_SIMPLE = [
   { association: 'Project', attributes: ['id', 'name'] },
@@ -12,6 +20,7 @@ const DETAIL_INCLUDE_SIMPLE = [
   { association: 'responsibleThirdParty', attributes: ['id', 'name'] },
   { association: 'authorizedByUser', attributes: ['id', 'name'] },
   { model: InventoryCheckoutItem, as: 'items' },
+  { model: InventoryConfirmation, as: 'confirmations' },
 ];
 
 const list = asyncHandler(async (req, res) => {
@@ -84,10 +93,12 @@ function resolveDestino(checkout) {
   return checkout.destinationText || '-';
 }
 
-// Envía por WhatsApp (LoroAPI) el reporte de la salida completa, tal como quedó registrada.
+// Envía por WhatsApp (LoroAPI) el reporte de la salida completa, tal como quedó registrada, con el
+// enlace único de confirmación de recepción (creado junto con la salida).
 const notifySalida = asyncHandler(async (req, res) => {
   const { numero } = req.body;
   const checkout = await getCheckoutWithDetails(req.params.id);
+  const confirmation = (checkout.confirmations || []).find((c) => c.kind === 'salida');
   const texto = buildSalidaReportText({
     items: checkout.items.map((it) => ({ name: it.InventoryItem.name, code: it.InventoryItem.code, quantity: it.quantity })),
     destino: resolveDestino(checkout),
@@ -95,23 +106,29 @@ const notifySalida = asyncHandler(async (req, res) => {
     autorizadoPor: checkout.authorizedByUser?.name || '-',
     fecha: checkout.checkoutDate,
     notes: checkout.notes,
+    confirmUrl: confirmUrlFor(confirmation),
   });
   const result = await sendWhatsAppMessage(numero, texto);
   res.json({ ...result, preview: texto });
 });
 
-// Envía por WhatsApp (LoroAPI) el reporte de una devolución puntual: solo las líneas de checkin
-// indicadas (normalmente, las que se acaban de registrar en la misma acción de "Entrada").
+// Envía por WhatsApp (LoroAPI) el reporte de una devolución puntual: el lote de checkins de un
+// enlace de confirmación de entrada específico (normalmente, el que se acaba de crear en la misma
+// acción de "Entrada" — ver InventoryCheckoutsPage, que pasa el confirmationId recibido de checkin()).
 const notifyEntrada = asyncHandler(async (req, res) => {
-  const { numero, checkinIds } = req.body;
-  if (!Array.isArray(checkinIds) || !checkinIds.length) throw new ApiError(400, 'checkinIds es obligatorio');
+  const { numero, confirmationId } = req.body;
+  if (!confirmationId) throw new ApiError(400, 'confirmationId es obligatorio');
 
   const checkout = await getCheckoutWithDetails(req.params.id);
-  const checkinById = new Map();
-  checkout.items.forEach((it) => it.checkins.forEach((c) => checkinById.set(c.id, { checkin: c, item: it.InventoryItem })));
+  const confirmation = (checkout.confirmations || []).find((c) => c.id === confirmationId && c.kind === 'entrada');
+  if (!confirmation) throw new ApiError(404, 'No se encontró el enlace de confirmación indicado en esta salida');
 
-  const selected = checkinIds.map((id) => checkinById.get(id)).filter(Boolean);
-  if (!selected.length) throw new ApiError(404, 'No se encontraron los checkins indicados en esta salida');
+  const checkinIdSet = new Set(confirmation.checkinIds || []);
+  const selected = [];
+  checkout.items.forEach((it) => it.checkins.forEach((c) => {
+    if (checkinIdSet.has(c.id)) selected.push({ checkin: c, item: it.InventoryItem });
+  }));
+  if (!selected.length) throw new ApiError(404, 'No se encontraron los checkins de este lote de devolución');
 
   const texto = buildEntradaReportText({
     items: selected.map(({ checkin: c, item }) => ({
@@ -121,6 +138,7 @@ const notifyEntrada = asyncHandler(async (req, res) => {
     responsable: resolveResponsable(checkout),
     recibidoPor: selected[0].checkin.receivedByUser?.name || '-',
     fecha: selected[0].checkin.checkinDate,
+    confirmUrl: confirmUrlFor(confirmation),
   });
   const result = await sendWhatsAppMessage(numero, texto);
   res.json({ ...result, preview: texto });

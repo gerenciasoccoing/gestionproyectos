@@ -37,7 +37,7 @@ const CONDITION_LABEL = { bueno: 'Bueno', dañado: 'Dañado', incompleto: 'Incom
 const STATUS_LABEL = { disponible: 'Disponible', mantenimiento: 'En mantenimiento', baja: 'Dado de baja' };
 
 // items: [{ name, code, quantity }]
-function buildSalidaReportText({ items, destino, responsable, autorizadoPor, fecha, notes }) {
+function buildSalidaReportText({ items, destino, responsable, autorizadoPor, fecha, notes, confirmUrl }) {
   const lines = items.map((it) => `• ${it.name} (${it.code}) x${Number(it.quantity)}`);
   return [
     '*Reporte de Salida de Inventario*',
@@ -49,11 +49,12 @@ function buildSalidaReportText({ items, destino, responsable, autorizadoPor, fec
     'Equipos:',
     ...lines,
     notes ? `\nNotas: ${notes}` : '',
+    confirmUrl ? `\nPor favor confirma la recepción del equipo aquí:\n${confirmUrl}` : '',
   ].filter((l) => l !== '').join('\n');
 }
 
 // items: [{ name, code, quantity, condition, resultingStatus }]
-function buildEntradaReportText({ items, destino, responsable, recibidoPor, fecha }) {
+function buildEntradaReportText({ items, destino, responsable, recibidoPor, fecha, confirmUrl }) {
   const lines = items.map(
     (it) => `• ${it.name} (${it.code}) x${Number(it.quantity)} — estado: ${CONDITION_LABEL[it.condition] || it.condition}, queda: ${STATUS_LABEL[it.resultingStatus] || it.resultingStatus}`
   );
@@ -65,7 +66,8 @@ function buildEntradaReportText({ items, destino, responsable, recibidoPor, fech
     '',
     'Equipos devueltos:',
     ...lines,
-  ].join('\n');
+    confirmUrl ? `\nPor favor confirma la devolución del equipo aquí:\n${confirmUrl}` : '',
+  ].filter((l) => l !== '').join('\n');
 }
 
 module.exports = { sendWhatsAppMessage, buildSalidaReportText, buildEntradaReportText };
