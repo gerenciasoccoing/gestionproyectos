@@ -44,7 +44,28 @@
     "logout": "Cerrar sesión",
     "logoutShort": "Salir",
     "openMenu": "Abrir menú",
+    "toggleSidebar": "Mostrar/ocultar menú",
     "language": "Idioma"
+  },
+  "motivational": {
+    "admin_lideres": {
+      "liderazgo1": "Un buen líder no solo dirige proyectos: inspira a las personas que los hacen posibles.",
+      "liderazgo2": "Hoy es un buen día para tomar decisiones claras y comunicarlas con confianza a tu equipo.",
+      "liderazgo3": "La visión de un proyecto se construye decisión a decisión. Confía en tu criterio.",
+      "liderazgo4": "Un equipo bien liderado supera cualquier obstáculo. Hoy, lidera con el ejemplo.",
+      "liderazgo5": "Las grandes obras empiezan con líderes que saben escuchar antes de decidir.",
+      "liderazgo6": "Tu liderazgo de hoy es la base de los resultados de mañana. Vamos con todo.",
+      "liderazgo7": "Decidir con datos, liderar con empatía: así se construyen proyectos exitosos."
+    },
+    "empleados": {
+      "equipo1": "Cada tarea que completas hoy suma a un proyecto más grande. ¡Tu esfuerzo se nota!",
+      "equipo2": "El trabajo en equipo hace posible lo que a uno solo le tomaría el doble de tiempo.",
+      "equipo3": "Hoy es una nueva oportunidad para dar lo mejor de ti. ¡Vamos con energía!",
+      "equipo4": "Tu trabajo de hoy construye, literalmente, algo que va a durar. ¡Bien hecho!",
+      "equipo5": "Un buen día empieza con una buena actitud. ¡Gracias por tu compromiso diario!",
+      "equipo6": "Cada detalle que cuidas hoy hace la diferencia en el resultado final.",
+      "equipo7": "El esfuerzo constante, aunque no siempre se note, es el que construye grandes resultados."
+    }
   },
   "enums": {
     "projectStatus": {

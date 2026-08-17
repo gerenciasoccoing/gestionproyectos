@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { projectsApi, thirdPartiesApi } from '../api';
 import { Card, Button, Input, SearchSelect, Table, Badge, ErrorText, extractError } from '../components/ui';
 import Can from '../components/Can';
+import MotivationalBanner from '../components/MotivationalBanner';
 
 export default function ProjectsListPage() {
   const { t } = useTranslation();
@@ -45,6 +46,8 @@ export default function ProjectsListPage() {
 
   return (
     <div>
+      <MotivationalBanner />
+
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold text-gray-900">{t('projects.title')}</h1>
         <Can module="proyectos" action="create">

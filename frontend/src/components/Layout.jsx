@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { companyApi } from '../api';
@@ -7,19 +7,49 @@ import { setCurrencyConfig } from './ui';
 import Can from './Can';
 import Logo from './Logo';
 import LanguageSwitcher from './LanguageSwitcher';
+import {
+  ProjectsIcon, QuotationsIcon, PriceBookIcon, ApuIcon, ThirdPartiesIcon, InventoryIcon, AdminIcon,
+  MenuIcon, LogoutIcon,
+} from './NavIcons';
+
+// Ancho del sidebar expandido/colapsado (a íconos). Se comparte entre el <aside> y el spacer del
+// header para que el layout no salte al alternar.
+const SIDEBAR_W = 224;
+const SIDEBAR_W_COLLAPSED = 64;
+
+function SidebarLink({ to, label, icon, collapsed, end, onNavigate }) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      onClick={onNavigate}
+      title={collapsed ? label : undefined}
+      className={({ isActive }) => [
+        'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
+        collapsed ? 'justify-center' : '',
+        isActive ? 'bg-blue-600/90 text-white' : 'text-gray-300 hover:text-white hover:bg-white/10',
+      ].join(' ')}
+    >
+      <span className="shrink-0">{icon}</span>
+      {!collapsed && <span className="truncate">{label}</span>}
+    </NavLink>
+  );
+}
 
 export default function Layout() {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
+  // En pantallas pequeñas arranca colapsado a íconos (ahorra espacio horizontal); en escritorio,
+  // expandido. A partir de ahí el usuario controla el estado con el botón de menú.
+  const [collapsed, setCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
 
   const NAV_LINKS = [
-    { to: '/', label: t('nav.projects') },
-    { to: '/quotations', label: t('nav.quotations') },
-    { to: '/price-book', label: t('nav.priceBook') },
-    { to: '/apus', label: t('nav.apu') },
-    { to: '/third-parties', label: t('nav.thirdParties') },
+    { to: '/', label: t('nav.projects'), icon: <ProjectsIcon />, end: true },
+    { to: '/quotations', label: t('nav.quotations'), icon: <QuotationsIcon /> },
+    { to: '/price-book', label: t('nav.priceBook'), icon: <PriceBookIcon /> },
+    { to: '/apus', label: t('nav.apu'), icon: <ApuIcon /> },
+    { to: '/third-parties', label: t('nav.thirdParties'), icon: <ThirdPartiesIcon /> },
   ];
 
   // La moneda es una configuración del negocio (independiente del idioma de la interfaz): se
@@ -27,83 +57,64 @@ export default function Layout() {
   useEffect(() => { companyApi.get().then((s) => setCurrencyConfig(s.currency)); }, []);
 
   const handleLogout = () => { logout(); navigate('/login'); };
+  const sidebarWidth = collapsed ? SIDEBAR_W_COLLAPSED : SIDEBAR_W;
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-gray-900 text-white px-4 py-2.5 border-b border-gray-800">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6 min-w-0">
-            <Link to="/" className="hover:opacity-90 transition-opacity shrink-0" onClick={() => setMenuOpen(false)}>
-              <Logo size={32} dark />
-            </Link>
-            <nav className="hidden md:flex items-center gap-1 border-l border-gray-700 pl-6">
-              {NAV_LINKS.map((l) => (
-                <Link key={l.to} to={l.to} className="text-sm text-gray-300 hover:text-white hover:bg-white/5 px-3 py-1.5 rounded-md transition-colors">
-                  {l.label}
-                </Link>
-              ))}
-              <Can module="inventario" action="view">
-                <Link to="/inventory" className="text-sm text-gray-300 hover:text-white hover:bg-white/5 px-3 py-1.5 rounded-md transition-colors">{t('nav.inventory')}</Link>
-              </Can>
-              <Can module="admin" action="view">
-                <Link to="/admin" className="text-sm text-gray-300 hover:text-white hover:bg-white/5 px-3 py-1.5 rounded-md transition-colors">{t('nav.admin')}</Link>
-              </Can>
-            </nav>
-          </div>
-
-          <div className="hidden md:flex items-center gap-3 text-sm shrink-0">
-            <span className="text-gray-300 truncate max-w-[220px]">{user?.name} <span className="text-gray-500">({user?.roles?.join(', ')})</span></span>
-            <LanguageSwitcher />
-            <button onClick={handleLogout} className="bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-md transition-colors">
-              {t('nav.logout')}
-            </button>
-          </div>
-
+      <header className="h-14 bg-gray-900 text-white flex items-center justify-between px-3 sm:px-4 border-b border-gray-800 shrink-0 z-10">
+        <div className="flex items-center gap-1 min-w-0">
           <button
-            className="md:hidden p-2 -mr-2 text-gray-300 hover:text-white"
-            onClick={() => setMenuOpen((o) => !o)}
-            aria-label={t('nav.openMenu')}
+            onClick={() => setCollapsed((c) => !c)}
+            className="p-2 -ml-1 text-gray-300 hover:text-white hover:bg-white/5 rounded-md transition-colors shrink-0"
+            aria-label={t('nav.toggleSidebar')}
+            title={t('nav.toggleSidebar')}
           >
-            {menuOpen ? (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" /></svg>
-            ) : (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" /></svg>
-            )}
+            <MenuIcon />
           </button>
+          <Link to="/" className="hover:opacity-90 transition-opacity shrink-0 flex items-center ml-1">
+            <span className="hidden sm:flex"><Logo size={30} dark /></span>
+            <span className="sm:hidden flex"><Logo size={30} dark iconOnly /></span>
+          </Link>
         </div>
 
-        {menuOpen && (
-          <nav className="md:hidden mt-3 pb-1 flex flex-col gap-1 border-t border-gray-800 pt-3">
+        <div className="flex items-center gap-2 sm:gap-3 text-sm shrink-0 min-w-0">
+          <span className="hidden sm:inline text-gray-300 truncate max-w-[220px]">
+            {user?.name} <span className="text-gray-500">({user?.roles?.join(', ')})</span>
+          </span>
+          <LanguageSwitcher />
+          <button
+            onClick={handleLogout}
+            className="bg-gray-800 hover:bg-gray-700 px-2.5 sm:px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5"
+            title={t('nav.logout')}
+          >
+            <span className="sm:hidden"><LogoutIcon /></span>
+            <span className="hidden sm:inline">{t('nav.logout')}</span>
+          </button>
+        </div>
+      </header>
+
+      <div className="flex flex-1 min-h-0">
+        <aside
+          style={{ width: sidebarWidth }}
+          className="bg-gray-900 text-white shrink-0 border-r border-gray-800 sticky top-14 h-[calc(100vh-56px)] overflow-y-auto overflow-x-hidden transition-[width] duration-150 flex flex-col"
+        >
+          <nav className="flex-1 py-3 px-2 flex flex-col gap-1">
             {NAV_LINKS.map((l) => (
-              <Link key={l.to} to={l.to} onClick={() => setMenuOpen(false)} className="text-sm text-gray-300 hover:text-white hover:bg-white/5 px-3 py-2 rounded-md transition-colors">
-                {l.label}
-              </Link>
+              <SidebarLink key={l.to} {...l} collapsed={collapsed} />
             ))}
             <Can module="inventario" action="view">
-              <Link to="/inventory" onClick={() => setMenuOpen(false)} className="text-sm text-gray-300 hover:text-white hover:bg-white/5 px-3 py-2 rounded-md transition-colors">
-                {t('nav.inventory')}
-              </Link>
+              <SidebarLink to="/inventory" label={t('nav.inventory')} icon={<InventoryIcon />} collapsed={collapsed} />
             </Can>
             <Can module="admin" action="view">
-              <Link to="/admin" onClick={() => setMenuOpen(false)} className="text-sm text-gray-300 hover:text-white hover:bg-white/5 px-3 py-2 rounded-md transition-colors">
-                {t('nav.admin')}
-              </Link>
+              <SidebarLink to="/admin" label={t('nav.admin')} icon={<AdminIcon />} collapsed={collapsed} />
             </Can>
-            <div className="flex items-center justify-between px-3 pt-2 mt-1 border-t border-gray-800 text-sm gap-2">
-              <span className="text-gray-400 truncate">{user?.name} ({user?.roles?.join(', ')})</span>
-              <div className="flex items-center gap-2 shrink-0">
-                <LanguageSwitcher />
-                <button onClick={handleLogout} className="bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-md">
-                  {t('nav.logoutShort')}
-                </button>
-              </div>
-            </div>
           </nav>
-        )}
-      </header>
-      <main className="flex-1 bg-gray-100 p-3 sm:p-4 overflow-x-hidden">
-        <Outlet />
-      </main>
+        </aside>
+
+        <main className="flex-1 min-w-0 bg-gray-100 p-3 sm:p-4 overflow-x-hidden">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

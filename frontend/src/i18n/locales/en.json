@@ -44,7 +44,28 @@
     "logout": "Log out",
     "logoutShort": "Log out",
     "openMenu": "Open menu",
+    "toggleSidebar": "Show/hide menu",
     "language": "Language"
+  },
+  "motivational": {
+    "admin_lideres": {
+      "liderazgo1": "A good leader doesn't just direct projects: they inspire the people who make them possible.",
+      "liderazgo2": "Today is a good day to make clear decisions and communicate them confidently to your team.",
+      "liderazgo3": "A project's vision is built decision by decision. Trust your judgment.",
+      "liderazgo4": "A well-led team can overcome any obstacle. Today, lead by example.",
+      "liderazgo5": "Great projects start with leaders who know how to listen before deciding.",
+      "liderazgo6": "Your leadership today is the foundation of tomorrow's results. Let's go all in.",
+      "liderazgo7": "Decide with data, lead with empathy: that's how successful projects are built."
+    },
+    "empleados": {
+      "equipo1": "Every task you finish today adds up to something bigger. Your effort shows!",
+      "equipo2": "Teamwork makes possible what would take twice as long alone.",
+      "equipo3": "Today is a new chance to give your best. Let's go with energy!",
+      "equipo4": "Your work today literally builds something that will last. Well done!",
+      "equipo5": "A good day starts with a good attitude. Thanks for your daily commitment!",
+      "equipo6": "Every detail you take care of today makes a difference in the final result.",
+      "equipo7": "Steady effort, even when it goes unnoticed, is what builds great results."
+    }
   },
   "enums": {
     "projectStatus": {
