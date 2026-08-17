@@ -173,6 +173,9 @@ export function SearchSelect({ label, className = '', options, value, onChange, 
         value={open ? query : (selected ? selected.label : '')}
         placeholder={effectivePlaceholder}
         onFocus={(e) => { setOpen(true); setQuery(''); setHighlighted(0); e.target.select(); }}
+        // El input ya enfocado (ej. justo después de elegir una opción) no vuelve a disparar
+        // onFocus en un clic siguiente, así que sin esto un segundo clic no reabría la lista.
+        onClick={() => { if (!open) { setOpen(true); setQuery(''); setHighlighted(0); } }}
         onChange={(e) => { setQuery(e.target.value); setOpen(true); setHighlighted(0); }}
         onKeyDown={handleKeyDown}
       />
