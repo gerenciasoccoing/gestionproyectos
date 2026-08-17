@@ -29,6 +29,8 @@ import ApuPage from './pages/quotations/ApuPage';
 import SuppliersPage from './pages/thirdparties/SuppliersPage';
 import ClientsPage from './pages/thirdparties/ClientsPage';
 
+import CashBoxesPage from './pages/cashboxes/CashBoxesPage';
+
 import InventoryLayout from './pages/inventory/InventoryLayout';
 import InventoryCatalogPage from './pages/inventory/InventoryCatalogPage';
 import InventoryCheckoutsPage from './pages/inventory/InventoryCheckoutsPage';
@@ -55,6 +57,9 @@ export default function App() {
         <Route path="suppliers" element={<SuppliersPage />} />
         <Route path="clients" element={<ClientsPage />} />
         <Route path="third-parties" element={<Navigate to="/suppliers" replace />} />
+
+        <Route path="expenses" element={<ProtectedRoute module="gastos" action="view"><ExpensesPage /></ProtectedRoute>} />
+        <Route path="cash-boxes" element={<ProtectedRoute module="cajas" action="view"><CashBoxesPage /></ProtectedRoute>} />
 
         <Route path="inventory" element={<ProtectedRoute module="inventario" action="view"><InventoryLayout /></ProtectedRoute>}>
           <Route index element={<Navigate to="catalog" replace />} />

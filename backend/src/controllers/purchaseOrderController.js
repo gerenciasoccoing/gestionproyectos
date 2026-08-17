@@ -8,6 +8,7 @@ const {
 } = require('../services/purchaseOrderService');
 const { generatePurchaseOrderPdf } = require('../services/pdfService');
 const { getSettingsForPdf } = require('./companySettingsController');
+const { assertCashBoxUsable, overdraftWarning } = require('../services/cashBoxService');
 
 // Estos controladores atienden DOS montajes de ruta: el anidado en proyecto
 // (/projects/:projectId/purchase-orders, ver purchaseOrderRoutes.js — comportamiento sin cambios)
@@ -187,16 +188,20 @@ const convertToExpense = asyncHandler(async (req, res) => {
   if (order.expenseId) throw new ApiError(400, 'Esta orden de compra ya fue trasladada a gastos');
   if (!order.items.length) throw new ApiError(400, 'La orden no tiene ítems para trasladar');
 
-  const { category, date } = req.body;
+  const { category, date, cashBoxId } = req.body;
+  if (!cashBoxId) throw new ApiError(400, 'cashBoxId es obligatorio');
   const CATEGORIES = ['mano_obra', 'materiales', 'equipos', 'viaticos', 'imprevistos'];
   const expenseCategory = category && CATEGORIES.includes(category) ? category : 'materiales';
   const expenseDate = date || order.date;
 
   const totalAmount = order.items.reduce((s, it) => s + Number(it.totalValue), 0);
 
-  const expense = await sequelize.transaction(async (t) => {
+  const { expense, warning } = await sequelize.transaction(async (t) => {
+    await assertCashBoxUsable(cashBoxId, { transaction: t });
     const created = await Expense.create({
       projectId: order.projectId,
+      cashBoxId,
+      supplierId: order.supplierId,
       category: expenseCategory,
       amount: totalAmount,
       date: expenseDate,
@@ -221,11 +226,12 @@ const convertToExpense = asyncHandler(async (req, res) => {
     order.expenseId = created.id;
     await order.save({ transaction: t });
 
-    return created;
+    const w = await overdraftWarning(cashBoxId, { transaction: t });
+    return { expense: created, warning: w };
   });
 
   const full = await Expense.findByPk(expense.id, { include: [{ model: ExpenseItem, as: 'items' }] });
-  res.status(201).json(full);
+  res.status(201).json({ ...full.toJSON(), warning });
 });
 
 // Registra una recepción (total o parcial) y genera automáticamente el gasto en la categoría
@@ -241,9 +247,10 @@ const addReceipt = asyncHandler(async (req, res) => {
   const item = await PurchaseOrderItem.findOne({ where: { id: req.params.itemId, purchaseOrderId: order.id } });
   if (!item) throw new ApiError(404, 'Ítem de orden de compra no encontrado');
 
-  const { date, quantityReceived, notes } = req.body;
+  const { date, quantityReceived, notes, cashBoxId } = req.body;
   if (!date || quantityReceived === undefined) throw new ApiError(400, 'date y quantityReceived son obligatorios');
   if (Number(quantityReceived) < 0) throw new ApiError(400, 'La cantidad recibida no puede ser negativa');
+  if (!cashBoxId) throw new ApiError(400, 'cashBoxId es obligatorio');
 
   const existingReceipts = await PurchaseReceipt.findAll({ where: { purchaseOrderItemId: item.id } });
   const deliveredBefore = existingReceipts.reduce((sum, r) => sum + Number(r.quantityReceived), 0);
@@ -252,9 +259,12 @@ const addReceipt = asyncHandler(async (req, res) => {
     ? `La cantidad entregada acumulada (${deliveredAfter}) supera la cantidad ordenada (${item.quantityOrdered}).`
     : null;
 
-  const { receipt, expense } = await sequelize.transaction(async (t) => {
+  const { receipt, expense, cashBoxWarning } = await sequelize.transaction(async (t) => {
+    await assertCashBoxUsable(cashBoxId, { transaction: t });
     const expenseCreated = await Expense.create({
       projectId: order.projectId,
+      cashBoxId,
+      supplierId: order.supplierId,
       category: 'materiales',
       amount: Number(quantityReceived) * Number(item.unitPrice),
       date,
@@ -281,10 +291,11 @@ const addReceipt = asyncHandler(async (req, res) => {
       await order.save({ transaction: t });
     }
 
-    return { receipt: receiptCreated, expense: expenseCreated };
+    const cbWarning = await overdraftWarning(cashBoxId, { transaction: t });
+    return { receipt: receiptCreated, expense: expenseCreated, cashBoxWarning: cbWarning };
   });
 
-  res.status(201).json({ receipt, expense, warning });
+  res.status(201).json({ receipt, expense, warning, cashBoxWarning });
 });
 
 // Cierre normal (todo entregado) o cierre con faltantes justificados (requiere closureReason).

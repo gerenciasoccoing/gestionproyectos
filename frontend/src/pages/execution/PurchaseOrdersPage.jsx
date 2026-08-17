@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { purchaseOrdersApi, budgetApi, thirdPartiesApi } from '../../api';
+import { purchaseOrdersApi, budgetApi, thirdPartiesApi, cashBoxesApi } from '../../api';
 import { Card, Button, Input, Select, SearchSelect, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { purchaseOrderPdfUrl } from '../../api/client';
 import Can from '../../components/Can';
@@ -21,6 +21,7 @@ export default function PurchaseOrdersPage() {
   const [orders, setOrders] = useState([]);
   const [budgetItems, setBudgetItems] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [cashBoxes, setCashBoxes] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
@@ -32,6 +33,7 @@ export default function PurchaseOrdersPage() {
     load();
     budgetApi.get(projectId).then((d) => setBudgetItems(d.items));
     thirdPartiesApi.list({ type: 'proveedor' }).then(setSuppliers);
+    cashBoxesApi.list().then(setCashBoxes);
   }, [projectId]);
 
   const updateItemRow = (idx, field, value) => {
@@ -138,7 +140,7 @@ export default function PurchaseOrdersPage() {
         </Table>
       </Card>
 
-      {expandedId && <OrderDetail projectId={projectId} orderId={expandedId} budgetItems={budgetItems} onChange={load} />}
+      {expandedId && <OrderDetail projectId={projectId} orderId={expandedId} budgetItems={budgetItems} cashBoxes={cashBoxes} onChange={load} />}
 
       {report && (
         <Card title={t('execution.purchaseOrders.reportTitle')}>
@@ -163,17 +165,19 @@ export default function PurchaseOrdersPage() {
   );
 }
 
-function OrderDetail({ projectId, orderId, budgetItems, onChange }) {
+function OrderDetail({ projectId, orderId, budgetItems, cashBoxes, onChange }) {
   const { t } = useTranslation();
   const [order, setOrder] = useState(null);
   const [receiptForms, setReceiptForms] = useState({});
   const [closureReason, setClosureReason] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
-  const [convertForm, setConvertForm] = useState({ category: 'materiales', date: '' });
+  const [convertForm, setConvertForm] = useState({ category: 'materiales', date: '', cashBoxId: '' });
   const [showConvert, setShowConvert] = useState(false);
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
+
+  const cashBoxOptions = cashBoxes.filter((cb) => cb.status === 'activa');
 
   const load = () => purchaseOrdersApi.get(projectId, orderId).then(setOrder);
   useEffect(() => { load(); }, [projectId, orderId]);
@@ -182,9 +186,11 @@ function OrderDetail({ projectId, orderId, budgetItems, onChange }) {
     setError(''); setWarning('');
     const data = receiptForms[itemId] || {};
     if (!data.date || !data.quantityReceived) { setError(t('execution.purchaseOrders.receiptRequired')); return; }
+    if (!data.cashBoxId) { setError(t('expenses.cashBoxRequired')); return; }
     try {
       const res = await purchaseOrdersApi.addReceipt(projectId, orderId, itemId, data);
       if (res.warning) setWarning(res.warning);
+      if (res.cashBoxWarning) setWarning((w) => (w ? `${w} ${res.cashBoxWarning}` : res.cashBoxWarning));
       setReceiptForms((f) => ({ ...f, [itemId]: {} }));
       load();
       onChange();
@@ -226,9 +232,11 @@ function OrderDetail({ projectId, orderId, budgetItems, onChange }) {
 
   const convertToExpense = async () => {
     setError('');
+    if (!convertForm.cashBoxId) { setError(t('expenses.cashBoxRequired')); return; }
     if (!confirm(t('execution.purchaseOrders.confirmConvertDialog'))) return;
     try {
-      await purchaseOrdersApi.convertToExpense(projectId, orderId, convertForm);
+      const res = await purchaseOrdersApi.convertToExpense(projectId, orderId, convertForm);
+      if (res.warning) setWarning(res.warning);
       setShowConvert(false);
       load();
       onChange();
@@ -295,6 +303,10 @@ function OrderDetail({ projectId, orderId, budgetItems, onChange }) {
                       <div className="flex flex-wrap gap-2">
                         <Input type="date" value={receiptForms[it.id]?.date || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], date: e.target.value } }))} />
                         <Input type="number" min="0" step="0.01" placeholder={t('execution.purchaseOrders.receiptQty')} value={receiptForms[it.id]?.quantityReceived || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], quantityReceived: e.target.value } }))} />
+                        <Select value={receiptForms[it.id]?.cashBoxId || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], cashBoxId: e.target.value } }))}>
+                          <option value="">{t('expenses.cashBox')}</option>
+                          {cashBoxOptions.map((cb) => <option key={cb.id} value={cb.id}>{cb.name} ({money(cb.balance)})</option>)}
+                        </Select>
                         <Button onClick={() => submitReceipt(it.id)}>{t('execution.purchaseOrders.register')}</Button>
                       </div>
                     )}
@@ -335,6 +347,10 @@ function OrderDetail({ projectId, orderId, budgetItems, onChange }) {
                   {CATEGORIES.map((c) => <option key={c} value={c}>{t(`execution.dashboard.categories.${c}`)}</option>)}
                 </Select>
                 <Input label={t('execution.purchaseOrders.expenseDate')} type="date" value={convertForm.date} onChange={(e) => setConvertForm({ ...convertForm, date: e.target.value })} placeholder={order.date} />
+                <Select label={t('expenses.cashBox')} value={convertForm.cashBoxId} onChange={(e) => setConvertForm({ ...convertForm, cashBoxId: e.target.value })}>
+                  <option value="">{t('common.selectPlaceholder')}</option>
+                  {cashBoxOptions.map((cb) => <option key={cb.id} value={cb.id}>{cb.name} ({money(cb.balance)})</option>)}
+                </Select>
                 <Button onClick={convertToExpense}>{t('execution.purchaseOrders.confirmTransfer')}</Button>
                 <Button variant="secondary" onClick={() => setShowConvert(false)}>{t('execution.purchaseOrders.cancel')}</Button>
               </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { thirdPartiesApi, supplierPurchaseOrdersApi, projectsApi, budgetApi } from '../../api';
+import { thirdPartiesApi, supplierPurchaseOrdersApi, projectsApi, budgetApi, cashBoxesApi } from '../../api';
 import { Card, Button, Input, Select, SearchSelect, TextArea, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { fileUrl, purchaseOrderPdfUrl } from '../../api/client';
 import Can from '../../components/Can';
@@ -329,21 +329,26 @@ function SupplierOrderDetail({ orderId, onChange }) {
   const [order, setOrder] = useState(null);
   const [receiptForms, setReceiptForms] = useState({});
   const [closureReason, setClosureReason] = useState('');
-  const [convertForm, setConvertForm] = useState({ category: 'materiales', date: '' });
+  const [convertForm, setConvertForm] = useState({ category: 'materiales', date: '', cashBoxId: '' });
   const [showConvert, setShowConvert] = useState(false);
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
+  const [cashBoxes, setCashBoxes] = useState([]);
+
+  const cashBoxOptions = cashBoxes.filter((cb) => cb.status === 'activa');
 
   const load = () => supplierPurchaseOrdersApi.get(orderId).then(setOrder);
-  useEffect(() => { load(); }, [orderId]);
+  useEffect(() => { load(); cashBoxesApi.list().then(setCashBoxes); }, [orderId]);
 
   const submitReceipt = async (itemId) => {
     setError(''); setWarning('');
     const data = receiptForms[itemId] || {};
     if (!data.date || !data.quantityReceived) { setError(t('execution.purchaseOrders.receiptRequired')); return; }
+    if (!data.cashBoxId) { setError(t('expenses.cashBoxRequired')); return; }
     try {
       const res = await supplierPurchaseOrdersApi.addReceipt(orderId, itemId, data);
       if (res.warning) setWarning(res.warning);
+      if (res.cashBoxWarning) setWarning((w) => (w ? `${w} ${res.cashBoxWarning}` : res.cashBoxWarning));
       setReceiptForms((f) => ({ ...f, [itemId]: {} }));
       load();
       onChange();
@@ -365,9 +370,11 @@ function SupplierOrderDetail({ orderId, onChange }) {
 
   const convertToExpense = async () => {
     setError('');
+    if (!convertForm.cashBoxId) { setError(t('expenses.cashBoxRequired')); return; }
     if (!confirm(t('execution.purchaseOrders.confirmConvertDialog'))) return;
     try {
-      await supplierPurchaseOrdersApi.convertToExpense(orderId, convertForm);
+      const res = await supplierPurchaseOrdersApi.convertToExpense(orderId, convertForm);
+      if (res.warning) setWarning(res.warning);
       setShowConvert(false);
       load();
       onChange();
@@ -407,6 +414,10 @@ function SupplierOrderDetail({ orderId, onChange }) {
                     <div className="flex flex-wrap gap-2">
                       <Input type="date" value={receiptForms[it.id]?.date || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], date: e.target.value } }))} />
                       <Input type="number" min="0" step="0.01" placeholder={t('execution.purchaseOrders.receiptQty')} value={receiptForms[it.id]?.quantityReceived || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], quantityReceived: e.target.value } }))} />
+                      <Select value={receiptForms[it.id]?.cashBoxId || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], cashBoxId: e.target.value } }))}>
+                        <option value="">{t('expenses.cashBox')}</option>
+                        {cashBoxOptions.map((cb) => <option key={cb.id} value={cb.id}>{cb.name} ({money(cb.balance)})</option>)}
+                      </Select>
                       <Button onClick={() => submitReceipt(it.id)}>{t('execution.purchaseOrders.register')}</Button>
                     </div>
                   )}
@@ -446,6 +457,10 @@ function SupplierOrderDetail({ orderId, onChange }) {
                   {CATEGORIES.map((c) => <option key={c} value={c}>{t(`execution.dashboard.categories.${c}`)}</option>)}
                 </Select>
                 <Input label={t('execution.purchaseOrders.expenseDate')} type="date" value={convertForm.date} onChange={(e) => setConvertForm({ ...convertForm, date: e.target.value })} placeholder={order.date} />
+                <Select label={t('expenses.cashBox')} value={convertForm.cashBoxId} onChange={(e) => setConvertForm({ ...convertForm, cashBoxId: e.target.value })}>
+                  <option value="">{t('common.selectPlaceholder')}</option>
+                  {cashBoxOptions.map((cb) => <option key={cb.id} value={cb.id}>{cb.name} ({money(cb.balance)})</option>)}
+                </Select>
                 <Button onClick={convertToExpense}>{t('execution.purchaseOrders.confirmTransfer')}</Button>
                 <Button variant="secondary" onClick={() => setShowConvert(false)}>{t('execution.purchaseOrders.cancel')}</Button>
               </div>

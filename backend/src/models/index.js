@@ -43,6 +43,8 @@ const modelDefiners = [
   require('./InventoryCheckoutItem'),
   require('./InventoryCheckin'),
   require('./InventoryConfirmation'),
+  require('./CashBox'),
+  require('./CashBoxMovement'),
 ];
 
 const models = {};

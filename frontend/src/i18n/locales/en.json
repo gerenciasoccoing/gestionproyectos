@@ -42,6 +42,8 @@
     "suppliers": "Suppliers",
     "clients": "Clients",
     "inventory": "Inventory",
+    "expenses": "Expenses",
+    "cashBoxes": "Cash Boxes",
     "admin": "Administration",
     "logout": "Log out",
     "logoutShort": "Log out",
@@ -470,6 +472,7 @@
           "terminacion_termino": "Fixed-term contract termination"
         },
         "calculate": "Calculate settlement (preview)",
+        "cashBoxRequired": "You must select the cash box before confirming the exit.",
         "confirmDialog": "Confirm the exit and settlement? This action will move the employee to history.",
         "processing": "Processing...",
         "confirmButton": "Confirm exit and generate settlement",
@@ -501,6 +504,11 @@
     "scanNote": "Automatic reading is local (OCR + text rules, no external AI): use it as support, it doesn't replace reviewing the invoice. The invoice and payment receipt are saved as independent attachments.",
     "totalValue": "Total value",
     "date": "Date",
+    "cashBox": "Cash box",
+    "cashBoxRequired": "You must select the cash box.",
+    "assignProject": "Assign to project (optional)",
+    "registeredSupplier": "Registered supplier (optional)",
+    "supplierPlaceholder": "-- none / type manually --",
     "vendor": "Vendor",
     "vendorNit": "Vendor Tax ID",
     "vendorPhone": "Vendor phone",
@@ -534,6 +542,8 @@
       "date": "Date",
       "category": "Category",
       "vendor": "Vendor",
+      "project": "Project",
+      "cashBox": "Cash box",
       "items": "Items",
       "value": "Value",
       "origin": "Origin",
@@ -546,13 +556,26 @@
       "manual": "Manual",
       "purchase_receipt": "Purchase",
       "purchase_order": "Purchase order",
-      "settlement": "Settlement"
+      "liquidacion": "Settlement"
     },
     "nit": "Tax ID",
     "phone": "Phone",
     "email": "Email",
     "notesLabel": "Notes",
     "empty": "No expenses recorded.",
+    "filters": {
+      "title": "Filters",
+      "project": "Project",
+      "supplier": "Supplier",
+      "cashBox": "Cash box",
+      "from": "From",
+      "to": "To",
+      "allProjects": "-- all projects --",
+      "allSuppliers": "-- all suppliers --",
+      "allCashBoxes": "-- all cash boxes --",
+      "noProject": "No project",
+      "clear": "Clear filters"
+    },
     "categories": {
       "mano_obra": "Labor",
       "materiales": "Materials",
@@ -629,6 +652,37 @@
       },
       "total": "{{count}} project(s) — Total value: {{amount}}"
     }
+  },
+  "cashBoxes": {
+    "title": "Cash Boxes",
+    "newCashBox": "+ New cash box",
+    "fields": {
+      "name": "Name",
+      "initialBalance": "Initial balance",
+      "amount": "Amount",
+      "date": "Date",
+      "concept": "Concept"
+    },
+    "table": {
+      "name": "Name",
+      "initialBalance": "Initial balance",
+      "balance": "Current balance",
+      "status": "Status",
+      "date": "Date",
+      "concept": "Concept",
+      "amount": "Amount"
+    },
+    "status": {
+      "activa": "Active",
+      "cerrada": "Closed"
+    },
+    "close": "Close",
+    "activate": "Activate",
+    "addMovement": "Add income",
+    "movementsTitle": "Movements: {{name}}",
+    "registerIncome": "Register income",
+    "noMovements": "This cash box has no income registered yet.",
+    "empty": "No cash boxes registered."
   },
   "inventory": {
     "title": "Inventory",

@@ -3,6 +3,7 @@ const ApiError = require('../utils/ApiError');
 const { sequelize, Employee, Severance, Expense } = require('../models');
 const { calculateSeverance } = require('../services/severanceService');
 const { relativePath } = require('../middleware/upload');
+const { assertCashBoxUsable, overdraftWarning } = require('../services/cashBoxService');
 
 async function loadActiveEmployee(req) {
   const employee = await Employee.findOne({ where: { id: req.params.id, projectId: req.params.projectId } });
@@ -31,8 +32,9 @@ const preview = asyncHandler(async (req, res) => {
 // Confirma el retiro: calcula, persiste la liquidación, genera el gasto y pasa el empleado a histórico.
 const confirmRetirement = asyncHandler(async (req, res) => {
   const employee = await loadActiveEmployee(req);
-  const { exitDate, cause } = req.body;
+  const { exitDate, cause, cashBoxId } = req.body;
   if (!exitDate || !cause) throw new ApiError(400, 'exitDate y cause son obligatorios');
+  if (!cashBoxId) throw new ApiError(400, 'cashBoxId es obligatorio');
   if (new Date(exitDate) < new Date(employee.entryDate)) {
     throw new ApiError(400, 'La fecha de retiro no puede ser anterior a la fecha de ingreso');
   }
@@ -44,9 +46,11 @@ const confirmRetirement = asyncHandler(async (req, res) => {
     cause,
   });
 
-  const severance = await sequelize.transaction(async (t) => {
+  const { severance, warning } = await sequelize.transaction(async (t) => {
+    await assertCashBoxUsable(cashBoxId, { transaction: t });
     const expense = await Expense.create({
       projectId: req.params.projectId,
+      cashBoxId,
       category: 'mano_obra',
       amount: result.total,
       date: exitDate,
@@ -78,10 +82,11 @@ const confirmRetirement = asyncHandler(async (req, res) => {
     employee.status = 'retirado';
     await employee.save({ transaction: t });
 
-    return created;
+    const w = await overdraftWarning(cashBoxId, { transaction: t });
+    return { severance: created, warning: w };
   });
 
-  res.status(201).json(severance);
+  res.status(201).json({ ...severance.toJSON(), warning });
 });
 
 const uploadPazYSalvo = asyncHandler(async (req, res) => {

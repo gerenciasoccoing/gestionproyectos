@@ -1,15 +1,35 @@
 const { Op } = require('sequelize');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { sequelize, Expense, ExpenseItem, ExpenseTax, ExpenseBudget } = require('../models');
+const {
+  sequelize, Expense, ExpenseItem, ExpenseTax, ExpenseBudget, Project, CashBox, ThirdParty,
+} = require('../models');
 const { relativePath } = require('../middleware/upload');
 const { scanInvoice } = require('../services/invoiceScanService');
+const { assertCashBoxUsable, overdraftWarning } = require('../services/cashBoxService');
+
+// Estos controladores atienden DOS montajes de ruta: el anidado en proyecto
+// (/projects/:projectId/expenses, ver expenseRoutes.js — comportamiento sin cambios) y el global
+// (/expenses, ver globalExpenseRoutes.js), usado por la vista general de Gastos donde el proyecto
+// es opcional y hay filtros adicionales. Es la MISMA lógica de negocio en ambos casos: cuando la
+// ruta trae :projectId se usa como filtro estricto (igual que antes); cuando no, se opera sin esa
+// restricción y se admiten los filtros de la vista general. Así no se duplica el modelo de datos
+// ni el componente entre los dos puntos de entrada.
 
 const CATEGORIES = ['mano_obra', 'materiales', 'equipos', 'viaticos', 'imprevistos'];
 const EXPENSE_INCLUDE = [
   { model: ExpenseItem, as: 'items' },
   { model: ExpenseTax, as: 'taxes' },
+  { model: Project, attributes: ['id', 'name'] },
+  { model: CashBox, attributes: ['id', 'name'] },
+  { model: ThirdParty, as: 'supplierParty', attributes: ['id', 'name'] },
 ];
+
+function scopeWhere(req) {
+  const where = { id: req.params.id };
+  if (req.params.projectId) where.projectId = req.params.projectId;
+  return where;
+}
 
 // items/taxes llegan como JSON string (el formulario es multipart/form-data por el archivo
 // adjunto). Se valida y normaliza cada fila; una fila inválida se descarta en vez de abortar.
@@ -55,10 +75,20 @@ function filesFromRequest(req) {
   };
 }
 
+// Filtros de la vista general (ruta global, sin :projectId): proyecto (incluyendo "sin
+// proyecto"), proveedor, caja y rango de fechas, combinables entre sí. En la ruta anidada el
+// proyecto queda fijo por la URL y estos filtros de proyecto no aplican.
 const list = asyncHandler(async (req, res) => {
-  const { from, to, category } = req.query;
-  const where = { projectId: req.params.projectId };
+  const { from, to, category, supplierId, cashBoxId } = req.query;
+  const where = {};
+  if (req.params.projectId) {
+    where.projectId = req.params.projectId;
+  } else if (req.query.projectId) {
+    where.projectId = req.query.projectId === 'none' ? null : req.query.projectId;
+  }
   if (category) where.category = category;
+  if (supplierId) where.supplierId = supplierId;
+  if (cashBoxId) where.cashBoxId = cashBoxId;
   if (from || to) {
     where.date = {};
     if (from) where.date[Op.gte] = from;
@@ -69,18 +99,33 @@ const list = asyncHandler(async (req, res) => {
 });
 
 const create = asyncHandler(async (req, res) => {
-  const { category, amount, date, description, vendorName, vendorNit, vendorPhone, vendorEmail, subtotal, taxAmount } = req.body;
+  const {
+    category, amount, date, description, vendorName, vendorNit, vendorPhone, vendorEmail,
+    subtotal, taxAmount, cashBoxId, supplierId,
+  } = req.body;
+  // Ruta anidada: projectId siempre viene en la URL. Ruta global: opcional, en el body (el gasto
+  // puede quedar sin proyecto).
+  const projectId = req.params.projectId || req.body.projectId || null;
+
   if (!category || !CATEGORIES.includes(category)) throw new ApiError(400, `category debe ser uno de: ${CATEGORIES.join(', ')}`);
   if (amount === undefined || Number(amount) < 0) throw new ApiError(400, 'amount es obligatorio y no puede ser negativo');
   if (!date) throw new ApiError(400, 'date es obligatorio');
+  if (!cashBoxId) throw new ApiError(400, 'cashBoxId es obligatorio');
+
+  if (projectId && !req.user.isAdmin && !req.user.projectIds.includes(projectId)) {
+    throw new ApiError(403, 'No tiene acceso a este proyecto');
+  }
 
   const items = sanitizeItems(req.body.items);
   const taxes = sanitizeTaxes(req.body.taxes);
   const { invoiceFile, paymentReceiptFile } = filesFromRequest(req);
 
-  const expense = await sequelize.transaction(async (t) => {
+  const { expense, warning } = await sequelize.transaction(async (t) => {
+    await assertCashBoxUsable(cashBoxId, { transaction: t });
     const created = await Expense.create({
-      projectId: req.params.projectId,
+      projectId,
+      cashBoxId,
+      supplierId: supplierId || null,
       category,
       amount,
       date,
@@ -98,11 +143,12 @@ const create = asyncHandler(async (req, res) => {
     }, { transaction: t });
     if (items.length) await ExpenseItem.bulkCreate(items.map((it) => ({ ...it, expenseId: created.id })), { transaction: t });
     if (taxes.length) await ExpenseTax.bulkCreate(taxes.map((tx) => ({ ...tx, expenseId: created.id })), { transaction: t });
-    return created;
+    const w = await overdraftWarning(cashBoxId, { transaction: t });
+    return { expense: created, warning: w };
   });
 
   const full = await Expense.findByPk(expense.id, { include: EXPENSE_INCLUDE });
-  res.status(201).json(full);
+  res.status(201).json({ ...full.toJSON(), warning });
 });
 
 // Lee una factura (PDF o imagen) subida y devuelve los datos que se lograron reconocer, para
@@ -116,11 +162,14 @@ const scan = asyncHandler(async (req, res) => {
 });
 
 const update = asyncHandler(async (req, res) => {
-  const expense = await Expense.findOne({ where: { id: req.params.id, projectId: req.params.projectId } });
+  const expense = await Expense.findOne({ where: scopeWhere(req) });
   if (!expense) throw new ApiError(404, 'Gasto no encontrado');
   if (expense.source !== 'manual') throw new ApiError(400, 'Este gasto se generó automáticamente y no puede editarse manualmente');
 
-  const { category, amount, date, description, vendorName, vendorNit, vendorPhone, vendorEmail, subtotal, taxAmount } = req.body;
+  const {
+    category, amount, date, description, vendorName, vendorNit, vendorPhone, vendorEmail,
+    subtotal, taxAmount, cashBoxId, supplierId,
+  } = req.body;
   if (category !== undefined) {
     if (!CATEGORIES.includes(category)) throw new ApiError(400, `category debe ser uno de: ${CATEGORIES.join(', ')}`);
     expense.category = category;
@@ -137,6 +186,16 @@ const update = asyncHandler(async (req, res) => {
   if (vendorEmail !== undefined) expense.vendorEmail = vendorEmail || null;
   if (subtotal !== undefined) expense.subtotal = subtotal || null;
   if (taxAmount !== undefined) expense.taxAmount = taxAmount || null;
+  if (supplierId !== undefined) expense.supplierId = supplierId || null;
+  // El proyecto solo es editable desde la ruta general: en la ruta anidada queda fijo por la URL,
+  // igual que siempre.
+  if (!req.params.projectId && req.body.projectId !== undefined) {
+    const newProjectId = req.body.projectId || null;
+    if (newProjectId && !req.user.isAdmin && !req.user.projectIds.includes(newProjectId)) {
+      throw new ApiError(403, 'No tiene acceso a este proyecto');
+    }
+    expense.projectId = newProjectId;
+  }
   const { invoiceFile, paymentReceiptFile } = filesFromRequest(req);
   if (invoiceFile) expense.supportFilePath = relativePath(invoiceFile);
   if (paymentReceiptFile) expense.paymentReceiptFilePath = relativePath(paymentReceiptFile);
@@ -144,7 +203,12 @@ const update = asyncHandler(async (req, res) => {
   const items = req.body.items !== undefined ? sanitizeItems(req.body.items) : null;
   const taxes = req.body.taxes !== undefined ? sanitizeTaxes(req.body.taxes) : null;
 
+  let warning = null;
   await sequelize.transaction(async (t) => {
+    if (cashBoxId !== undefined && cashBoxId !== expense.cashBoxId) {
+      await assertCashBoxUsable(cashBoxId, { transaction: t });
+      expense.cashBoxId = cashBoxId;
+    }
     await expense.save({ transaction: t });
     if (items) {
       await ExpenseItem.destroy({ where: { expenseId: expense.id }, transaction: t });
@@ -154,21 +218,23 @@ const update = asyncHandler(async (req, res) => {
       await ExpenseTax.destroy({ where: { expenseId: expense.id }, transaction: t });
       if (taxes.length) await ExpenseTax.bulkCreate(taxes.map((tx) => ({ ...tx, expenseId: expense.id })), { transaction: t });
     }
+    warning = await overdraftWarning(expense.cashBoxId, { transaction: t });
   });
 
   const full = await Expense.findByPk(expense.id, { include: EXPENSE_INCLUDE });
-  res.json(full);
+  res.json({ ...full.toJSON(), warning });
 });
 
 const remove = asyncHandler(async (req, res) => {
-  const expense = await Expense.findOne({ where: { id: req.params.id, projectId: req.params.projectId } });
+  const expense = await Expense.findOne({ where: scopeWhere(req) });
   if (!expense) throw new ApiError(404, 'Gasto no encontrado');
   if (expense.source !== 'manual') throw new ApiError(400, 'Este gasto se generó automáticamente y no puede eliminarse manualmente');
   await expense.destroy();
   res.status(204).send();
 });
 
-// Presupuesto por categoría (para el consolidado presupuesto vs. gasto vs. saldo).
+// Presupuesto por categoría (para el consolidado presupuesto vs. gasto vs. saldo). Solo tiene
+// sentido por proyecto: no se expone en la ruta general.
 const setBudget = asyncHandler(async (req, res) => {
   const { category, budgetedAmount } = req.body;
   if (!CATEGORIES.includes(category)) throw new ApiError(400, `category debe ser uno de: ${CATEGORIES.join(', ')}`);
@@ -183,7 +249,8 @@ const setBudget = asyncHandler(async (req, res) => {
   res.json(budget);
 });
 
-// Vista consolidada: presupuesto vs. gasto acumulado vs. saldo disponible, por categoría.
+// Vista consolidada: presupuesto vs. gasto acumulado vs. saldo disponible, por categoría. Solo
+// por proyecto (no se expone en la ruta general).
 const summary = asyncHandler(async (req, res) => {
   const [budgets, expenses] = await Promise.all([
     ExpenseBudget.findAll({ where: { projectId: req.params.projectId } }),

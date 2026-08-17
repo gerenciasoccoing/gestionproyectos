@@ -78,6 +78,25 @@ export function AdminIcon(props) {
   );
 }
 
+export function ExpensesIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" {...common} {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v10M9 9.5c0-1.2 1.2-2 3-2s3 .9 3 2-1.2 1.8-3 1.8-3 .8-3 2 1.2 2 3 2 3-.8 3-2" />
+    </svg>
+  );
+}
+
+export function CashBoxIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" {...common} {...props}>
+      <rect x="3" y="7" width="18" height="13" rx="1.5" />
+      <path d="M3 11h18M8 7V5.5A1.5 1.5 0 019.5 4h5A1.5 1.5 0 0116 5.5V7" />
+      <circle cx="12" cy="14.5" r="2" />
+    </svg>
+  );
+}
+
 export function MenuIcon(props) {
   return (
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" {...props}>

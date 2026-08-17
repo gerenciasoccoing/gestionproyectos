@@ -42,6 +42,8 @@
     "suppliers": "Proveedores",
     "clients": "Clientes",
     "inventory": "Inventario",
+    "expenses": "Gastos",
+    "cashBoxes": "Cajas",
     "admin": "Administración",
     "logout": "Cerrar sesión",
     "logoutShort": "Salir",
@@ -470,6 +472,7 @@
           "terminacion_termino": "Terminación de contrato a término fijo"
         },
         "calculate": "Calcular liquidación (previsualizar)",
+        "cashBoxRequired": "Debes seleccionar la caja de origen antes de confirmar el retiro.",
         "confirmDialog": "¿Confirmar el retiro y liquidación? Esta acción pasará al empleado a histórico.",
         "processing": "Procesando...",
         "confirmButton": "Confirmar retiro y generar liquidación",
@@ -501,6 +504,11 @@
     "scanNote": "La lectura automática es local (OCR + reglas de texto, sin IA externa): úsala como apoyo, no reemplaza revisar la factura. La factura y el comprobante de pago se guardan como adjuntos independientes.",
     "totalValue": "Valor total",
     "date": "Fecha",
+    "cashBox": "Caja de origen",
+    "cashBoxRequired": "Debes seleccionar la caja de origen.",
+    "assignProject": "Asignar a proyecto (opcional)",
+    "registeredSupplier": "Proveedor registrado (opcional)",
+    "supplierPlaceholder": "-- ninguno / digitar manualmente --",
     "vendor": "Proveedor",
     "vendorNit": "NIT proveedor",
     "vendorPhone": "Teléfono proveedor",
@@ -534,6 +542,8 @@
       "date": "Fecha",
       "category": "Categoría",
       "vendor": "Proveedor",
+      "project": "Proyecto",
+      "cashBox": "Caja",
       "items": "Ítems",
       "value": "Valor",
       "origin": "Origen",
@@ -546,7 +556,7 @@
       "manual": "Manual",
       "purchase_receipt": "Compra",
       "purchase_order": "Orden de compra",
-      "settlement": "Liquidación"
+      "liquidacion": "Liquidación"
     },
     "nit": "NIT",
     "phone": "Tel",
@@ -559,6 +569,19 @@
       "equipos": "Equipos",
       "viaticos": "Viáticos",
       "imprevistos": "Imprevistos"
+    },
+    "filters": {
+      "title": "Filtros",
+      "project": "Proyecto",
+      "supplier": "Proveedor",
+      "cashBox": "Caja",
+      "from": "Desde",
+      "to": "Hasta",
+      "allProjects": "-- todos los proyectos --",
+      "allSuppliers": "-- todos los proveedores --",
+      "allCashBoxes": "-- todas las cajas --",
+      "noProject": "Sin proyecto",
+      "clear": "Limpiar filtros"
     }
   },
   "thirdParties": {
@@ -629,6 +652,37 @@
       },
       "total": "{{count}} proyecto(s) — Valor total: {{amount}}"
     }
+  },
+  "cashBoxes": {
+    "title": "Cajas",
+    "newCashBox": "+ Nueva caja",
+    "fields": {
+      "name": "Nombre",
+      "initialBalance": "Saldo inicial",
+      "amount": "Monto",
+      "date": "Fecha",
+      "concept": "Concepto"
+    },
+    "table": {
+      "name": "Nombre",
+      "initialBalance": "Saldo inicial",
+      "balance": "Saldo actual",
+      "status": "Estado",
+      "date": "Fecha",
+      "concept": "Concepto",
+      "amount": "Monto"
+    },
+    "status": {
+      "activa": "Activa",
+      "cerrada": "Cerrada"
+    },
+    "close": "Cerrar",
+    "activate": "Activar",
+    "addMovement": "Ingresar valores",
+    "movementsTitle": "Movimientos: {{name}}",
+    "registerIncome": "Registrar ingreso",
+    "noMovements": "Esta caja aún no tiene ingresos registrados.",
+    "empty": "Sin cajas registradas."
   },
   "inventory": {
     "title": "Inventario",

@@ -1,4 +1,4 @@
-const { sequelize } = require('../models');
+const { sequelize, CashBox } = require('../models');
 
 // sequelize.sync({ alter: true }) añade columnas nuevas de forma segura, pero no siempre
 // relaja restricciones NOT NULL en columnas existentes (limitación conocida en Postgres).
@@ -25,6 +25,24 @@ async function applyPostSyncFixups() {
     ) sub
     WHERE po.id = sub.id;
   `);
+
+  // Expense.projectId pasó de obligatorio a opcional (un gasto puede registrarse desde la vista
+  // general sin proyecto) y se agregaron cashBoxId (obligatoria en la práctica) y supplierId
+  // (opcional). Migración en orden: 1) relaja projectId, 2) asegura una "Caja general" para los
+  // gastos que ya existían sin caja, 3) los backfillea, 4) recién ahí exige cashBoxId a nivel de
+  // base de datos (antes del backfill fallaría por las filas existentes). El backfill solo toca
+  // filas con cashBoxId NULL y el SET NOT NULL es un no-op si ya estaba así, por lo que es seguro
+  // ejecutar esto en cada arranque.
+  await sequelize.query('ALTER TABLE "Expenses" ALTER COLUMN "projectId" DROP NOT NULL;');
+  const [defaultCashBox] = await CashBox.findOrCreate({
+    where: { name: 'Caja general' },
+    defaults: { initialBalance: 0, status: 'activa' },
+  });
+  await sequelize.query(
+    'UPDATE "Expenses" SET "cashBoxId" = :cashBoxId WHERE "cashBoxId" IS NULL;',
+    { replacements: { cashBoxId: defaultCashBox.id } }
+  );
+  await sequelize.query('ALTER TABLE "Expenses" ALTER COLUMN "cashBoxId" SET NOT NULL;');
 }
 
 module.exports = { applyPostSyncFixups };

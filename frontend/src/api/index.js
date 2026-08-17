@@ -122,6 +122,26 @@ export const expensesApi = {
   scan: (pid, formData) => client.post(`/projects/${pid}/expenses/scan`, formData).then((r) => r.data),
 };
 
+// Vista general de Gastos (sin proyecto fijo, ver backend/globalExpenseRoutes.js) — mismo modelo y
+// misma lógica que expensesApi; solo cambia el punto de entrada (proyecto va como filtro/campo
+// opcional en vez de venir fijo en la URL).
+export const generalExpensesApi = {
+  list: (params) => client.get('/expenses', { params }).then((r) => r.data),
+  create: (formData) => client.post('/expenses', formData).then((r) => r.data),
+  update: (id, formData) => client.put(`/expenses/${id}`, formData).then((r) => r.data),
+  remove: (id) => client.delete(`/expenses/${id}`),
+  scan: (formData) => client.post('/expenses/scan', formData).then((r) => r.data),
+};
+
+export const cashBoxesApi = {
+  list: () => client.get('/cash-boxes').then((r) => r.data),
+  get: (id) => client.get(`/cash-boxes/${id}`).then((r) => r.data),
+  create: (data) => client.post('/cash-boxes', data).then((r) => r.data),
+  update: (id, data) => client.put(`/cash-boxes/${id}`, data).then((r) => r.data),
+  setStatus: (id, status) => client.post(`/cash-boxes/${id}/status`, { status }).then((r) => r.data),
+  addMovement: (id, data) => client.post(`/cash-boxes/${id}/movements`, data).then((r) => r.data),
+};
+
 export const thirdPartiesApi = {
   list: (params) => client.get('/third-parties', { params }).then((r) => r.data),
   get: (id) => client.get(`/third-parties/${id}`).then((r) => r.data),

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useOutletContext, useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { employeesApi } from '../../api';
+import { employeesApi, cashBoxesApi } from '../../api';
 import { Card, Button, Input, Select, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
@@ -170,10 +170,15 @@ function BreakdownTable({ breakdown }) {
 
 function SeveranceSection({ projectId, employee, onChange }) {
   const { t } = useTranslation();
-  const [form, setForm] = useState({ exitDate: '', cause: 'renuncia' });
+  const [form, setForm] = useState({ exitDate: '', cause: 'renuncia', cashBoxId: '' });
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const [warning, setWarning] = useState('');
+  const [cashBoxes, setCashBoxes] = useState([]);
+
+  useEffect(() => { cashBoxesApi.list().then(setCashBoxes); }, []);
+  const cashBoxOptions = cashBoxes.filter((cb) => cb.status === 'activa');
 
   const doPreview = async (e) => {
     e.preventDefault();
@@ -187,11 +192,14 @@ function SeveranceSection({ projectId, employee, onChange }) {
   };
 
   const confirm = async () => {
+    if (!form.cashBoxId) { setError(t('personnel.detail.severance.cashBoxRequired')); return; }
     if (!window.confirm(t('personnel.detail.severance.confirmDialog'))) return;
     setConfirming(true);
     setError('');
+    setWarning('');
     try {
-      await employeesApi.severanceConfirm(projectId, employee.id, form);
+      const result = await employeesApi.severanceConfirm(projectId, employee.id, form);
+      if (result.warning) setWarning(result.warning);
       onChange();
     } catch (err) {
       setError(extractError(err));
@@ -211,9 +219,14 @@ function SeveranceSection({ projectId, employee, onChange }) {
             <option value="sin_justa_causa">{t('personnel.detail.severance.causes.sin_justa_causa')}</option>
             <option value="terminacion_termino">{t('personnel.detail.severance.causes.terminacion_termino')}</option>
           </Select>
+          <Select label={t('expenses.cashBox')} value={form.cashBoxId} onChange={(e) => setForm({ ...form, cashBoxId: e.target.value })}>
+            <option value="">{t('common.selectPlaceholder')}</option>
+            {cashBoxOptions.map((cb) => <option key={cb.id} value={cb.id}>{cb.name} ({money(cb.balance)})</option>)}
+          </Select>
           <Button type="submit">{t('personnel.detail.severance.calculate')}</Button>
         </form>
         <ErrorText>{error}</ErrorText>
+        {warning && <p className="text-sm text-yellow-600 mt-1">⚠ {warning}</p>}
       </Can>
 
       {preview && (

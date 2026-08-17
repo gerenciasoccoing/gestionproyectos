@@ -9,7 +9,7 @@ import Logo from './Logo';
 import LanguageSwitcher from './LanguageSwitcher';
 import {
   ProjectsIcon, QuotationsIcon, PriceBookIcon, ApuIcon, SuppliersIcon, ThirdPartiesIcon, InventoryIcon, AdminIcon,
-  MenuIcon, LogoutIcon,
+  ExpensesIcon, CashBoxIcon, MenuIcon, LogoutIcon,
 } from './NavIcons';
 
 // Ancho del sidebar expandido/colapsado (a íconos). Se comparte entre el <aside> y el spacer del
@@ -105,6 +105,12 @@ export default function Layout() {
             ))}
             <Can module="inventario" action="view">
               <SidebarLink to="/inventory" label={t('nav.inventory')} icon={<InventoryIcon />} collapsed={collapsed} />
+            </Can>
+            <Can module="gastos" action="view">
+              <SidebarLink to="/expenses" label={t('nav.expenses')} icon={<ExpensesIcon />} collapsed={collapsed} />
+            </Can>
+            <Can module="cajas" action="view">
+              <SidebarLink to="/cash-boxes" label={t('nav.cashBoxes')} icon={<CashBoxIcon />} collapsed={collapsed} />
             </Can>
             <Can module="admin" action="view">
               <SidebarLink to="/admin" label={t('nav.admin')} icon={<AdminIcon />} collapsed={collapsed} />

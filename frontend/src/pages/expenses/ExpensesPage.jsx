@@ -1,24 +1,52 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { expensesApi } from '../../api';
-import { Card, Button, Input, Select, TextArea, Table, ErrorText, extractError, money, formatDate } from '../../components/ui';
+import { expensesApi, generalExpensesApi, projectsApi, thirdPartiesApi, cashBoxesApi } from '../../api';
+import { Card, Button, Input, Select, SearchSelect, TextArea, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
 
 const CATEGORIES = ['mano_obra', 'materiales', 'equipos', 'viaticos', 'imprevistos'];
-const emptyForm = { category: 'materiales', amount: '', date: '', description: '', vendorName: '', vendorNit: '', vendorPhone: '', vendorEmail: '' };
+const emptyForm = {
+  category: 'materiales', amount: '', date: '', description: '',
+  vendorName: '', vendorNit: '', vendorPhone: '', vendorEmail: '',
+  cashBoxId: '', supplierId: '', projectId: '',
+};
 const emptyItem = { description: '', quantity: '1', unitPrice: '', totalPrice: '' };
 const emptyTax = { name: '', rate: '', amount: '' };
+const emptyFilters = { projectId: '', supplierId: '', cashBoxId: '', from: '', to: '' };
 const TAX_CODE_SUGGESTIONS = ['IVA', 'ReteIVA', 'ReteICA', 'ICA', 'Impoconsumo'];
 
 function sum(list, field) {
   return list.reduce((s, r) => s + (Number(r[field]) || 0), 0);
 }
 
+// Un solo componente para las DOS vistas de Gastos: dentro de un proyecto (useOutletContext trae
+// projectId, ver ProjectLayout.jsx) y la vista general del menú principal (sin ese contexto,
+// projectId queda undefined). Mismo modelo de datos y misma lógica en ambos casos — ver
+// expenseController.js en el backend, que atiende los dos montajes de ruta con las mismas
+// funciones — solo cambia qué API se llama y qué controles adicionales se muestran (filtros y
+// resumen de presupuesto son exclusivos de cada modo).
 export default function ExpensesPage() {
   const { t } = useTranslation();
-  const { projectId } = useOutletContext();
+  const outletCtx = useOutletContext();
+  const projectId = outletCtx?.projectId;
+  const isGeneral = !projectId;
+
+  const api = isGeneral
+    ? {
+      list: (params) => generalExpensesApi.list(params),
+      create: (fd) => generalExpensesApi.create(fd),
+      remove: (id) => generalExpensesApi.remove(id),
+      scan: (fd) => generalExpensesApi.scan(fd),
+    }
+    : {
+      list: () => expensesApi.list(projectId),
+      create: (fd) => expensesApi.create(projectId, fd),
+      remove: (id) => expensesApi.remove(projectId, id),
+      scan: (fd) => expensesApi.scan(projectId, fd),
+    };
+
   const [expenses, setExpenses] = useState([]);
   const [summary, setSummary] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -31,15 +59,36 @@ export default function ExpensesPage() {
   const [scanNotice, setScanNotice] = useState('');
   const [budgetForm, setBudgetForm] = useState({ category: 'materiales', budgetedAmount: '' });
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
   const [expandedId, setExpandedId] = useState(null);
 
+  const [cashBoxes, setCashBoxes] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [filters, setFilters] = useState(emptyFilters);
+
   const LABELS = Object.fromEntries(CATEGORIES.map((c) => [c, t(`expenses.categories.${c}`)]));
+  const cashBoxOptions = cashBoxes.filter((cb) => cb.status === 'activa' || cb.id === form.cashBoxId);
 
   const load = () => {
-    expensesApi.list(projectId).then(setExpenses);
-    expensesApi.summary(projectId).then(setSummary);
+    const params = isGeneral
+      ? {
+        ...(filters.projectId ? { projectId: filters.projectId } : {}),
+        ...(filters.supplierId ? { supplierId: filters.supplierId } : {}),
+        ...(filters.cashBoxId ? { cashBoxId: filters.cashBoxId } : {}),
+        ...(filters.from ? { from: filters.from } : {}),
+        ...(filters.to ? { to: filters.to } : {}),
+      }
+      : undefined;
+    api.list(params).then(setExpenses);
+    if (!isGeneral) expensesApi.summary(projectId).then(setSummary);
   };
-  useEffect(() => { load(); }, [projectId]);
+  useEffect(() => { load(); }, [projectId, filters]);
+  useEffect(() => {
+    cashBoxesApi.list().then(setCashBoxes);
+    thirdPartiesApi.list({ type: 'proveedor' }).then(setSuppliers);
+    if (isGeneral) projectsApi.list().then(setProjects);
+  }, [isGeneral]);
 
   const itemsSubtotal = sum(items, 'totalPrice');
   const taxesTotal = sum(taxes, 'amount');
@@ -53,19 +102,29 @@ export default function ExpensesPage() {
     setScanNotice('');
   };
 
+  const pickSupplier = (supplierId) => {
+    const s = suppliers.find((x) => x.id === supplierId);
+    setForm((f) => ({ ...f, supplierId, vendorName: s ? s.name : f.vendorName, vendorNit: s?.nit || f.vendorNit, vendorPhone: s?.phone || f.vendorPhone, vendorEmail: s?.email || f.vendorEmail }));
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setError('');
+    setWarning('');
     try {
       const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => fd.append(k, v));
+      Object.entries(form).forEach(([k, v]) => {
+        if (k === 'projectId' && !isGeneral) return; // en modo proyecto el projectId lo fija la URL, no se envía
+        fd.append(k, v);
+      });
       fd.append('subtotal', itemsSubtotal || '');
       fd.append('taxAmount', taxesTotal || '');
       fd.append('items', JSON.stringify(items.filter((it) => it.description.trim())));
       fd.append('taxes', JSON.stringify(taxes.filter((tx) => tx.name.trim())));
       if (invoiceFile) fd.append('invoiceFile', invoiceFile);
       if (paymentReceiptFile) fd.append('paymentReceiptFile', paymentReceiptFile);
-      await expensesApi.create(projectId, fd);
+      const created = await api.create(fd);
+      if (created.warning) setWarning(created.warning);
       resetForm();
       setShowForm(false);
       load();
@@ -82,7 +141,7 @@ export default function ExpensesPage() {
     try {
       const fd = new FormData();
       fd.append('file', invoiceFile);
-      const result = await expensesApi.scan(projectId, fd);
+      const result = await api.scan(fd);
       setForm((f) => ({
         ...f,
         amount: result.total != null ? String(result.total) : f.amount,
@@ -149,13 +208,43 @@ export default function ExpensesPage() {
 
   const remove = async (id) => {
     if (!confirm(t('expenses.confirmDelete'))) return;
-    await expensesApi.remove(projectId, id);
+    await api.remove(id);
     load();
   };
 
   return (
     <div>
-      {summary && (
+      {isGeneral && (
+        <Card title={t('expenses.filters.title')}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <SearchSelect
+              label={t('expenses.filters.project')}
+              options={[{ value: 'none', label: t('expenses.filters.noProject') }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
+              value={filters.projectId}
+              onChange={(v) => setFilters((f) => ({ ...f, projectId: v }))}
+              placeholder={t('expenses.filters.allProjects')}
+            />
+            <SearchSelect
+              label={t('expenses.filters.supplier')}
+              options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+              value={filters.supplierId}
+              onChange={(v) => setFilters((f) => ({ ...f, supplierId: v }))}
+              placeholder={t('expenses.filters.allSuppliers')}
+            />
+            <Select label={t('expenses.filters.cashBox')} value={filters.cashBoxId} onChange={(e) => setFilters((f) => ({ ...f, cashBoxId: e.target.value }))}>
+              <option value="">{t('expenses.filters.allCashBoxes')}</option>
+              {cashBoxes.map((cb) => <option key={cb.id} value={cb.id}>{cb.name}</option>)}
+            </Select>
+            <Input label={t('expenses.filters.from')} type="date" value={filters.from} onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value }))} />
+            <Input label={t('expenses.filters.to')} type="date" value={filters.to} onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value }))} />
+          </div>
+          {(filters.projectId || filters.supplierId || filters.cashBoxId || filters.from || filters.to) && (
+            <Button variant="secondary" className="mt-3" onClick={() => setFilters(emptyFilters)}>{t('expenses.filters.clear')}</Button>
+          )}
+        </Card>
+      )}
+
+      {!isGeneral && summary && (
         <Card title={t('expenses.summaryTitle')}>
           <Table columns={[t('expenses.table.category'), t('expenses.table.budgeted'), t('expenses.table.spent'), t('expenses.table.available')]}>
             {summary.rows.map((r) => (
@@ -213,7 +302,27 @@ export default function ExpensesPage() {
               </Select>
               <Input label={t('expenses.totalValue')} type="number" min="0" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
               <Input label={t('expenses.date')} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
-              <Input label={t('expenses.vendor')} value={form.vendorName} onChange={(e) => setForm({ ...form, vendorName: e.target.value })} />
+              <Select label={t('expenses.cashBox')} value={form.cashBoxId} onChange={(e) => setForm({ ...form, cashBoxId: e.target.value })} required>
+                <option value="">{t('common.selectPlaceholder')}</option>
+                {cashBoxOptions.map((cb) => <option key={cb.id} value={cb.id}>{cb.name} ({money(cb.balance)})</option>)}
+              </Select>
+              {isGeneral && (
+                <SearchSelect
+                  label={t('expenses.assignProject')}
+                  options={projects.map((p) => ({ value: p.id, label: p.name }))}
+                  value={form.projectId}
+                  onChange={(v) => setForm((f) => ({ ...f, projectId: v }))}
+                  placeholder={t('expenses.filters.noProject')}
+                />
+              )}
+              <SearchSelect
+                label={t('expenses.registeredSupplier')}
+                options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                value={form.supplierId}
+                onChange={pickSupplier}
+                placeholder={t('expenses.supplierPlaceholder')}
+              />
+              <Input label={t('expenses.vendor')} value={form.vendorName} onChange={(e) => setForm({ ...form, vendorName: e.target.value, supplierId: '' })} />
               <Input label={t('expenses.vendorNit')} value={form.vendorNit} onChange={(e) => setForm({ ...form, vendorNit: e.target.value })} />
               <Input label={t('expenses.vendorPhone')} value={form.vendorPhone} onChange={(e) => setForm({ ...form, vendorPhone: e.target.value })} />
               <Input label={t('expenses.vendorEmail')} type="email" value={form.vendorEmail} onChange={(e) => setForm({ ...form, vendorEmail: e.target.value })} />
@@ -269,13 +378,24 @@ export default function ExpensesPage() {
             </div>
           </form>
         )}
-        <Table columns={[t('expenses.list.date'), t('expenses.list.category'), t('expenses.list.vendor'), t('expenses.list.items'), t('expenses.list.value'), t('expenses.list.origin'), t('expenses.list.invoice'), t('expenses.list.receipt'), '']}>
+        {warning && <p className="text-sm text-yellow-600 mb-3">⚠ {warning}</p>}
+        <Table columns={[
+          t('expenses.list.date'), t('expenses.list.category'), t('expenses.list.vendor'),
+          ...(isGeneral ? [t('expenses.list.project'), t('expenses.list.cashBox')] : []),
+          t('expenses.list.items'), t('expenses.list.value'), t('expenses.list.origin'), t('expenses.list.invoice'), t('expenses.list.receipt'), '',
+        ]}>
           {expenses.map((e) => (
             <Fragment key={e.id}>
               <tr className="border-b border-gray-100">
                 <td className="py-1 pr-3">{formatDate(e.date)}</td>
                 <td className="py-1 pr-3">{LABELS[e.category]}</td>
                 <td className="py-1 pr-3">{e.vendorName || '-'}</td>
+                {isGeneral && (
+                  <>
+                    <td className="py-1 pr-3">{e.Project?.name || <span className="text-gray-400">{t('expenses.filters.noProject')}</span>}</td>
+                    <td className="py-1 pr-3">{e.CashBox?.name || '-'}</td>
+                  </>
+                )}
                 <td className="py-1 pr-3">
                   {(e.items?.length || e.taxes?.length || e.vendorNit || e.vendorPhone || e.vendorEmail || e.description) ? (
                     <button type="button" className="text-blue-600 hover:underline text-xs" onClick={() => setExpandedId(expandedId === e.id ? null : e.id)}>
@@ -297,7 +417,7 @@ export default function ExpensesPage() {
               </tr>
               {expandedId === e.id && (
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  <td colSpan={9} className="py-3 px-3">
+                  <td colSpan={isGeneral ? 11 : 9} className="py-3 px-3">
                     <div className="text-xs text-gray-500 mb-2 flex flex-wrap gap-x-4 gap-y-1">
                       {e.vendorNit && <span>{t('expenses.nit')}: {e.vendorNit}</span>}
                       {e.vendorPhone && <span>{t('expenses.phone')}: {e.vendorPhone}</span>}
@@ -332,7 +452,7 @@ export default function ExpensesPage() {
               )}
             </Fragment>
           ))}
-          {expenses.length === 0 && <tr><td colSpan={9} className="py-3 text-center text-gray-400">{t('expenses.empty')}</td></tr>}
+          {expenses.length === 0 && <tr><td colSpan={isGeneral ? 11 : 9} className="py-3 text-center text-gray-400">{t('expenses.empty')}</td></tr>}
         </Table>
       </Card>
     </div>
