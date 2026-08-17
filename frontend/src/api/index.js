@@ -45,6 +45,7 @@ export const contractsApi = {
   create: (pid, formData) => client.post(`/projects/${pid}/contracts`, formData).then((r) => r.data),
   update: (pid, id, formData) => client.put(`/projects/${pid}/contracts/${id}`, formData).then((r) => r.data),
   remove: (pid, id) => client.delete(`/projects/${pid}/contracts/${id}`),
+  scan: (pid, formData) => client.post(`/projects/${pid}/contracts/scan`, formData).then((r) => r.data),
 };
 
 export const policiesApi = {
@@ -52,6 +53,7 @@ export const policiesApi = {
   create: (pid, formData) => client.post(`/projects/${pid}/policies`, formData).then((r) => r.data),
   update: (pid, id, formData) => client.put(`/projects/${pid}/policies/${id}`, formData).then((r) => r.data),
   remove: (pid, id) => client.delete(`/projects/${pid}/policies/${id}`),
+  scan: (pid, formData) => client.post(`/projects/${pid}/policies/scan`, formData).then((r) => r.data),
 };
 
 export const minutesApi = {

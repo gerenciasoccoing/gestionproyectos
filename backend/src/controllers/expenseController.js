@@ -7,6 +7,8 @@ const {
 const { relativePath } = require('../middleware/upload');
 const { scanInvoice } = require('../services/invoiceScanService');
 const { assertCashBoxUsable, overdraftWarning } = require('../services/cashBoxService');
+const aiVisionService = require('../services/aiVisionService');
+const { getExtractor } = require('../config/aiDocumentExtractors');
 
 // Estos controladores atienden DOS montajes de ruta: el anidado en proyecto
 // (/projects/:projectId/expenses, ver expenseRoutes.js — comportamiento sin cambios) y el global
@@ -153,10 +155,21 @@ const create = asyncHandler(async (req, res) => {
 
 // Lee una factura (PDF o imagen) subida y devuelve los datos que se lograron reconocer, para
 // prellenar el formulario de gasto. No crea el gasto: el usuario revisa/corrige y confirma.
-// Lectura 100% local (OCR con Tesseract + heurísticas de texto), sin proveedor de IA externo,
-// así que la precisión es limitada: siempre debe revisarse antes de guardar.
+// Usa la API de Claude (visión) cuando hay ANTHROPIC_API_KEY configurada, con mejor precisión
+// en montos/ítems que el motor local; si la clave no está configurada cae al motor local (OCR
+// con Tesseract + heurísticas de texto) que ya existía, para no perder la funcionalidad.
 const scan = asyncHandler(async (req, res) => {
   if (!req.file) throw new ApiError(400, 'Debe adjuntar un archivo PDF o imagen (jpg, png, webp)');
+  if (aiVisionService.isConfigured()) {
+    const extractor = getExtractor('invoice');
+    const result = await aiVisionService.extractStructuredData({
+      buffer: req.file.buffer,
+      mimetype: req.file.mimetype,
+      instructions: extractor.instructions,
+      schemaDescription: extractor.schemaDescription,
+    });
+    return res.json(result);
+  }
   const result = await scanInvoice(req.file.buffer, req.file.mimetype);
   res.json(result);
 });

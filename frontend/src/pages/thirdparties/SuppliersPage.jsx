@@ -98,6 +98,7 @@ export default function SuppliersPage() {
         nit: result.nit || f.nit,
         email: result.email || f.email,
         phone: result.phone || f.phone,
+        address: result.address || f.address,
       }));
       setScanNotice(t('thirdParties.scanDone'));
     } catch (err) {

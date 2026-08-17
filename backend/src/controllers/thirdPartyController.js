@@ -4,6 +4,8 @@ const { ThirdParty, Project } = require('../models');
 const { relativePath } = require('../middleware/upload');
 const { scanRut } = require('../services/rutScanService');
 const { getProjectBudgetTotal } = require('../services/budgetService');
+const aiVisionService = require('../services/aiVisionService');
+const { getExtractor } = require('../config/aiDocumentExtractors');
 
 const TYPES = ['proveedor', 'cliente'];
 
@@ -144,11 +146,22 @@ const getClientProjects = asyncHandler(async (req, res) => {
 });
 
 // Lee un RUT (PDF o imagen) subido y devuelve los datos que se lograron reconocer (razón
-// social, NIT, correo, teléfono), para prellenar el formulario. No crea/edita el tercero: el
-// usuario revisa y corrige antes de guardar. Lectura 100% local (mismo motor que la lectura de
-// facturas), sin proveedor de IA externo.
+// social, NIT, correo, teléfono, dirección), para prellenar el formulario. No crea/edita el
+// tercero: el usuario revisa y corrige antes de guardar. Usa la API de Claude (visión) cuando
+// hay ANTHROPIC_API_KEY configurada; si no, cae al motor local (OCR + heurísticas) que ya
+// existía, para no perder la funcionalidad en instalaciones sin la clave.
 const scanRutFile = asyncHandler(async (req, res) => {
   if (!req.file) throw new ApiError(400, 'Debe adjuntar un archivo PDF o imagen (jpg, png, webp)');
+  if (aiVisionService.isConfigured()) {
+    const extractor = getExtractor('rut');
+    const result = await aiVisionService.extractStructuredData({
+      buffer: req.file.buffer,
+      mimetype: req.file.mimetype,
+      instructions: extractor.instructions,
+      schemaDescription: extractor.schemaDescription,
+    });
+    return res.json(result);
+  }
   const result = await scanRut(req.file.buffer, req.file.mimetype);
   res.json(result);
 });

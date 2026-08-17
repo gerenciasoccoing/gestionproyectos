@@ -153,7 +153,11 @@
       },
       "confirmDelete": "¿Eliminar esta póliza?",
       "empty": "Sin pólizas."
-    }
+    },
+    "readAuto": "Leer automáticamente",
+    "reading": "Leyendo...",
+    "scanDone": "Datos leídos. Revísalos antes de guardar.",
+    "scanNote": "La lectura automática es una sugerencia: siempre revisa y corrige los datos antes de guardar."
   },
   "execution": {
     "budget": {
@@ -1249,6 +1253,9 @@
     "Debe adjuntar el documento PDF del acta": "Debe adjuntar el documento PDF del acta",
     "Debe adjuntar un archivo Excel (.xlsx o .xls)": "Debe adjuntar un archivo Excel (.xlsx o .xls)",
     "Debe adjuntar un archivo PDF o imagen (jpg, png, webp)": "Debe adjuntar un archivo PDF o imagen (jpg, png, webp)",
+    "La lectura automática con IA no está configurada en el servidor (falta ANTHROPIC_API_KEY).": "La lectura automática con IA no está configurada en el servidor (falta ANTHROPIC_API_KEY).",
+    "La IA no devolvió un resultado interpretable.": "La IA no devolvió un resultado interpretable.",
+    "La IA no devolvió un JSON válido.": "La IA no devolvió un JSON válido.",
     "Debe incluir al menos un ítem": "Debe incluir al menos un ítem",
     "El archivo no contiene filas de datos": "El archivo no contiene filas de datos",
     "El archivo no contiene ítems de presupuesto reconocibles.": "El archivo no contiene ítems de presupuesto reconocibles.",
