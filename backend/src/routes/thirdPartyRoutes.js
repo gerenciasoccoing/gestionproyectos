@@ -33,6 +33,7 @@ router.post('/scan-rut', requirePermission('terceros', 'create'), scanUpload.sin
 router.get('/', requirePermission('terceros', 'view'), thirdPartyController.list);
 router.post('/', requirePermission('terceros', 'create'), uploadFiles, thirdPartyController.create);
 router.get('/:id', requirePermission('terceros', 'view'), thirdPartyController.get);
+router.get('/:id/projects', requirePermission('terceros', 'view'), thirdPartyController.getClientProjects);
 router.put('/:id', requirePermission('terceros', 'edit'), uploadFiles, thirdPartyController.update);
 router.delete('/:id', requirePermission('terceros', 'delete'), thirdPartyController.remove);
 

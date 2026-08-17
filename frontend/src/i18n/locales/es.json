@@ -39,6 +39,8 @@
     "priceBook": "Base de Precios",
     "apu": "APU",
     "thirdParties": "Proveedores y Clientes",
+    "suppliers": "Proveedores",
+    "clients": "Clientes",
     "inventory": "Inventario",
     "admin": "Administración",
     "logout": "Cerrar sesión",
@@ -597,6 +599,36 @@
     "emptyClients": "Sin clientes registrados.",
     "duplicateNitSupplier": "Ya existe un proveedor registrado con este NIT: \"{{name}}\". Verifica que no sea un duplicado.",
     "duplicateNitClient": "Ya existe un cliente registrado con este NIT: \"{{name}}\". Verifica que no sea un duplicado."
+  },
+  "suppliers": {
+    "orders": {
+      "toggle": "Órdenes de compra",
+      "title": "Órdenes de compra: {{name}}",
+      "newOrder": "+ Nueva orden de compra",
+      "assignProject": "Asignar a proyecto (opcional)",
+      "noProjectPlaceholder": "-- sin proyecto --",
+      "noProject": "Sin proyecto asignado",
+      "noProjectNote": "Esta orden no tiene proyecto asignado: no se pueden registrar entregas ni pasar a gastos hasta asignarle uno. Puedes cerrarla (con o sin faltantes) igualmente.",
+      "pdf": "PDF",
+      "table": {
+        "number": "No.",
+        "project": "Proyecto"
+      },
+      "empty": "Este proveedor aún no tiene órdenes de compra."
+    }
+  },
+  "clients": {
+    "projectsPanel": {
+      "toggle": "Proyectos",
+      "title": "Proyectos de {{name}}",
+      "empty": "Este cliente aún no tiene proyectos registrados.",
+      "table": {
+        "project": "Proyecto",
+        "status": "Estado",
+        "value": "Valor (presupuesto)"
+      },
+      "total": "{{count}} proyecto(s) — Valor total: {{amount}}"
+    }
   },
   "inventory": {
     "title": "Inventario",

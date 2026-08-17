@@ -1,8 +1,9 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { ThirdParty } = require('../models');
+const { ThirdParty, Project } = require('../models');
 const { relativePath } = require('../middleware/upload');
 const { scanRut } = require('../services/rutScanService');
+const { getProjectBudgetTotal } = require('../services/budgetService');
 
 const TYPES = ['proveedor', 'cliente'];
 
@@ -119,6 +120,29 @@ const remove = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
+// Proyectos vinculados a este tercero como cliente (Project.clientId), con el valor de su
+// presupuesto vigente cada uno (nunca un campo manual) y el total acumulado. Devuelve listas/total
+// en cero si el cliente aún no tiene proyectos, en vez de fallar.
+const getClientProjects = asyncHandler(async (req, res) => {
+  const client = await ThirdParty.findByPk(req.params.id);
+  if (!client) throw new ApiError(404, 'Tercero no encontrado');
+
+  const projects = await Project.findAll({ where: { clientId: client.id }, order: [['createdAt', 'DESC']] });
+  const rows = await Promise.all(projects.map(async (p) => ({
+    id: p.id,
+    name: p.name,
+    status: p.status,
+    origin: p.origin,
+    budgetValue: await getProjectBudgetTotal(p.id),
+  })));
+
+  res.json({
+    projects: rows,
+    count: rows.length,
+    totalValue: rows.reduce((sum, r) => sum + r.budgetValue, 0),
+  });
+});
+
 // Lee un RUT (PDF o imagen) subido y devuelve los datos que se lograron reconocer (razón
 // social, NIT, correo, teléfono), para prellenar el formulario. No crea/edita el tercero: el
 // usuario revisa y corrige antes de guardar. Lectura 100% local (mismo motor que la lectura de
@@ -129,4 +153,4 @@ const scanRutFile = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
-module.exports = { list, get, create, update, remove, scanRutFile };
+module.exports = { list, get, create, update, remove, scanRutFile, getClientProjects };

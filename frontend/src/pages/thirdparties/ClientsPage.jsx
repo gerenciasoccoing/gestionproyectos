@@ -1,45 +1,39 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { thirdPartiesApi } from '../../api';
-import { Card, Button, Input, TextArea, Table, ErrorText, extractError } from '../../components/ui';
+import { Card, Button, Input, TextArea, Table, Badge, ErrorText, extractError, money } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
 
-const emptyForm = { type: 'proveedor', name: '', nit: '', email: '', phone: '', address: '', contactName: '', notes: '' };
+const emptyForm = { name: '', nit: '', email: '', phone: '', address: '', contactName: '', notes: '' };
+const STATUS_COLORS = { activo: 'green', suspendido: 'yellow', terminado: 'blue', liquidado: 'gray' };
 
 // Compara NIT sin importar puntos/guiones/espacios ni mayúsculas (ej. "900.303.701-0" === "9003037010").
 function normalizeNit(nit) {
   return String(nit || '').replace(/[^0-9a-zA-Z]/g, '').toLowerCase();
 }
 
-export default function ThirdPartiesPage() {
+// Sección "Clientes" independiente de "Proveedores" (ver SuppliersPage.jsx para el porqué de la
+// separación). Sin certificación bancaria (solo aplica a proveedores).
+export default function ClientsPage() {
   const { t } = useTranslation();
-  const TYPES = [
-    { value: 'proveedor', label: t('thirdParties.tabs.suppliers') },
-    { value: 'cliente', label: t('thirdParties.tabs.clients') },
-  ];
-  const [type, setType] = useState('proveedor');
   const [items, setItems] = useState([]);
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState({ ...emptyForm, type: 'proveedor' });
+  const [form, setForm] = useState(emptyForm);
   const [rutFile, setRutFile] = useState(null);
-  const [bankFile, setBankFile] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [scanNotice, setScanNotice] = useState('');
   const [error, setError] = useState('');
+  const [expandedId, setExpandedId] = useState(null);
 
-  const load = () => thirdPartiesApi.list({ type }).then(setItems);
-  useEffect(() => { load(); }, [type]);
+  const load = () => thirdPartiesApi.list({ type: 'cliente' }).then(setItems);
+  useEffect(() => { load(); }, []);
 
-  // Recibe el tipo explícito en vez de leerlo del estado `type`: si se llama justo después de
-  // cambiar de pestaña (setType), el estado todavía no se actualizó (React lo aplica en el
-  // siguiente render), así que leerlo de closure aquí guardaría el tipo de la pestaña anterior.
-  const resetForm = (forType = type) => {
-    setForm({ ...emptyForm, type: forType });
+  const resetForm = () => {
+    setForm(emptyForm);
     setRutFile(null);
-    setBankFile(null);
     setScanNotice('');
     setEditingId(null);
   };
@@ -47,11 +41,10 @@ export default function ThirdPartiesPage() {
   const startEdit = (item) => {
     setEditingId(item.id);
     setForm({
-      type: item.type, name: item.name, nit: item.nit || '', email: item.email || '',
+      name: item.name, nit: item.nit || '', email: item.email || '',
       phone: item.phone || '', address: item.address || '', contactName: item.contactName || '', notes: item.notes || '',
     });
     setRutFile(null);
-    setBankFile(null);
     setScanNotice('');
     setShowForm(true);
   };
@@ -64,16 +57,16 @@ export default function ThirdPartiesPage() {
     if (normalized) {
       const dup = items.find((it) => it.id !== editingId && normalizeNit(it.nit) === normalized);
       if (dup) {
-        setError(t(form.type === 'proveedor' ? 'thirdParties.duplicateNitSupplier' : 'thirdParties.duplicateNitClient', { name: dup.name }));
+        setError(t('thirdParties.duplicateNitClient', { name: dup.name }));
         return;
       }
     }
 
     try {
       const fd = new FormData();
+      fd.append('type', 'cliente');
       Object.entries(form).forEach(([k, v]) => fd.append(k, v));
       if (rutFile) fd.append('rutFile', rutFile);
-      if (bankFile) fd.append('bankCertificationFile', bankFile);
       if (editingId) await thirdPartiesApi.update(editingId, fd);
       else await thirdPartiesApi.create(fd);
       resetForm();
@@ -111,6 +104,7 @@ export default function ThirdPartiesPage() {
   const remove = async (id) => {
     if (!confirm(t('thirdParties.confirmDelete'))) return;
     await thirdPartiesApi.remove(id);
+    if (expandedId === id) setExpandedId(null);
     load();
   };
 
@@ -120,24 +114,12 @@ export default function ThirdPartiesPage() {
 
   return (
     <div>
-      <Card>
-        <div className="flex flex-wrap gap-2 mb-4 border-b border-gray-200">
-          {TYPES.map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => { setType(tab.value); setShowForm(false); resetForm(tab.value); }}
-              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${type === tab.value ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
+      <Card title={t('thirdParties.tabs.clients')}>
         <div className="flex flex-wrap items-end justify-between gap-2 mb-3">
           <Input label={t('thirdParties.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} className="w-64" />
           <Can module="terceros" action="create">
             <Button onClick={() => { if (showForm) resetForm(); setShowForm((s) => !s); }}>
-              {showForm ? t('common.cancel') : (type === 'proveedor' ? t('thirdParties.newSupplier') : t('thirdParties.newClient'))}
+              {showForm ? t('common.cancel') : t('thirdParties.newClient')}
             </Button>
           </Can>
         </div>
@@ -155,9 +137,7 @@ export default function ThirdPartiesPage() {
               </Button>
             </div>
             {scanNotice && <p className="text-sm text-green-700 mb-3">{scanNotice}</p>}
-            <p className="text-xs text-gray-400 mb-3">
-              {t('thirdParties.scanNote')}
-            </p>
+            <p className="text-xs text-gray-400 mb-3">{t('thirdParties.scanNote')}</p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <Input label={t('thirdParties.fields.name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
@@ -167,21 +147,13 @@ export default function ThirdPartiesPage() {
               <Input label={t('thirdParties.fields.address')} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
               <Input label={t('thirdParties.fields.contactName')} value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
               <TextArea label={t('thirdParties.fields.notes')} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="col-span-full" rows={2} />
-              {form.type === 'proveedor' && (
-                <Input
-                  label={t('thirdParties.fields.bankCertification')}
-                  type="file" accept=".pdf,.jpg,.jpeg,.png,.webp"
-                  onChange={(e) => setBankFile(e.target.files[0])}
-                  className="col-span-full sm:col-span-1"
-                />
-              )}
               <Button type="submit" className="col-span-full">{editingId ? t('thirdParties.saveChanges') : t('thirdParties.save')}</Button>
               <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
             </div>
           </form>
         )}
 
-        <Table columns={type === 'proveedor' ? [t('thirdParties.table.name'), t('thirdParties.table.nit'), t('thirdParties.table.email'), t('thirdParties.table.phone'), t('thirdParties.table.rut'), t('thirdParties.table.bankCertification'), ''] : [t('thirdParties.table.name'), t('thirdParties.table.nit'), t('thirdParties.table.email'), t('thirdParties.table.phone'), t('thirdParties.table.rut'), '']}>
+        <Table columns={[t('thirdParties.table.name'), t('thirdParties.table.nit'), t('thirdParties.table.email'), t('thirdParties.table.phone'), t('thirdParties.table.rut'), '']}>
           {filtered.map((it) => (
             <tr key={it.id} className="border-b border-gray-100">
               <td className="py-1 pr-3">{it.name}</td>
@@ -189,14 +161,12 @@ export default function ThirdPartiesPage() {
               <td className="py-1 pr-3">{it.email || '-'}</td>
               <td className="py-1 pr-3">{it.phone || '-'}</td>
               <td className="py-1 pr-3">{it.rutFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(it.rutFilePath)} target="_blank" rel="noreferrer">{t('common.view')}</a> : '-'}</td>
-              {type === 'proveedor' && (
-                <td className="py-1 pr-3">
-                  {it.bankCertificationFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(it.bankCertificationFilePath)} target="_blank" rel="noreferrer">{t('common.view')}</a> : '-'}
-                </td>
-              )}
-              <td className="py-1 pr-3 text-right">
+              <td className="py-1 pr-3 text-right whitespace-nowrap">
+                <Button variant="secondary" onClick={() => setExpandedId(expandedId === it.id ? null : it.id)}>
+                  {expandedId === it.id ? t('common.close') : t('clients.projectsPanel.toggle')}
+                </Button>
                 <Can module="terceros" action="edit">
-                  <Button variant="secondary" onClick={() => startEdit(it)}>{t('common.edit')}</Button>
+                  <Button variant="secondary" className="ml-2" onClick={() => startEdit(it)}>{t('common.edit')}</Button>
                 </Can>
                 <Can module="terceros" action="delete">
                   <Button variant="danger" className="ml-2" onClick={() => remove(it.id)}>{t('common.delete')}</Button>
@@ -204,9 +174,50 @@ export default function ThirdPartiesPage() {
               </td>
             </tr>
           ))}
-          {filtered.length === 0 && <tr><td colSpan={type === 'proveedor' ? 7 : 6} className="py-3 text-center text-gray-400">{type === 'proveedor' ? t('thirdParties.emptySuppliers') : t('thirdParties.emptyClients')}</td></tr>}
+          {filtered.length === 0 && <tr><td colSpan={6} className="py-3 text-center text-gray-400">{t('thirdParties.emptyClients')}</td></tr>}
         </Table>
       </Card>
+
+      {expandedId && <ClientProjects clientId={expandedId} clientName={items.find((it) => it.id === expandedId)?.name} />}
     </div>
+  );
+}
+
+// Proyectos vinculados a este cliente (Project.clientId) con el valor de su presupuesto vigente
+// (nunca un campo manual, ver thirdPartyController.getClientProjects) y el total acumulado.
+// Maneja explícitamente el caso de cero proyectos con un estado vacío en vez de una tabla en blanco.
+function ClientProjects({ clientId, clientName }) {
+  const { t } = useTranslation();
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setData(null);
+    setError('');
+    thirdPartiesApi.getProjects(clientId).then(setData).catch((err) => setError(extractError(err)));
+  }, [clientId]);
+
+  return (
+    <Card title={t('clients.projectsPanel.title', { name: clientName })}>
+      <ErrorText>{error}</ErrorText>
+      {!data && !error && <p className="text-sm text-gray-400">{t('common.loading')}</p>}
+      {data && data.count === 0 && (
+        <p className="text-sm text-gray-400 py-3 text-center">{t('clients.projectsPanel.empty')}</p>
+      )}
+      {data && data.count > 0 && (
+        <>
+          <Table columns={[t('clients.projectsPanel.table.project'), t('clients.projectsPanel.table.status'), t('clients.projectsPanel.table.value')]}>
+            {data.projects.map((p) => (
+              <tr key={p.id} className="border-b border-gray-100">
+                <td className="py-1 pr-3">{p.name}</td>
+                <td className="py-1 pr-3"><Badge color={STATUS_COLORS[p.status]}>{t(`enums.projectStatus.${p.status}`, p.status)}</Badge></td>
+                <td className="py-1 pr-3">{money(p.budgetValue)}</td>
+              </tr>
+            ))}
+          </Table>
+          <p className="text-sm font-semibold mt-3 text-right">{t('clients.projectsPanel.total', { count: data.count, amount: money(data.totalValue) })}</p>
+        </>
+      )}
+    </Card>
   );
 }

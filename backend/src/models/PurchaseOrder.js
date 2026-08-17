@@ -3,7 +3,13 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const PurchaseOrder = sequelize.define('PurchaseOrder', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
-    projectId: { type: DataTypes.UUID, allowNull: false },
+    // Opcional: una orden puede crearse desde la ficha de un proveedor sin asignarla todavía a un
+    // proyecto. Cuando sí tiene projectId, aparece en el listado de compras de ese proyecto (ver
+    // purchaseOrderController.list) exactamente igual que las creadas desde Ejecución de proyecto.
+    projectId: { type: DataTypes.UUID, allowNull: true },
+    // Consecutivo legible para el PDF/UI (no es el id interno). Se asigna en purchaseOrderService
+    // al crear la orden; las filas preexistentes se numeran una sola vez en postSyncFixups.
+    orderNumber: { type: DataTypes.INTEGER, allowNull: true },
     supplier: { type: DataTypes.STRING, allowNull: false },
     date: { type: DataTypes.DATEONLY, allowNull: false },
     status: {

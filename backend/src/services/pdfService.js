@@ -370,6 +370,202 @@ function generateBudgetWithApuAnnexPdf({ project, budget, items, apuDataById, el
   return doc;
 }
 
+// Etiquetas bilingües del PDF de orden de compra: a diferencia de los demás PDF de la app (todos
+// en español fijo), este respeta el idioma activo en la interfaz (lang: 'es'|'en'), enviado por el
+// frontend según i18n.language en el momento de exportar.
+const PO_LABELS = {
+  es: {
+    title: 'ORDEN DE COMPRA',
+    orderNumber: 'No.',
+    date: 'Fecha de emisión',
+    supplierSection: 'Datos del proveedor',
+    name: 'Razón social',
+    nit: 'NIT',
+    phone: 'Teléfono',
+    email: 'Correo',
+    address: 'Dirección',
+    projectSection: 'Proyecto asignado',
+    project: 'Proyecto',
+    client: 'Cliente',
+    noProject: 'Sin proyecto asignado',
+    itemsSection: 'Ítems',
+    code: 'Código',
+    description: 'Descripción',
+    unit: 'Unidad',
+    ordered: 'Cant. Ord.',
+    delivered: 'Cant. Ent.',
+    unitValue: 'Vr. Unit.',
+    total: 'Vr. Total',
+    subtotal: 'Subtotal',
+    tax: 'IVA',
+    taxNotApplicable: 'No se registra en esta orden',
+    grandTotal: 'TOTAL GENERAL',
+    status: 'Estado de la orden',
+    statusOpen: 'Abierta',
+    statusPartial: 'Parcial (en ejecución)',
+    statusClosed: 'Cerrada',
+    statusClosedShortage: 'Cerrada con faltantes',
+    shortageReason: 'Motivo del faltante',
+    elaborated: 'Elaboró',
+    authorized: 'Autorizó',
+    dateLabel: 'Fecha',
+  },
+  en: {
+    title: 'PURCHASE ORDER',
+    orderNumber: 'No.',
+    date: 'Issue date',
+    supplierSection: 'Supplier information',
+    name: 'Company name',
+    nit: 'Tax ID',
+    phone: 'Phone',
+    email: 'Email',
+    address: 'Address',
+    projectSection: 'Assigned project',
+    project: 'Project',
+    client: 'Client',
+    noProject: 'No project assigned',
+    itemsSection: 'Items',
+    code: 'Code',
+    description: 'Description',
+    unit: 'Unit',
+    ordered: 'Ord. Qty.',
+    delivered: 'Deliv. Qty.',
+    unitValue: 'Unit Value',
+    total: 'Total Value',
+    subtotal: 'Subtotal',
+    tax: 'Tax (VAT)',
+    taxNotApplicable: 'Not tracked on this order',
+    grandTotal: 'GRAND TOTAL',
+    status: 'Order status',
+    statusOpen: 'Open',
+    statusPartial: 'Partial (in progress)',
+    statusClosed: 'Closed',
+    statusClosedShortage: 'Closed with shortages',
+    shortageReason: 'Shortage reason',
+    elaborated: 'Prepared by',
+    authorized: 'Authorized by',
+    dateLabel: 'Date',
+  },
+};
+
+// Orden de compra: encabezado con branding + consecutivo, datos del proveedor (de Terceros si
+// está vinculada, o solo el nombre libre si no), proyecto asignado o "sin proyecto asignado" (una
+// orden puede crearse desde la ficha de un proveedor sin proyecto todavía, ver
+// purchaseOrderController.create), tabla de ítems con cantidad entregada vs. ordenada, totales,
+// estado (con motivo del faltante si aplica) y firmas. items: [{ code, name, unit, quantityOrdered,
+// delivered, unitPrice, totalValue }] (ver exportPdf en purchaseOrderController.js).
+function generatePurchaseOrderPdf({ order, items, company, lang = 'es' }) {
+  const L = PO_LABELS[lang] || PO_LABELS.es;
+  const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
+
+  if (company && company.logoPath && require('fs').existsSync(company.logoPath)) {
+    try { doc.image(company.logoPath, 50, 45, { width: 90 }); } catch (e) { /* logo ilegible: se omite */ }
+  }
+  doc.fontSize(16).font('Helvetica-Bold').text(company ? company.companyName : 'Empresa', 160, 50);
+  doc.fontSize(9).font('Helvetica').fillColor('#555')
+    .text(company?.nit ? `NIT: ${company.nit}` : '', 160, 70)
+    .text(company?.address || '', 160, 84)
+    .text(company?.phone || '', 160, 98);
+  doc.fillColor('#000');
+
+  doc.moveDown(3);
+  doc.fontSize(18).font('Helvetica-Bold').text(L.title, { align: 'center' });
+  doc.moveDown(0.2);
+  doc.fontSize(10).font('Helvetica').fillColor('#555').text(
+    `${L.orderNumber} ${order.orderNumber || '-'}   |   ${L.date}: ${order.date}`,
+    { align: 'center' }
+  );
+  doc.fillColor('#000');
+  doc.moveDown(1);
+
+  sectionTitle(doc, L.supplierSection);
+  const supplierParty = order.supplierParty;
+  doc.text(`${L.name}: ${supplierParty?.name || order.supplier}`);
+  doc.text(`${L.nit}: ${supplierParty?.nit || '-'}`);
+  doc.text(`${L.phone}: ${supplierParty?.phone || '-'}`);
+  doc.text(`${L.email}: ${supplierParty?.email || '-'}`);
+  doc.text(`${L.address}: ${supplierParty?.address || '-'}`);
+
+  sectionTitle(doc, L.projectSection);
+  if (order.Project) {
+    doc.text(`${L.project}: ${order.Project.name}`);
+    doc.text(`${L.client}: ${order.Project.client || '-'}`);
+  } else {
+    doc.text(L.noProject);
+  }
+
+  sectionTitle(doc, L.itemsSection);
+  const tableTop = doc.y + 5;
+  const colX = { code: 50, desc: 95, unit: 245, ordered: 292, delivered: 345, unitValue: 405, total: 475 };
+  doc.font('Helvetica-Bold').fontSize(8);
+  doc.text(L.code, colX.code, tableTop, { width: 43 });
+  doc.text(L.description, colX.desc, tableTop, { width: 148 });
+  doc.text(L.unit, colX.unit, tableTop, { width: 45 });
+  doc.text(L.ordered, colX.ordered, tableTop, { width: 51 });
+  doc.text(L.delivered, colX.delivered, tableTop, { width: 58 });
+  doc.text(L.unitValue, colX.unitValue, tableTop, { width: 68 });
+  doc.text(L.total, colX.total, tableTop, { width: 70 });
+  doc.moveTo(50, tableTop + 14).lineTo(545, tableTop + 14).stroke();
+
+  let y = tableTop + 20;
+  doc.font('Helvetica').fontSize(8);
+  let subtotal = 0;
+  items.forEach((item) => {
+    if (y > 700) { doc.addPage(); y = 50; }
+    doc.text(item.code || '-', colX.code, y, { width: 43 });
+    doc.text(item.name, colX.desc, y, { width: 148 });
+    doc.text(item.unit, colX.unit, y, { width: 45 });
+    doc.text(String(Number(item.quantityOrdered)), colX.ordered, y, { width: 51 });
+    doc.text(String(Number(item.delivered || 0)), colX.delivered, y, { width: 58 });
+    doc.text(money(item.unitPrice), colX.unitValue, y, { width: 68 });
+    doc.text(money(item.totalValue), colX.total, y, { width: 70 });
+    subtotal += Number(item.totalValue);
+    y += 18;
+  });
+
+  y += 8;
+  doc.moveTo(350, y).lineTo(545, y).stroke();
+  y += 8;
+  doc.fontSize(9).font('Helvetica').text(`${L.subtotal}: ${money(subtotal)}`, 300, y, { align: 'right', width: 245 });
+  y += 16;
+  doc.text(`${L.tax}: ${L.taxNotApplicable}`, 300, y, { align: 'right', width: 245 });
+  y += 16;
+  doc.font('Helvetica-Bold').fontSize(11).text(`${L.grandTotal}: ${money(subtotal)}`, 300, y, { align: 'right', width: 245 });
+  y += 30;
+
+  doc.y = y;
+  sectionTitle(doc, L.status);
+  const STATUS_LABEL = {
+    abierta: L.statusOpen,
+    parcial: L.statusPartial,
+    cerrada: L.statusClosed,
+    cerrada_con_faltantes: L.statusClosedShortage,
+  };
+  doc.text(STATUS_LABEL[order.status] || order.status);
+  if (order.status === 'cerrada_con_faltantes' && order.closureReason) {
+    doc.text(`${L.shortageReason}: ${order.closureReason}`);
+  }
+
+  doc.moveDown(2);
+  if (doc.y > 680) { doc.addPage(); doc.y = 50; }
+  let sigY = doc.y + 10;
+  doc.font('Helvetica-Bold').fontSize(9);
+  doc.text(L.elaborated, 50, sigY, { width: 220 });
+  doc.text(L.authorized, 320, sigY, { width: 220 });
+  sigY += 30;
+  doc.font('Helvetica').fontSize(9);
+  doc.text('_______________________', 50, sigY, { width: 220 });
+  doc.text('_______________________', 320, sigY, { width: 220 });
+  sigY += 16;
+  doc.fontSize(8).fillColor('#555');
+  doc.text(`${L.dateLabel}: ______________`, 50, sigY, { width: 220 });
+  doc.text(`${L.dateLabel}: ______________`, 320, sigY, { width: 220 });
+  doc.fillColor('#000');
+
+  doc.end();
+  return doc;
+}
+
 module.exports = {
-  generateProjectReportPdf, generateQuotationPdf, generateApuPdf, generateBudgetWithApuAnnexPdf, money,
+  generateProjectReportPdf, generateQuotationPdf, generateApuPdf, generateBudgetWithApuAnnexPdf, generatePurchaseOrderPdf, money,
 };

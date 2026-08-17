@@ -8,7 +8,7 @@ import Can from './Can';
 import Logo from './Logo';
 import LanguageSwitcher from './LanguageSwitcher';
 import {
-  ProjectsIcon, QuotationsIcon, PriceBookIcon, ApuIcon, ThirdPartiesIcon, InventoryIcon, AdminIcon,
+  ProjectsIcon, QuotationsIcon, PriceBookIcon, ApuIcon, SuppliersIcon, ThirdPartiesIcon, InventoryIcon, AdminIcon,
   MenuIcon, LogoutIcon,
 } from './NavIcons';
 
@@ -49,7 +49,8 @@ export default function Layout() {
     { to: '/quotations', label: t('nav.quotations'), icon: <QuotationsIcon /> },
     { to: '/price-book', label: t('nav.priceBook'), icon: <PriceBookIcon /> },
     { to: '/apus', label: t('nav.apu'), icon: <ApuIcon /> },
-    { to: '/third-parties', label: t('nav.thirdParties'), icon: <ThirdPartiesIcon /> },
+    { to: '/suppliers', label: t('nav.suppliers'), icon: <SuppliersIcon /> },
+    { to: '/clients', label: t('nav.clients'), icon: <ThirdPartiesIcon /> },
   ];
 
   // La moneda es una configuración del negocio (independiente del idioma de la interfaz): se

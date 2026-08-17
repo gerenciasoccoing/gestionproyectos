@@ -132,6 +132,16 @@ async function getCurrentBudgetForProject(projectId) {
   });
 }
 
+// Valor total del presupuesto vigente de un proyecto (suma de totalCost de sus ítems, que ya
+// incluye el AIU aplicado — ver resolveBudgetItemFields). 0 si el proyecto aún no tiene
+// presupuesto. Usado para mostrar "valor del proyecto" en la ficha de Clientes: se toma siempre
+// del presupuesto ya registrado, nunca de un campo manual aparte.
+async function getProjectBudgetTotal(projectId) {
+  const budget = await getCurrentBudgetForProject(projectId);
+  if (!budget) return 0;
+  return budget.items.reduce((sum, item) => sum + Number(item.totalCost), 0);
+}
+
 // Devuelve los ítems de presupuesto del proyecto con avance acumulado, % y valor ejecutado calculados.
 async function getBudgetItemsWithProgress(projectId) {
   const budget = await getCurrentBudgetForProject(projectId);
@@ -203,5 +213,5 @@ async function updateBudgetItemQuantity(item, quantity) {
 
 module.exports = {
   computeApuUnitCost, computeSectionCosts, laborBreakdown, recomputeAndPersistApuCost, recomputeApuCostsForPriceItems,
-  applyBudgetAiu, getCurrentBudgetForProject, getBudgetItemsWithProgress, resolveBudgetItemFields, updateBudgetItemQuantity,
+  applyBudgetAiu, getCurrentBudgetForProject, getProjectBudgetTotal, getBudgetItemsWithProgress, resolveBudgetItemFields, updateBudgetItemQuantity,
 };

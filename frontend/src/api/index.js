@@ -129,6 +129,23 @@ export const thirdPartiesApi = {
   update: (id, formData) => client.put(`/third-parties/${id}`, formData).then((r) => r.data),
   remove: (id) => client.delete(`/third-parties/${id}`),
   scanRut: (formData) => client.post('/third-parties/scan-rut', formData).then((r) => r.data),
+  // Proyectos vinculados a un cliente (Project.clientId), con el valor de su presupuesto vigente
+  // y el total acumulado — ver thirdPartyController.getClientProjects en el backend.
+  getProjects: (id) => client.get(`/third-parties/${id}/projects`).then((r) => r.data),
+};
+
+// Órdenes de compra creadas desde la ficha de un proveedor (proyecto opcional), mismo modelo y
+// misma lógica de negocio que purchaseOrdersApi (ver backend/purchaseOrderController.js) — solo
+// cambia el punto de entrada: /purchase-orders en vez de /projects/:id/purchase-orders. Una orden
+// creada aquí con projectId aparece automáticamente en el listado de ese proyecto en Ejecución.
+export const supplierPurchaseOrdersApi = {
+  list: (supplierId) => client.get('/purchase-orders', { params: { supplierId } }).then((r) => r.data),
+  get: (id) => client.get(`/purchase-orders/${id}`).then((r) => r.data),
+  create: (data) => client.post('/purchase-orders', data).then((r) => r.data),
+  updateItem: (id, itemId, data) => client.put(`/purchase-orders/${id}/items/${itemId}`, data).then((r) => r.data),
+  convertToExpense: (id, data) => client.post(`/purchase-orders/${id}/convert-to-expense`, data).then((r) => r.data),
+  addReceipt: (id, itemId, data) => client.post(`/purchase-orders/${id}/items/${itemId}/receipts`, data).then((r) => r.data),
+  close: (id, closureReason) => client.post(`/purchase-orders/${id}/close`, { closureReason }).then((r) => r.data),
 };
 
 export const inventoryItemsApi = {

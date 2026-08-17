@@ -26,7 +26,8 @@ import QuotationDetailPage from './pages/quotations/QuotationDetailPage';
 import PriceBookPage from './pages/quotations/PriceBookPage';
 import ApuPage from './pages/quotations/ApuPage';
 
-import ThirdPartiesPage from './pages/thirdparties/ThirdPartiesPage';
+import SuppliersPage from './pages/thirdparties/SuppliersPage';
+import ClientsPage from './pages/thirdparties/ClientsPage';
 
 import InventoryLayout from './pages/inventory/InventoryLayout';
 import InventoryCatalogPage from './pages/inventory/InventoryCatalogPage';
@@ -51,7 +52,9 @@ export default function App() {
         <Route path="quotations/:id" element={<QuotationDetailPage />} />
         <Route path="price-book" element={<PriceBookPage />} />
         <Route path="apus" element={<ApuPage />} />
-        <Route path="third-parties" element={<ThirdPartiesPage />} />
+        <Route path="suppliers" element={<SuppliersPage />} />
+        <Route path="clients" element={<ClientsPage />} />
+        <Route path="third-parties" element={<Navigate to="/suppliers" replace />} />
 
         <Route path="inventory" element={<ProtectedRoute module="inventario" action="view"><InventoryLayout /></ProtectedRoute>}>
           <Route index element={<Navigate to="catalog" replace />} />

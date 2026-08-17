@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { purchaseOrdersApi, budgetApi, thirdPartiesApi } from '../../api';
 import { Card, Button, Input, Select, SearchSelect, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
+import { purchaseOrderPdfUrl } from '../../api/client';
 import Can from '../../components/Can';
 
 const STATUS_COLORS = {
@@ -15,7 +16,7 @@ const STATUS_COLORS = {
 const CATEGORIES = ['mano_obra', 'materiales', 'equipos', 'viaticos', 'imprevistos'];
 
 export default function PurchaseOrdersPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { projectId } = useOutletContext();
   const [orders, setOrders] = useState([]);
   const [budgetItems, setBudgetItems] = useState([]);
@@ -123,8 +124,11 @@ export default function PurchaseOrdersPage() {
               <td className="py-2 pr-3"><Badge color={STATUS_COLORS[o.status]}>{t(`execution.purchaseOrders.status.${o.status}`, o.status)}</Badge></td>
               <td className="py-2 pr-3">{o.items?.length || 0}</td>
               <td className="py-2 pr-3">{o.expenseId ? <Badge color="green">{t('execution.purchaseOrders.transferred')}</Badge> : <span className="text-gray-400 text-xs">-</span>}</td>
-              <td className="py-2 pr-3 text-right">
-                <Button variant="secondary" onClick={() => setExpandedId(expandedId === o.id ? null : o.id)}>
+              <td className="py-2 pr-3 text-right whitespace-nowrap">
+                <Button variant="secondary" onClick={() => window.open(purchaseOrderPdfUrl(o.id, i18n.language), '_blank')}>
+                  {t('suppliers.orders.pdf')}
+                </Button>
+                <Button variant="secondary" className="ml-2" onClick={() => setExpandedId(expandedId === o.id ? null : o.id)}>
                   {expandedId === o.id ? t('common.close') : t('execution.purchaseOrders.detail')}
                 </Button>
               </td>

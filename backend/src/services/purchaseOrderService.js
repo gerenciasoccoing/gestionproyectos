@@ -26,6 +26,14 @@ async function isOrderFullyDelivered(purchaseOrderId) {
   return items.every((i) => i.pending <= 0);
 }
 
+// Consecutivo legible de la orden (para UI/PDF, distinto del id interno). Se calcula dentro de la
+// misma transacción de creación; el riesgo de colisión entre dos creaciones simultáneas es
+// aceptable para un consecutivo de exhibición (no es una clave de negocio con restricción única).
+async function nextOrderNumber(transaction) {
+  const max = await PurchaseOrder.max('orderNumber', { transaction });
+  return (max || 0) + 1;
+}
+
 // Reporte consolidado de compras (materiales) por proyecto y rango de fechas opcional,
 // basado en la fecha de cada recepción.
 async function getPurchaseReport(projectId, { from, to } = {}) {
@@ -71,5 +79,5 @@ async function getPurchaseReport(projectId, { from, to } = {}) {
 }
 
 module.exports = {
-  getItemWithDelivery, getOrderItemsWithDelivery, isOrderFullyDelivered, getPurchaseReport,
+  getItemWithDelivery, getOrderItemsWithDelivery, isOrderFullyDelivered, getPurchaseReport, nextOrderNumber,
 };

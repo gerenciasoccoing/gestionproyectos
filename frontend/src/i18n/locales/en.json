@@ -39,6 +39,8 @@
     "priceBook": "Price Book",
     "apu": "Unit Price Analysis",
     "thirdParties": "Suppliers and Clients",
+    "suppliers": "Suppliers",
+    "clients": "Clients",
     "inventory": "Inventory",
     "admin": "Administration",
     "logout": "Log out",
@@ -597,6 +599,36 @@
     "emptyClients": "No clients registered.",
     "duplicateNitSupplier": "A supplier is already registered with this Tax ID: \"{{name}}\". Verify it's not a duplicate.",
     "duplicateNitClient": "A client is already registered with this Tax ID: \"{{name}}\". Verify it's not a duplicate."
+  },
+  "suppliers": {
+    "orders": {
+      "toggle": "Purchase orders",
+      "title": "Purchase orders: {{name}}",
+      "newOrder": "+ New purchase order",
+      "assignProject": "Assign to project (optional)",
+      "noProjectPlaceholder": "-- no project --",
+      "noProject": "No project assigned",
+      "noProjectNote": "This order has no project assigned: deliveries can't be registered and it can't be transferred to expenses until you assign one. You can still close it (complete or with shortages).",
+      "pdf": "PDF",
+      "table": {
+        "number": "No.",
+        "project": "Project"
+      },
+      "empty": "This supplier has no purchase orders yet."
+    }
+  },
+  "clients": {
+    "projectsPanel": {
+      "toggle": "Projects",
+      "title": "Projects for {{name}}",
+      "empty": "This client has no projects registered yet.",
+      "table": {
+        "project": "Project",
+        "status": "Status",
+        "value": "Value (budget)"
+      },
+      "total": "{{count}} project(s) — Total value: {{amount}}"
+    }
   },
   "inventory": {
     "title": "Inventory",

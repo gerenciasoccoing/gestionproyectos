@@ -49,6 +49,17 @@ export function ThirdPartiesIcon(props) {
   );
 }
 
+export function SuppliersIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" {...common} {...props}>
+      <path d="M2.5 7h11v9h-11z" />
+      <path d="M13.5 10.5h4l3 3.5v2h-7z" />
+      <circle cx="6.5" cy="18.5" r="1.5" />
+      <circle cx="16.5" cy="18.5" r="1.5" />
+    </svg>
+  );
+}
+
 export function InventoryIcon(props) {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" {...common} {...props}>

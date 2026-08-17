@@ -34,6 +34,19 @@ export function fileUrl(relativePath) {
   return `${base}/api/files/${relativePath}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
 }
 
+// URL del PDF de una orden de compra (endpoint global /purchase-orders/:id/pdf, funciona tenga o
+// no proyecto asignado la orden — ver backend/purchaseOrderController.js#exportPdf). lang sigue el
+// idioma activo de la interfaz para que el PDF salga en el mismo idioma.
+export function purchaseOrderPdfUrl(id, lang) {
+  if (!id) return null;
+  const base = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+  const token = localStorage.getItem('token');
+  const params = new URLSearchParams();
+  if (token) params.set('token', token);
+  if (lang) params.set('lang', lang);
+  return `${base}/purchase-orders/${id}/pdf?${params.toString()}`;
+}
+
 // Descarga un archivo protegido (requiere token) e inicia la descarga en el navegador.
 export async function downloadProtectedFile(relativePath, filename) {
   const res = await client.get(`/files/${relativePath}`, { responseType: 'blob' });

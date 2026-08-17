@@ -12,6 +12,7 @@ router.use('/third-parties', require('./thirdPartyRoutes'));
 router.use('/inventory-items', require('./inventoryItemRoutes'));
 router.use('/inventory-checkouts', require('./inventoryCheckoutRoutes'));
 router.use('/inventory-confirmations', require('./inventoryConfirmationRoutes'));
+router.use('/purchase-orders', require('./globalPurchaseOrderRoutes'));
 
 router.use('/projects', require('./projectRoutes'));
 router.use('/projects/:projectId/contracts', require('./contractRoutes'));
