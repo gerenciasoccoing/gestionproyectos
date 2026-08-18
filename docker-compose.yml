@@ -26,6 +26,7 @@ services:
       CORS_ORIGIN: "*"
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD}
+      PLATFORM_ADMIN_SECRET: ${PLATFORM_ADMIN_SECRET}
     volumes:
       - uploads_data:/app/uploads
     depends_on:
