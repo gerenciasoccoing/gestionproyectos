@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { User, Role, Project, ProjectUser } = require('../models');
+const { assertWithinLimit } = require('../utils/planLimits');
 
 const list = asyncHandler(async (req, res) => {
   const users = await User.findAll({
@@ -14,6 +15,8 @@ const list = asyncHandler(async (req, res) => {
 const create = asyncHandler(async (req, res) => {
   const { name, email, password, roleIds = [] } = req.body;
   if (!name || !email || !password) throw new ApiError(400, 'name, email y password son obligatorios');
+
+  await assertWithinLimit(User, 'maxUsers');
 
   const passwordHash = await bcrypt.hash(password, 10);
   const user = await User.create({ name, email, passwordHash });

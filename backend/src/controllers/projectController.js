@@ -2,6 +2,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { Project, User, ProjectUser } = require('../models');
 const { deleteProjectCascade } = require('../services/projectDeletionService');
+const { assertWithinLimit } = require('../utils/planLimits');
 
 const list = asyncHandler(async (req, res) => {
   const where = req.user.isAdmin ? {} : { id: req.user.projectIds };
@@ -24,6 +25,8 @@ const get = asyncHandler(async (req, res) => {
 const create = asyncHandler(async (req, res) => {
   const { name, client, clientId, description, userIds = [] } = req.body;
   if (!name) throw new ApiError(400, 'El nombre del proyecto es obligatorio');
+
+  await assertWithinLimit(Project, 'maxActiveProjects', { status: 'activo' });
 
   const project = await Project.create({
     name, client, clientId: clientId || null, description, origin: 'manual', createdBy: req.user.id,

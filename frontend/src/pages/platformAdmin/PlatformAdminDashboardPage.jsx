@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { platformAdminApi } from '../../api';
 import { Card, Table, Badge, Button, Input, ErrorText, extractError, formatDate } from '../../components/ui';
@@ -9,9 +9,11 @@ const emptyForm = {
   adminName: '', adminEmail: '', adminPassword: '',
 };
 
-// Panel de super-admin: lista de empresas (tenants), activar/desactivar acceso, y alta de empresas
-// nuevas. No usa ProtectedRoute (esa es para usuarios de empresa) — la sesión de operador se valida
-// contra el backend en cada carga; si no hay token o expiró, platformAdminClient redirige solo.
+// Panel de super-admin: lista de empresas (tenants), activar/desactivar acceso, alta de empresas
+// nuevas y edición del plan (esqueleto de planes/límites — ver Company.js: planTier es una
+// etiqueta libre, maxUsers/maxActiveProjects son topes blandos, vacío = sin límite). No usa
+// ProtectedRoute (esa es para usuarios de empresa) — la sesión de operador se valida contra el
+// backend en cada carga; si no hay token o expiró, platformAdminClient redirige solo.
 export default function PlatformAdminDashboardPage() {
   const navigate = useNavigate();
   const [companies, setCompanies] = useState(null);
@@ -20,6 +22,11 @@ export default function PlatformAdminDashboardPage() {
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const [editingPlanId, setEditingPlanId] = useState(null);
+  const [planForm, setPlanForm] = useState({ planTier: '', maxUsers: '', maxActiveProjects: '' });
+  const [planError, setPlanError] = useState('');
+  const [savingPlan, setSavingPlan] = useState(false);
 
   const load = () => {
     platformAdminApi.listCompanies().then(setCompanies).catch((err) => setError(extractError(err)));
@@ -60,6 +67,36 @@ export default function PlatformAdminDashboardPage() {
     }
   };
 
+  const startEditPlan = (company) => {
+    setEditingPlanId(company.id);
+    setPlanError('');
+    setPlanForm({
+      planTier: company.planTier || '',
+      maxUsers: company.maxUsers ?? '',
+      maxActiveProjects: company.maxActiveProjects ?? '',
+    });
+  };
+
+  const setPlanField = (field) => (e) => setPlanForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const submitPlan = async (companyId) => {
+    setSavingPlan(true);
+    setPlanError('');
+    try {
+      await platformAdminApi.updateCompanyPlan(companyId, {
+        planTier: planForm.planTier,
+        maxUsers: planForm.maxUsers === '' ? null : Number(planForm.maxUsers),
+        maxActiveProjects: planForm.maxActiveProjects === '' ? null : Number(planForm.maxActiveProjects),
+      });
+      setEditingPlanId(null);
+      load();
+    } catch (err) {
+      setPlanError(extractError(err));
+    } finally {
+      setSavingPlan(false);
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('platformAdminToken');
     navigate('/platform-admin/login');
@@ -67,7 +104,7 @@ export default function PlatformAdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <Logo size={32} />
@@ -105,25 +142,58 @@ export default function PlatformAdminDashboardPage() {
           {!companies ? (
             <p className="text-sm text-gray-500">Cargando…</p>
           ) : (
-            <Table columns={['Empresa', 'Usuarios', 'Plan', 'Creada', 'Estado', '']}>
+            <Table columns={['Empresa', 'Usuarios', 'Proyectos activos', 'Plan', 'Creada', 'Estado', '']}>
               {companies.map((c) => (
-                <tr key={c.id} className="border-b border-gray-50">
-                  <td className="py-2 pr-3">
-                    <div className="font-medium text-gray-900">{c.companyName}</div>
-                    {c.contactEmail && <div className="text-xs text-gray-500">{c.contactEmail}</div>}
-                  </td>
-                  <td className="py-2 pr-3">{c.userCount}{c.maxUsers ? ` / ${c.maxUsers}` : ''}</td>
-                  <td className="py-2 pr-3">{c.planTier}</td>
-                  <td className="py-2 pr-3">{formatDate(c.createdAt)}</td>
-                  <td className="py-2 pr-3">
-                    <Badge color={c.active ? 'green' : 'red'}>{c.active ? 'Activa' : 'Inactiva'}</Badge>
-                  </td>
-                  <td className="py-2 pr-3">
-                    <Button type="button" variant="secondary" onClick={() => toggleActive(c)}>
-                      {c.active ? 'Desactivar' : 'Activar'}
-                    </Button>
-                  </td>
-                </tr>
+                <Fragment key={c.id}>
+                  <tr className="border-b border-gray-50">
+                    <td className="py-2 pr-3">
+                      <div className="font-medium text-gray-900">{c.companyName}</div>
+                      {c.contactEmail && <div className="text-xs text-gray-500">{c.contactEmail}</div>}
+                    </td>
+                    <td className="py-2 pr-3">{c.userCount}{c.maxUsers ? ` / ${c.maxUsers}` : ''}</td>
+                    <td className="py-2 pr-3">{c.activeProjectCount}{c.maxActiveProjects ? ` / ${c.maxActiveProjects}` : ''}</td>
+                    <td className="py-2 pr-3">{c.planTier}</td>
+                    <td className="py-2 pr-3">{formatDate(c.createdAt)}</td>
+                    <td className="py-2 pr-3">
+                      <Badge color={c.active ? 'green' : 'red'}>{c.active ? 'Activa' : 'Inactiva'}</Badge>
+                    </td>
+                    <td className="py-2 pr-3 flex gap-2">
+                      <Button type="button" variant="secondary" onClick={() => toggleActive(c)}>
+                        {c.active ? 'Desactivar' : 'Activar'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => (editingPlanId === c.id ? setEditingPlanId(null) : startEditPlan(c))}
+                      >
+                        {editingPlanId === c.id ? 'Cancelar' : 'Editar plan'}
+                      </Button>
+                    </td>
+                  </tr>
+                  {editingPlanId === c.id && (
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <td colSpan={7} className="py-3 px-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                          <Input label="Plan" value={planForm.planTier} onChange={setPlanField('planTier')} />
+                          <Input
+                            label="Máx. usuarios (vacío = sin límite)"
+                            type="number" min="0"
+                            value={planForm.maxUsers} onChange={setPlanField('maxUsers')}
+                          />
+                          <Input
+                            label="Máx. proyectos activos (vacío = sin límite)"
+                            type="number" min="0"
+                            value={planForm.maxActiveProjects} onChange={setPlanField('maxActiveProjects')}
+                          />
+                          <Button type="button" onClick={() => submitPlan(c.id)} disabled={savingPlan}>
+                            {savingPlan ? 'Guardando…' : 'Guardar'}
+                          </Button>
+                        </div>
+                        {planError && <ErrorText>{planError}</ErrorText>}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </Table>
           )}

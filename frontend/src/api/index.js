@@ -12,6 +12,7 @@ export const platformAdminApi = {
   listCompanies: () => platformAdminClient.get('/platform-admin/companies').then((r) => r.data),
   createCompany: (data) => platformAdminClient.post('/platform-admin/companies', data).then((r) => r.data),
   setCompanyStatus: (id, active) => platformAdminClient.patch(`/platform-admin/companies/${id}/status`, { active }).then((r) => r.data),
+  updateCompanyPlan: (id, data) => platformAdminClient.patch(`/platform-admin/companies/${id}/plan`, data).then((r) => r.data),
 };
 
 export const usersApi = {

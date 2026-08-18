@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { PlatformAdmin, Company, User } = require('../models');
+const { PlatformAdmin, Company, User, Project } = require('../models');
 const { provisionCompany } = require('../services/companyProvisioningService');
 
 function signToken(admin) {
@@ -37,6 +37,15 @@ const listCompanies = asyncHandler(async (req, res) => {
   });
   const countByCompany = Object.fromEntries(userCounts.map((r) => [r.companyId, Number(r.count)]));
 
+  const activeProjectCounts = await Project.findAll({
+    attributes: ['companyId', [Project.sequelize.fn('COUNT', Project.sequelize.col('id')), 'count']],
+    where: { status: 'activo' },
+    group: ['companyId'],
+    hooks: false,
+    raw: true,
+  });
+  const activeProjectCountByCompany = Object.fromEntries(activeProjectCounts.map((r) => [r.companyId, Number(r.count)]));
+
   res.json(companies.map((c) => ({
     id: c.id,
     companyName: c.companyName,
@@ -47,6 +56,7 @@ const listCompanies = asyncHandler(async (req, res) => {
     maxUsers: c.maxUsers,
     maxActiveProjects: c.maxActiveProjects,
     userCount: countByCompany[c.id] || 0,
+    activeProjectCount: activeProjectCountByCompany[c.id] || 0,
     createdAt: c.createdAt,
   })));
 });
@@ -75,4 +85,34 @@ const setCompanyStatus = asyncHandler(async (req, res) => {
   res.json({ id: company.id, companyName: company.companyName, active: company.active });
 });
 
-module.exports = { login, listCompanies, createCompany, setCompanyStatus };
+// Esqueleto de planes/límites (ver diseño multi-tenant): sin cobro ni enforcement duro todavía,
+// solo el tope blando que aplican userController.create/projectController.create (ver esos
+// archivos) contra maxUsers/maxActiveProjects. planTier es hoy una simple etiqueta libre — no hay
+// catálogo de planes fijo ni lógica que dependa de su valor.
+const updateCompanyPlan = asyncHandler(async (req, res) => {
+  const { planTier, maxUsers, maxActiveProjects } = req.body;
+
+  const company = await Company.findByPk(req.params.id, { hooks: false });
+  if (!company) throw new ApiError(404, 'Empresa no encontrada');
+
+  const updates = {};
+  if (planTier !== undefined) updates.planTier = planTier;
+  if (maxUsers !== undefined) updates.maxUsers = maxUsers === null || maxUsers === '' ? null : Number(maxUsers);
+  if (maxActiveProjects !== undefined) {
+    updates.maxActiveProjects = maxActiveProjects === null || maxActiveProjects === '' ? null : Number(maxActiveProjects);
+  }
+  if (Object.values(updates).some((v) => v !== null && Number.isNaN(v))) {
+    throw new ApiError(400, 'maxUsers y maxActiveProjects deben ser números o vacíos (sin límite)');
+  }
+
+  await company.update(updates);
+  res.json({
+    id: company.id,
+    companyName: company.companyName,
+    planTier: company.planTier,
+    maxUsers: company.maxUsers,
+    maxActiveProjects: company.maxActiveProjects,
+  });
+});
+
+module.exports = { login, listCompanies, createCompany, setCompanyStatus, updateCompanyPlan };
