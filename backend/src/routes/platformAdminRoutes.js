@@ -1,7 +1,10 @@
 const router = require('express').Router();
-const { requirePlatformSecret } = require('../middleware/platformAdminAuth');
+const { authenticatePlatformAdmin } = require('../middleware/platformAdminAuth');
 const platformAdminController = require('../controllers/platformAdminController');
 
-router.post('/companies', requirePlatformSecret, platformAdminController.createCompany);
+router.post('/login', platformAdminController.login);
+router.get('/companies', authenticatePlatformAdmin, platformAdminController.listCompanies);
+router.post('/companies', authenticatePlatformAdmin, platformAdminController.createCompany);
+router.patch('/companies/:id/status', authenticatePlatformAdmin, platformAdminController.setCompanyStatus);
 
 module.exports = router;

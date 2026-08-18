@@ -31,6 +31,33 @@ client.interceptors.response.use(
 
 export default client;
 
+// Instancia aparte para el panel de super-admin (ver PlatformAdminLoginPage/DashboardPage): usa su
+// propia clave de localStorage ('platformAdminToken', nunca 'token') y su propio manejo de 401, así
+// que iniciar sesión como operador nunca pisa ni se confunde con una sesión de usuario de empresa
+// abierta en la misma pestaña.
+export const platformAdminClient = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:4000/api',
+});
+
+platformAdminClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('platformAdminToken');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+platformAdminClient.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401 && err.config?.url !== '/platform-admin/login') {
+      localStorage.removeItem('platformAdminToken');
+      if (!window.location.pathname.includes('/platform-admin/login')) {
+        window.location.href = '/platform-admin/login';
+      }
+    }
+    return Promise.reject(err);
+  }
+);
+
 // URL para incrustar directamente en <img>/<a> (incluye el token por query string, ver backend/src/middleware/auth.js).
 export function fileUrl(relativePath) {
   if (!relativePath) return null;

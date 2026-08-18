@@ -1,0 +1,134 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { platformAdminApi } from '../../api';
+import { Card, Table, Badge, Button, Input, ErrorText, extractError, formatDate } from '../../components/ui';
+import Logo from '../../components/Logo';
+
+const emptyForm = {
+  companyName: '', nit: '', address: '', phone: '', contactEmail: '',
+  adminName: '', adminEmail: '', adminPassword: '',
+};
+
+// Panel de super-admin: lista de empresas (tenants), activar/desactivar acceso, y alta de empresas
+// nuevas. No usa ProtectedRoute (esa es para usuarios de empresa) — la sesión de operador se valida
+// contra el backend en cada carga; si no hay token o expiró, platformAdminClient redirige solo.
+export default function PlatformAdminDashboardPage() {
+  const navigate = useNavigate();
+  const [companies, setCompanies] = useState(null);
+  const [error, setError] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [formError, setFormError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const load = () => {
+    platformAdminApi.listCompanies().then(setCompanies).catch((err) => setError(extractError(err)));
+  };
+
+  useEffect(() => {
+    if (!localStorage.getItem('platformAdminToken')) {
+      navigate('/platform-admin/login');
+      return;
+    }
+    load();
+  }, []);
+
+  const toggleActive = async (company) => {
+    try {
+      await platformAdminApi.setCompanyStatus(company.id, !company.active);
+      load();
+    } catch (err) {
+      setError(extractError(err));
+    }
+  };
+
+  const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const submitCreate = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setFormError('');
+    try {
+      await platformAdminApi.createCompany(form);
+      setForm(emptyForm);
+      setShowForm(false);
+      load();
+    } catch (err) {
+      setFormError(extractError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('platformAdminToken');
+    navigate('/platform-admin/login');
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <Logo size={32} />
+            <h1 className="text-lg font-semibold text-gray-900">Panel de operador — Empresas</h1>
+          </div>
+          <Button type="button" variant="secondary" onClick={logout}>Salir</Button>
+        </div>
+
+        {error && <ErrorText>{error}</ErrorText>}
+
+        <Card
+          title="Empresas registradas"
+          actions={<Button type="button" onClick={() => setShowForm((v) => !v)}>{showForm ? 'Cancelar' : '+ Nueva empresa'}</Button>}
+        >
+          {showForm && (
+            <form onSubmit={submitCreate} className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 pb-6 border-b border-gray-100">
+              <Input label="Nombre de la empresa" value={form.companyName} onChange={set('companyName')} required />
+              <Input label="NIT" value={form.nit} onChange={set('nit')} />
+              <Input label="Dirección" value={form.address} onChange={set('address')} />
+              <Input label="Teléfono" value={form.phone} onChange={set('phone')} />
+              <Input label="Correo de contacto" type="email" value={form.contactEmail} onChange={set('contactEmail')} />
+              <div />
+              <Input label="Nombre del administrador" value={form.adminName} onChange={set('adminName')} required />
+              <Input label="Correo del administrador" type="email" value={form.adminEmail} onChange={set('adminEmail')} required />
+              <Input label="Contraseña inicial" type="password" value={form.adminPassword} onChange={set('adminPassword')} required minLength={8} />
+
+              {formError && <div className="sm:col-span-2"><ErrorText>{formError}</ErrorText></div>}
+
+              <div className="sm:col-span-2">
+                <Button type="submit" disabled={saving}>{saving ? 'Creando…' : 'Crear empresa'}</Button>
+              </div>
+            </form>
+          )}
+
+          {!companies ? (
+            <p className="text-sm text-gray-500">Cargando…</p>
+          ) : (
+            <Table columns={['Empresa', 'Usuarios', 'Plan', 'Creada', 'Estado', '']}>
+              {companies.map((c) => (
+                <tr key={c.id} className="border-b border-gray-50">
+                  <td className="py-2 pr-3">
+                    <div className="font-medium text-gray-900">{c.companyName}</div>
+                    {c.contactEmail && <div className="text-xs text-gray-500">{c.contactEmail}</div>}
+                  </td>
+                  <td className="py-2 pr-3">{c.userCount}{c.maxUsers ? ` / ${c.maxUsers}` : ''}</td>
+                  <td className="py-2 pr-3">{c.planTier}</td>
+                  <td className="py-2 pr-3">{formatDate(c.createdAt)}</td>
+                  <td className="py-2 pr-3">
+                    <Badge color={c.active ? 'green' : 'red'}>{c.active ? 'Activa' : 'Inactiva'}</Badge>
+                  </td>
+                  <td className="py-2 pr-3">
+                    <Button type="button" variant="secondary" onClick={() => toggleActive(c)}>
+                      {c.active ? 'Desactivar' : 'Activar'}
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </Table>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}

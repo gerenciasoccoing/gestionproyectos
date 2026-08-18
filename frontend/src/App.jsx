@@ -3,7 +3,8 @@ import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import ConfirmationPage from './pages/public/ConfirmationPage';
-import RegisterCompanyPage from './pages/public/RegisterCompanyPage';
+import PlatformAdminLoginPage from './pages/platformAdmin/PlatformAdminLoginPage';
+import PlatformAdminDashboardPage from './pages/platformAdmin/PlatformAdminDashboardPage';
 import ProjectsListPage from './pages/ProjectsListPage';
 import ProjectLayout from './pages/ProjectLayout';
 
@@ -47,7 +48,8 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/confirm/:token" element={<ConfirmationPage />} />
-      <Route path="/register-company" element={<RegisterCompanyPage />} />
+      <Route path="/platform-admin/login" element={<PlatformAdminLoginPage />} />
+      <Route path="/platform-admin" element={<PlatformAdminDashboardPage />} />
 
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<ProjectsListPage />} />

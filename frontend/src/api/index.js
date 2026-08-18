@@ -1,16 +1,17 @@
-import client, { postAndDownload } from './client';
+import client, { postAndDownload, platformAdminClient } from './client';
 
 export const authApi = {
   login: (email, password) => client.post('/auth/login', { email, password }).then((r) => r.data),
   me: () => client.get('/auth/me').then((r) => r.data),
 };
 
-// Alta de empresas nuevas (multi-tenant) — página interna sin login, protegida por una clave de
-// operador que el usuario escribe a mano (no se guarda), ver backend/middleware/platformAdminAuth.js.
+// Panel de super-admin (multi-tenant) — sesión propia de operador, ver client.js/platformAdminClient
+// y backend/middleware/platformAdminAuth.js. Nada de esto pasa por el token de usuario normal.
 export const platformAdminApi = {
-  createCompany: (secret, data) => client.post('/platform-admin/companies', data, {
-    headers: { 'X-Platform-Admin-Secret': secret },
-  }).then((r) => r.data),
+  login: (email, password) => platformAdminClient.post('/platform-admin/login', { email, password }).then((r) => r.data),
+  listCompanies: () => platformAdminClient.get('/platform-admin/companies').then((r) => r.data),
+  createCompany: (data) => platformAdminClient.post('/platform-admin/companies', data).then((r) => r.data),
+  setCompanyStatus: (id, active) => platformAdminClient.patch(`/platform-admin/companies/${id}/status`, { active }).then((r) => r.data),
 };
 
 export const usersApi = {
