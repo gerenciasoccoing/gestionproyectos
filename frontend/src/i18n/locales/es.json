@@ -1273,6 +1273,7 @@
     "La lectura automática con IA no está configurada en el servidor (falta ANTHROPIC_API_KEY).": "La lectura automática con IA no está configurada en el servidor (falta ANTHROPIC_API_KEY).",
     "La IA no devolvió un resultado interpretable.": "La IA no devolvió un resultado interpretable.",
     "La IA no devolvió un JSON válido.": "La IA no devolvió un JSON válido.",
+    "El documento tiene demasiado contenido y la respuesta de la IA se cortó antes de terminar. Intenta con un archivo más corto, o divídelo en partes más pequeñas.": "El documento tiene demasiado contenido y la respuesta de la IA se cortó antes de terminar. Intenta con un archivo más corto, o divídelo en partes más pequeñas.",
     "Debe incluir al menos un ítem": "Debe incluir al menos un ítem",
     "El archivo no contiene filas de datos": "El archivo no contiene filas de datos",
     "El archivo no contiene ítems de presupuesto reconocibles.": "El archivo no contiene ítems de presupuesto reconocibles.",

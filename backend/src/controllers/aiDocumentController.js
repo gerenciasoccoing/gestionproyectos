@@ -15,6 +15,7 @@ function scanDocument(extractorKey) {
       mimetype: req.file.mimetype,
       instructions: extractor.instructions,
       schemaDescription: extractor.schemaDescription,
+      maxTokens: extractor.maxTokens,
     });
     res.json(result);
   });

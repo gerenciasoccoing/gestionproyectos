@@ -11,6 +11,9 @@ const EXTRACTORS = {
   invoice: {
     instructions: 'Este documento es una factura de compra/gasto. Extrae los datos del proveedor y los totales.',
     schemaDescription: '{ "vendorName": string|null, "vendorNit": string|null, "vendorPhone": string|null, "vendorEmail": string|null, "date": "YYYY-MM-DD"|null, "subtotal": number|null, "taxAmount": number|null, "total": number|null, "items": [{ "description": string, "quantity": number, "unitPrice": number, "totalPrice": number }], "taxes": [{ "name": string, "rate": number|null, "amount": number }] }',
+    // Igual que budgetItems: una factura con muchos ítems puede necesitar más espacio de
+    // respuesta del que alcanza el default.
+    maxTokens: 6000,
   },
   contract: {
     instructions: 'Este documento es un contrato de obra o de servicios. Extrae el objeto del contrato (descripción de su alcance) y sus datos clave.',
@@ -27,6 +30,11 @@ const EXTRACTORS = {
   budgetItems: {
     instructions: 'Este documento es un presupuesto de obra de construcción. Contiene una tabla con varios ítems (materiales, actividades, capítulos, etc). Extrae CADA fila de ítem como un elemento independiente del array, ignorando encabezados de columna, subtotales de capítulo y la fila de total general. Si el archivo no contiene una tabla de ítems de presupuesto reconocible, devuelve items como un array vacío.',
     schemaDescription: '{ "items": [ { "description": string, "unit": string|null, "quantity": number|null, "unitPrice": number|null, "totalPrice": number|null } ] }',
+    // Una lista de ítems puede ser mucho más larga que los demás extractores (que devuelven un
+    // solo objeto): un presupuesto real con decenas/cientos de renglones necesita mucho más
+    // espacio de respuesta o se corta a mitad del JSON (ver el chequeo de stop_reason en
+    // aiVisionService.callClaude).
+    maxTokens: 8000,
   },
 };
 

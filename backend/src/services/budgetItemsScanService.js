@@ -62,6 +62,7 @@ async function scanBudgetItemsFile({ buffer, mimetype, originalname }) {
       text,
       instructions: extractor.instructions,
       schemaDescription: extractor.schemaDescription,
+      maxTokens: extractor.maxTokens,
     });
   } else {
     result = await extractStructuredData({
@@ -69,6 +70,7 @@ async function scanBudgetItemsFile({ buffer, mimetype, originalname }) {
       mimetype,
       instructions: extractor.instructions,
       schemaDescription: extractor.schemaDescription,
+      maxTokens: extractor.maxTokens,
     });
   }
 

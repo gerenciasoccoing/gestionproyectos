@@ -159,6 +159,7 @@ const scanRutFile = asyncHandler(async (req, res) => {
       mimetype: req.file.mimetype,
       instructions: extractor.instructions,
       schemaDescription: extractor.schemaDescription,
+      maxTokens: extractor.maxTokens,
     });
     return res.json(result);
   }
