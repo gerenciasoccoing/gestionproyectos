@@ -15,6 +15,7 @@ router.use('/inventory-confirmations', require('./inventoryConfirmationRoutes'))
 router.use('/purchase-orders', require('./globalPurchaseOrderRoutes'));
 router.use('/cash-boxes', require('./cashBoxRoutes'));
 router.use('/expenses', require('./globalExpenseRoutes'));
+router.use('/platform-admin', require('./platformAdminRoutes'));
 
 router.use('/projects', require('./projectRoutes'));
 router.use('/projects/:projectId/contracts', require('./contractRoutes'));

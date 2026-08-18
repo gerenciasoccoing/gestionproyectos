@@ -5,6 +5,14 @@ export const authApi = {
   me: () => client.get('/auth/me').then((r) => r.data),
 };
 
+// Alta de empresas nuevas (multi-tenant) — página interna sin login, protegida por una clave de
+// operador que el usuario escribe a mano (no se guarda), ver backend/middleware/platformAdminAuth.js.
+export const platformAdminApi = {
+  createCompany: (secret, data) => client.post('/platform-admin/companies', data, {
+    headers: { 'X-Platform-Admin-Secret': secret },
+  }).then((r) => r.data),
+};
+
 export const usersApi = {
   list: () => client.get('/users').then((r) => r.data),
   create: (data) => client.post('/users', data).then((r) => r.data),
