@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { budgetApi, progressApi, apuApi } from '../../api';
-import { Card, Button, Input, SearchSelect, Table, ErrorText, extractError, money, formatDate } from '../../components/ui';
+import { Card, Button, Input, SearchSelect, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
 
@@ -15,6 +15,12 @@ export default function BudgetProgressPage() {
   const [expandedId, setExpandedId] = useState(null);
   const [showItemForm, setShowItemForm] = useState(false);
   const [itemForm, setItemForm] = useState({ apuId: '', description: '', notes: '', unit: '', quantity: '', unitCost: '' });
+  const [showAiForm, setShowAiForm] = useState(false);
+  const [aiFile, setAiFile] = useState(null);
+  const [aiScanning, setAiScanning] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const [aiPreviewItems, setAiPreviewItems] = useState(null);
+  const [aiConfirming, setAiConfirming] = useState(false);
   const [editingQtyId, setEditingQtyId] = useState(null);
   const [qtyDraft, setQtyDraft] = useState('');
   const [qtyError, setQtyError] = useState('');
@@ -95,6 +101,62 @@ export default function BudgetProgressPage() {
       unit: apu ? apu.unit : f.unit,
       unitCost: apu ? apu.unitCost.toFixed(2) : f.unitCost,
     }));
+  };
+
+  // Opción 2 (sin APU, con IA): sube un presupuesto libre y muestra una vista previa editable
+  // antes de crear nada — el usuario revisa/corrige cada fila y solo entonces se confirma en
+  // bloque (addItemsBulk). Los ítems resultantes siempre quedan sin apuId (con itemCode generado
+  // por el backend), igual que un ítem manual.
+  const scanAiFile = async () => {
+    if (!aiFile) return;
+    setAiScanning(true);
+    setAiError('');
+    setAiPreviewItems(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', aiFile);
+      const result = await budgetApi.scanItems(projectId, fd);
+      setAiPreviewItems(result.items.map((it) => ({
+        description: it.description || '',
+        unit: it.unit || '',
+        quantity: it.quantity != null ? String(it.quantity) : '',
+        unitCost: it.unitPrice != null ? String(it.unitPrice) : '',
+      })));
+    } catch (err) {
+      setAiError(extractError(err));
+    } finally {
+      setAiScanning(false);
+    }
+  };
+
+  const updateAiPreviewField = (idx, field, value) => {
+    setAiPreviewItems((list) => list.map((it, i) => (i === idx ? { ...it, [field]: value } : it)));
+  };
+
+  const removeAiPreviewRow = (idx) => {
+    setAiPreviewItems((list) => list.filter((_, i) => i !== idx));
+  };
+
+  const cancelAiForm = () => {
+    setShowAiForm(false);
+    setAiFile(null);
+    setAiPreviewItems(null);
+    setAiError('');
+  };
+
+  const confirmAiItems = async () => {
+    setAiError('');
+    setAiConfirming(true);
+    try {
+      const b = await ensureBudget();
+      await budgetApi.addItemsBulk(projectId, b.id, aiPreviewItems);
+      cancelAiForm();
+      load();
+    } catch (err) {
+      setAiError(extractError(err));
+    } finally {
+      setAiConfirming(false);
+    }
   };
 
   const submitImport = async (e) => {
@@ -252,8 +314,87 @@ export default function BudgetProgressPage() {
       <Card title={t('execution.budget.items.title')} actions={
         <Can module="ejecucion" action="create">
           <Button onClick={() => setShowItemForm((s) => !s)}>{showItemForm ? t('common.cancel') : t('execution.budget.items.add')}</Button>
+          <Button variant="secondary" onClick={() => setShowAiForm((s) => !s)}>{showAiForm ? t('common.cancel') : t('execution.budget.items.aiAdd')}</Button>
         </Can>
       }>
+        {showAiForm && (
+          <div className="mb-4 border rounded p-3 bg-gray-50">
+            <p className="text-sm text-gray-600 mb-3">{t('execution.budget.items.aiHelp')}</p>
+            {!aiPreviewItems && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end mb-2">
+                <Input
+                  label={t('execution.budget.items.aiFile')}
+                  type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls"
+                  onChange={(e) => { setAiFile(e.target.files[0]); setAiError(''); }}
+                />
+                <Button type="button" disabled={!aiFile || aiScanning} onClick={scanAiFile}>
+                  {aiScanning ? t('execution.budget.items.aiScanning') : t('execution.budget.items.aiScan')}
+                </Button>
+              </div>
+            )}
+            <ErrorText>{aiError}</ErrorText>
+
+            {aiPreviewItems && (
+              <div className="mt-3">
+                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                  <Badge color="yellow">{t('execution.budget.items.aiNoApuBadge')}</Badge>
+                  <span className="text-sm text-gray-500">{t('execution.budget.items.aiPreviewCount', { count: aiPreviewItems.length })}</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-gray-500 border-b">
+                        <th className="py-1 pr-2">{t('execution.budget.items.table.description')}</th>
+                        <th className="py-1 pr-2">{t('execution.budget.items.unit')}</th>
+                        <th className="py-1 pr-2">{t('execution.budget.items.budgetedQty')}</th>
+                        <th className="py-1 pr-2">{t('execution.budget.items.unitValue')}</th>
+                        <th className="py-1 pr-2 text-right">{t('execution.budget.items.table.total')}</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {aiPreviewItems.map((it, idx) => (
+                        <tr key={idx} className="border-b border-gray-100">
+                          <td className="py-1 pr-2">
+                            <input className="border border-gray-300 rounded px-2 py-1 w-56" value={it.description} onChange={(e) => updateAiPreviewField(idx, 'description', e.target.value)} />
+                          </td>
+                          <td className="py-1 pr-2">
+                            <input className="border border-gray-300 rounded px-2 py-1 w-16" value={it.unit} onChange={(e) => updateAiPreviewField(idx, 'unit', e.target.value)} />
+                          </td>
+                          <td className="py-1 pr-2">
+                            <input className="border border-gray-300 rounded px-2 py-1 w-24 text-right" type="number" min="0" step="0.01" value={it.quantity} onChange={(e) => updateAiPreviewField(idx, 'quantity', e.target.value)} />
+                          </td>
+                          <td className="py-1 pr-2">
+                            <input className="border border-gray-300 rounded px-2 py-1 w-28 text-right" type="number" min="0" step="0.01" value={it.unitCost} onChange={(e) => updateAiPreviewField(idx, 'unitCost', e.target.value)} />
+                          </td>
+                          <td className="py-1 pr-2 text-right whitespace-nowrap">{money(Number(it.quantity || 0) * Number(it.unitCost || 0))}</td>
+                          <td className="py-1 pl-2">
+                            <button type="button" className="text-red-600 hover:underline text-xs" onClick={() => removeAiPreviewRow(idx)}>{t('common.delete')}</button>
+                          </td>
+                        </tr>
+                      ))}
+                      {aiPreviewItems.length === 0 && (
+                        <tr><td colSpan={6} className="py-3 text-center text-gray-400">{t('execution.budget.items.aiPreviewEmpty')}</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
+                  <p className="text-sm font-medium">
+                    {t('execution.budget.items.aiPreviewTotal', { amount: money(aiPreviewItems.reduce((s, it) => s + Number(it.quantity || 0) * Number(it.unitCost || 0), 0)) })}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="secondary" onClick={cancelAiForm}>{t('common.cancel')}</Button>
+                    <Button disabled={aiConfirming || aiPreviewItems.length === 0} onClick={confirmAiItems}>
+                      {aiConfirming ? t('execution.budget.items.aiConfirming') : t('execution.budget.items.aiConfirm')}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {showItemForm && (
           <form onSubmit={submitItem} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
             <SearchSelect
@@ -280,9 +421,12 @@ export default function BudgetProgressPage() {
         <Table columns={[t('execution.budget.items.table.code'), t('execution.budget.items.table.description'), t('execution.budget.items.table.budgetedQty'), t('execution.budget.items.table.executed'), t('execution.budget.items.table.percent'), t('execution.budget.items.table.unitValue'), t('execution.budget.items.table.total'), t('execution.budget.items.table.executedValue'), '']}>
           {items.map((it) => (
             <tr key={it.id} className="border-b border-gray-100">
-              <td className="py-2 pr-3 text-gray-400">{it.APU?.code || '-'}</td>
+              <td className="py-2 pr-3 text-gray-400 font-mono text-xs">{it.APU?.code || it.itemCode || '-'}</td>
               <td className="py-2 pr-3">
-                {it.description} <span className="text-gray-400">({it.unit})</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span>{it.description} <span className="text-gray-400">({it.unit})</span></span>
+                  {!it.apuId && <Badge color="yellow">{t('execution.budget.items.aiNoApuBadge')}</Badge>}
+                </div>
                 {it.notes && <div className="text-xs text-gray-400">{t('execution.budget.items.noteLabel')}: {it.notes}</div>}
               </td>
               <td className="py-2 pr-3">

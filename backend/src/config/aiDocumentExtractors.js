@@ -20,6 +20,14 @@ const EXTRACTORS = {
     instructions: 'Este documento es una póliza de seguro asociada a un proyecto de construcción (ej. cumplimiento, responsabilidad civil, todo riesgo). Extrae su tipo y su vigencia.',
     schemaDescription: '{ "type": string|null, "value": number|null, "coverageStart": "YYYY-MM-DD"|null, "coverageEnd": "YYYY-MM-DD"|null }',
   },
+  // Presupuesto de obra (lista de ítems), usado por "Avance por Ítem" para crear ítems SIN
+  // vincularlos al catálogo APU. Puede recibir una imagen/PDF (vía visión) o texto ya extraído
+  // de un Excel (ver budgetItemsScanService.js, que convierte la hoja a texto antes de llamar
+  // acá porque Claude no lee .xlsx como documento nativo).
+  budgetItems: {
+    instructions: 'Este documento es un presupuesto de obra de construcción. Contiene una tabla con varios ítems (materiales, actividades, capítulos, etc). Extrae CADA fila de ítem como un elemento independiente del array, ignorando encabezados de columna, subtotales de capítulo y la fila de total general. Si el archivo no contiene una tabla de ítems de presupuesto reconocible, devuelve items como un array vacío.',
+    schemaDescription: '{ "items": [ { "description": string, "unit": string|null, "quantity": number|null, "unitPrice": number|null, "totalPrice": number|null } ] }',
+  },
 };
 
 function getExtractor(key) {

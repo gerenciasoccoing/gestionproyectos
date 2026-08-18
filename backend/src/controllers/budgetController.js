@@ -1,8 +1,9 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { Budget, BudgetItem, Project } = require('../models');
+const { sequelize, Budget, BudgetItem, Project } = require('../models');
 const { getBudgetItemsWithProgress, resolveBudgetItemFields, updateBudgetItemQuantity } = require('../services/budgetService');
 const { importBudgetFromWorkbook } = require('../services/budgetImportService');
+const { scanBudgetItemsFile } = require('../services/budgetItemsScanService');
 const { buildApuDataByIdMap } = require('../services/apuExportService');
 const { generateBudgetWithApuAnnexPdf } = require('../services/pdfService');
 const { generateBudgetWithApuAnnexExcelBuffer } = require('../services/apuExcelExportService');
@@ -75,6 +76,50 @@ const removeItem = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
+// Lee un presupuesto (imagen, PDF o Excel) con IA y devuelve los ítems que logró reconocer, para
+// mostrarlos en una vista previa editable. No crea nada: el usuario revisa/corrige cada fila y
+// confirma con addItemsBulk. Siempre sin APU (esta vía es justamente para presupuestos que no
+// vienen codificados contra el catálogo de precios unitarios).
+const scanItemsFile = asyncHandler(async (req, res) => {
+  if (!req.file) throw new ApiError(400, 'Debe adjuntar un archivo PDF, imagen (jpg, png, webp) o Excel (.xlsx, .xls)');
+  const result = await scanBudgetItemsFile({
+    buffer: req.file.buffer,
+    mimetype: req.file.mimetype,
+    originalname: req.file.originalname,
+  });
+  res.json(result);
+});
+
+// Crea varios ítems de presupuesto de una sola vez, todos sin APU (con itemCode generado por
+// ítem — ver resolveBudgetItemFields), tras la confirmación del usuario sobre la vista previa de
+// scanItemsFile. Cada ítem pasa por la misma validación que un ítem manual individual.
+const addItemsBulk = asyncHandler(async (req, res) => {
+  const budget = await Budget.findOne({ where: { id: req.params.budgetId, projectId: req.params.projectId } });
+  if (!budget) throw new ApiError(404, 'Presupuesto no encontrado');
+
+  const { items } = req.body;
+  if (!Array.isArray(items) || !items.length) throw new ApiError(400, 'Debe enviar al menos un ítem');
+
+  const created = await sequelize.transaction(async (t) => {
+    const rows = [];
+    for (const raw of items) {
+      const fields = await resolveBudgetItemFields({
+        budget,
+        apuId: null,
+        description: raw.description,
+        notes: raw.notes,
+        unit: raw.unit,
+        quantity: raw.quantity,
+        unitCost: raw.unitCost,
+        transaction: t,
+      });
+      rows.push(await BudgetItem.create(fields, { transaction: t }));
+    }
+    return rows;
+  });
+  res.status(201).json(created);
+});
+
 // Sube un Excel de listado de precios unitarios (hojas "Items de Presupuesto" + "Unitarios")
 // y crea automáticamente una nueva versión de presupuesto con sus ítems y los APU (con
 // materiales/personal/equipos) referenciados, creando en la Base de Precios los insumos que
@@ -120,5 +165,5 @@ const exportExcel = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  getProjectBudget, createBudgetVersion, updateBudget, addItem, updateItem, removeItem, importFromFile, exportPdf, exportExcel,
+  getProjectBudget, createBudgetVersion, updateBudget, addItem, updateItem, removeItem, scanItemsFile, addItemsBulk, importFromFile, exportPdf, exportExcel,
 };

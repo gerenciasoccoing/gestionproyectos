@@ -165,17 +165,50 @@ async function getBudgetItemsWithProgress(projectId) {
   return { budget, items };
 }
 
+// Genera un código de ítem único para BudgetItem.itemCode: prefijo "SA-" (Sin Análisis, es decir
+// sin APU/desglose de costos) + 6 caracteres al azar, con un alfabeto sin caracteres ambiguos
+// (sin 0/O ni 1/I/L). Se verifica contra itemCode de otros ítems Y contra code de APU (para que
+// nunca coincida por accidente con un código real del catálogo, aunque los prefijos ya los
+// distinguen en la práctica); reintenta si hay choque, con el índice único de la columna como
+// respaldo final ante una carrera entre dos creaciones simultáneas.
+const ITEM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const ITEM_CODE_LENGTH = 6;
+const ITEM_CODE_MAX_ATTEMPTS = 20;
+
+function randomItemCode() {
+  let suffix = '';
+  for (let i = 0; i < ITEM_CODE_LENGTH; i++) {
+    suffix += ITEM_CODE_ALPHABET[Math.floor(Math.random() * ITEM_CODE_ALPHABET.length)];
+  }
+  return `SA-${suffix}`;
+}
+
+async function generateUniqueItemCode({ transaction } = {}) {
+  for (let attempt = 0; attempt < ITEM_CODE_MAX_ATTEMPTS; attempt++) {
+    const code = randomItemCode();
+    const [existingItem, existingApu] = await Promise.all([
+      BudgetItem.findOne({ where: { itemCode: code }, transaction }),
+      APU.findOne({ where: { code }, transaction }),
+    ]);
+    if (!existingItem && !existingApu) return code;
+  }
+  throw new ApiError(500, 'No se pudo generar un código único para el ítem, intenta de nuevo');
+}
+
 // Valida y resuelve los campos de un ítem de presupuesto antes de crearlo. La Descripción se
 // toma siempre del APU elegido (no se pide ni se duplica a mano); solo se pide como texto libre
-// para ítems manuales, sin APU asociado. Compartido por el presupuesto de Proyectos
-// (budgetController) y el de Cotizaciones (quotationController) para que ambos flujos se
-// comporten siempre igual y una corrección futura no tenga que aplicarse dos veces.
-async function resolveBudgetItemFields({ budget, apuId, description, notes, unit, quantity, unitCost }) {
+// para ítems manuales, sin APU asociado — que además reciben un itemCode generado (ver
+// generateUniqueItemCode) para que la columna de código nunca quede vacía. Compartido por el
+// presupuesto de Proyectos (budgetController) y el de Cotizaciones (quotationController) para
+// que ambos flujos se comporten siempre igual y una corrección futura no tenga que aplicarse
+// dos veces.
+async function resolveBudgetItemFields({ budget, apuId, description, notes, unit, quantity, unitCost, transaction }) {
   if (!unit || quantity === undefined) throw new ApiError(400, 'unit y quantity son obligatorios');
   if (Number(quantity) < 0) throw new ApiError(400, 'La cantidad no puede ser negativa');
 
   let resolvedDescription = description;
   let resolvedUnitCost = unitCost || 0;
+  let itemCode = null;
   if (apuId) {
     const result = await computeApuUnitCost(apuId);
     if (!result) throw new ApiError(404, 'APU no encontrado');
@@ -183,11 +216,14 @@ async function resolveBudgetItemFields({ budget, apuId, description, notes, unit
     resolvedUnitCost = applyBudgetAiu(result.directCost, budget);
   } else if (!resolvedDescription) {
     throw new ApiError(400, 'description es obligatoria para un ítem manual (sin APU)');
+  } else {
+    itemCode = await generateUniqueItemCode({ transaction });
   }
 
   return {
     budgetId: budget.id,
     apuId: apuId || null,
+    itemCode,
     description: resolvedDescription,
     notes: notes || null,
     unit,
@@ -214,4 +250,5 @@ async function updateBudgetItemQuantity(item, quantity) {
 module.exports = {
   computeApuUnitCost, computeSectionCosts, laborBreakdown, recomputeAndPersistApuCost, recomputeApuCostsForPriceItems,
   applyBudgetAiu, getCurrentBudgetForProject, getProjectBudgetTotal, getBudgetItemsWithProgress, resolveBudgetItemFields, updateBudgetItemQuantity,
+  generateUniqueItemCode,
 };

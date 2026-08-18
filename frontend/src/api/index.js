@@ -75,6 +75,8 @@ export const budgetApi = {
   updateAiu: (pid, budgetId, aiu) => client.put(`/projects/${pid}/budget/${budgetId}`, aiu).then((r) => r.data),
   importFile: (pid, formData) => client.post(`/projects/${pid}/budget/import`, formData).then((r) => r.data),
   addItem: (pid, budgetId, data) => client.post(`/projects/${pid}/budget/${budgetId}/items`, data).then((r) => r.data),
+  scanItems: (pid, formData) => client.post(`/projects/${pid}/budget/scan-items`, formData).then((r) => r.data),
+  addItemsBulk: (pid, budgetId, items) => client.post(`/projects/${pid}/budget/${budgetId}/items/bulk`, { items }).then((r) => r.data),
   updateItem: (pid, budgetId, itemId, data) => client.put(`/projects/${pid}/budget/${budgetId}/items/${itemId}`, data).then((r) => r.data),
   removeItem: (pid, budgetId, itemId) => client.delete(`/projects/${pid}/budget/${budgetId}/items/${itemId}`),
   exportPdf: (pid, data) => postAndDownload(`/projects/${pid}/budget/export-pdf`, data, 'presupuesto.pdf'),
