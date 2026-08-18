@@ -3,6 +3,9 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const BudgetItem = sequelize.define('BudgetItem', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    // Aislamiento multi-tenant (ver applyTenantScoping.js): asignado automáticamente por los
+    // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
+    companyId: { type: DataTypes.UUID, allowNull: true },
     budgetId: { type: DataTypes.UUID, allowNull: false },
     apuId: { type: DataTypes.UUID, allowNull: true },
     // Código generado por el sistema para ítems sin APU (manuales o extraídos por IA): un ítem

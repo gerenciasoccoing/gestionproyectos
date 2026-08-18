@@ -307,9 +307,14 @@ async function getItemHistory(inventoryItemId) {
 // (buildPublicSummary). No valida vigencia acá: eso lo decide quien llama (get vs. confirm tratan
 // el vencimiento distinto — get lo muestra, confirm lo rechaza).
 async function getConfirmationByToken(token) {
+  // hooks:false: endpoint público (sin sesión, ver inventoryConfirmationRoutes.js) — no hay
+  // companyId de contexto todavía porque justamente esta consulta es la que lo resuelve, a
+  // partir del token (192 bits aleatorios, imposible de adivinar). Es la única consulta de todo
+  // este flujo, gracias al include, así que es el único punto que necesita este escape.
   const confirmation = await InventoryConfirmation.findOne({
     where: { token },
     include: [{ model: InventoryCheckout, as: 'checkout', include: CHECKOUT_DETAIL_INCLUDE }],
+    hooks: false,
   });
   if (!confirmation) throw new ApiError(404, 'Enlace de confirmación no encontrado o inválido');
   return confirmation;
@@ -320,7 +325,8 @@ async function getConfirmationByToken(token) {
 // enlace se asume enviado solo a esa persona); solo queda el timestamp de confirmación.
 async function confirmToken(token) {
   return sequelize.transaction(async (t) => {
-    const confirmation = await InventoryConfirmation.findOne({ where: { token }, transaction: t, lock: t.LOCK.UPDATE });
+    // hooks:false: mismo motivo que en getConfirmationByToken — endpoint público sin sesión.
+    const confirmation = await InventoryConfirmation.findOne({ where: { token }, transaction: t, lock: t.LOCK.UPDATE, hooks: false });
     if (!confirmation) throw new ApiError(404, 'Enlace de confirmación no encontrado o inválido');
     if (confirmation.status === 'confirmado') throw new ApiError(409, 'Este movimiento ya fue confirmado anteriormente.');
     if (new Date() > new Date(confirmation.expiresAt)) throw new ApiError(410, 'Este enlace de confirmación venció. Contacta al administrador para gestionarlo manualmente.');

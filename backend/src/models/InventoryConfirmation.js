@@ -11,6 +11,9 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const InventoryConfirmation = sequelize.define('InventoryConfirmation', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    // Aislamiento multi-tenant (ver applyTenantScoping.js): asignado automáticamente por los
+    // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
+    companyId: { type: DataTypes.UUID, allowNull: true },
     token: { type: DataTypes.STRING, allowNull: false, unique: true },
     kind: { type: DataTypes.ENUM('salida', 'entrada'), allowNull: false },
     checkoutId: { type: DataTypes.UUID, allowNull: false },

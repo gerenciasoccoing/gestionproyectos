@@ -6,6 +6,9 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const ThirdParty = sequelize.define('ThirdParty', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    // Aislamiento multi-tenant (ver applyTenantScoping.js): asignado automáticamente por los
+    // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
+    companyId: { type: DataTypes.UUID, allowNull: true },
     type: { type: DataTypes.ENUM('proveedor', 'cliente'), allowNull: false },
     name: { type: DataTypes.STRING, allowNull: false }, // razón social / nombre
     nit: { type: DataTypes.STRING, allowNull: true },

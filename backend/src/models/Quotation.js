@@ -3,6 +3,9 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const Quotation = sequelize.define('Quotation', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    // Aislamiento multi-tenant (ver applyTenantScoping.js): asignado automáticamente por los
+    // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
+    companyId: { type: DataTypes.UUID, allowNull: true },
     clientName: { type: DataTypes.STRING, allowNull: false },
     clientId: { type: DataTypes.UUID, allowNull: true }, // vínculo opcional a Terceros (cliente)
     projectNameProposed: { type: DataTypes.STRING, allowNull: false },

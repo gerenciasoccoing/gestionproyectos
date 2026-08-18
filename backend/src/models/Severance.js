@@ -3,6 +3,9 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const Severance = sequelize.define('Severance', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    // Aislamiento multi-tenant (ver applyTenantScoping.js): asignado automáticamente por los
+    // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
+    companyId: { type: DataTypes.UUID, allowNull: true },
     employeeId: { type: DataTypes.UUID, allowNull: false, unique: true },
     exitDate: { type: DataTypes.DATEONLY, allowNull: false },
     cause: {

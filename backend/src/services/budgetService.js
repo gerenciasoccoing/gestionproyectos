@@ -103,7 +103,10 @@ async function recomputeApuCostsForPriceItems(priceItemIds, transaction) {
   });
   // Update masivo vía SQL crudo (no bulkCreate+updateOnDuplicate: eso hace un INSERT ... ON
   // CONFLICT que exige valores para columnas NOT NULL como name/unit, que acá no tenemos ni
-  // queremos tocar).
+  // queremos tocar). Seguro respecto al aislamiento multi-tenant sin filtrar companyId acá: los
+  // ids que arma `values` salen de `apus`, ya resuelto arriba con el where scopeado
+  // automáticamente por los hooks de APU — nunca de un id que venga directo del cliente.
+  // Auditado como parte de la migración multi-tenant (ver applyTenantScoping.js).
   const values = apus
     .map((apu) => {
       const sections = computeSectionCosts(apu.components);

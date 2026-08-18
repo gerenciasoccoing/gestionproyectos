@@ -6,6 +6,9 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const PriceListImport = sequelize.define('PriceListImport', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    // Aislamiento multi-tenant (ver applyTenantScoping.js): asignado automáticamente por los
+    // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
+    companyId: { type: DataTypes.UUID, allowNull: true },
     sourceLabel: { type: DataTypes.STRING, allowNull: false }, // ej. "Listado Marzo 2026"
     fileName: { type: DataTypes.STRING, allowNull: true },
     effectiveDate: { type: DataTypes.DATEONLY, allowNull: false },

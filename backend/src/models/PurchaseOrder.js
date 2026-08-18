@@ -3,6 +3,9 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const PurchaseOrder = sequelize.define('PurchaseOrder', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    // Aislamiento multi-tenant (ver applyTenantScoping.js): asignado automáticamente por los
+    // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
+    companyId: { type: DataTypes.UUID, allowNull: true },
     // Opcional: una orden puede crearse desde la ficha de un proveedor sin asignarla todavía a un
     // proyecto. Cuando sí tiene projectId, aparece en el listado de compras de ese proyecto (ver
     // purchaseOrderController.list) exactamente igual que las creadas desde Ejecución de proyecto.

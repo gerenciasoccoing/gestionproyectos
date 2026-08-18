@@ -4,6 +4,9 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const LaborParameters = sequelize.define('LaborParameters', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    // Aislamiento multi-tenant (ver applyTenantScoping.js): asignado automáticamente por los
+    // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
+    companyId: { type: DataTypes.UUID, allowNull: true },
     effectiveDate: { type: DataTypes.DATEONLY, allowNull: false },
     smlv: { type: DataTypes.DECIMAL(18, 2), allowNull: false, validate: { min: 0 } }, // salario mínimo legal vigente
     auxTransporte: { type: DataTypes.DECIMAL(18, 2), allowNull: false, defaultValue: 0, validate: { min: 0 } },

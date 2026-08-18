@@ -7,6 +7,9 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const APUPriceHistory = sequelize.define('APUPriceHistory', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    // Aislamiento multi-tenant (ver applyTenantScoping.js): asignado automáticamente por los
+    // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
+    companyId: { type: DataTypes.UUID, allowNull: true },
     apuId: { type: DataTypes.UUID, allowNull: false },
     priceListImportId: { type: DataTypes.UUID, allowNull: true },
     directCost: { type: DataTypes.DECIMAL(18, 2), allowNull: false },

@@ -3,6 +3,9 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const Expense = sequelize.define('Expense', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    // Aislamiento multi-tenant (ver applyTenantScoping.js): asignado automáticamente por los
+    // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
+    companyId: { type: DataTypes.UUID, allowNull: true },
     // Opcional: un gasto puede registrarse desde la vista general de Gastos sin asociarlo a un
     // proyecto específico (ver expenseController.js, usado tanto por la ruta anidada de proyecto
     // como por la ruta global /expenses).

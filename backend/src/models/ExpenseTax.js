@@ -4,6 +4,9 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const ExpenseTax = sequelize.define('ExpenseTax', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    // Aislamiento multi-tenant (ver applyTenantScoping.js): asignado automáticamente por los
+    // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
+    companyId: { type: DataTypes.UUID, allowNull: true },
     expenseId: { type: DataTypes.UUID, allowNull: false },
     name: { type: DataTypes.STRING, allowNull: false }, // ej. "IVA", "ICA", "Retención en la fuente"
     rate: { type: DataTypes.DECIMAL(6, 2), allowNull: true, validate: { min: 0 } }, // % (opcional)

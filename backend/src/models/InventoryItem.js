@@ -12,8 +12,11 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const InventoryItem = sequelize.define('InventoryItem', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    // Aislamiento multi-tenant (ver applyTenantScoping.js): asignado automáticamente por los
+    // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
+    companyId: { type: DataTypes.UUID, allowNull: true },
     name: { type: DataTypes.STRING, allowNull: false },
-    code: { type: DataTypes.STRING, allowNull: false, unique: true },
+    code: { type: DataTypes.STRING, allowNull: false },
     category: { type: DataTypes.STRING, allowNull: false },
     trackingType: { type: DataTypes.ENUM('serializado', 'cantidad'), allowNull: false, defaultValue: 'serializado' },
     status: { type: DataTypes.ENUM('disponible', 'en_prestamo', 'mantenimiento', 'baja'), allowNull: false, defaultValue: 'disponible' },
@@ -25,6 +28,9 @@ module.exports = (sequelize) => {
     retiredQuantity: { type: DataTypes.DECIMAL(18, 2), allowNull: false, defaultValue: 0, validate: { min: 0 } },
     notes: { type: DataTypes.TEXT, allowNull: true },
     createdBy: { type: DataTypes.UUID, allowNull: true },
+  }, {
+    // Único por empresa, no global: dos empresas pueden usar el mismo código de equipo.
+    indexes: [{ unique: true, fields: ['companyId', 'code'] }],
   });
 
   InventoryItem.associate = (models) => {

@@ -3,6 +3,9 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const PurchaseOrderItem = sequelize.define('PurchaseOrderItem', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    // Aislamiento multi-tenant (ver applyTenantScoping.js): asignado automáticamente por los
+    // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
+    companyId: { type: DataTypes.UUID, allowNull: true },
     purchaseOrderId: { type: DataTypes.UUID, allowNull: false },
     budgetItemId: { type: DataTypes.UUID, allowNull: true }, // vínculo opcional al ítem de presupuesto
     name: { type: DataTypes.STRING, allowNull: false },

@@ -1,4 +1,5 @@
-const { sequelize, CashBox } = require('../models');
+const { sequelize, Company, CashBox } = require('../models');
+const { runWithCompany } = require('../utils/tenantContext');
 
 // sequelize.sync({ alter: true }) añade columnas nuevas de forma segura, pero no siempre
 // relaja restricciones NOT NULL en columnas existentes (limitación conocida en Postgres).
@@ -12,7 +13,84 @@ const { sequelize, CashBox } = require('../models');
 // se ajusta aquí; y las órdenes que ya existían quedan sin orderNumber tras el alter, así que se
 // numeran una sola vez (solo toca filas con orderNumber NULL, por lo que es un no-op en arranques
 // posteriores, una vez que toda fila nueva ya se crea con su número asignado por la aplicación).
+
+// Backfillea companyId en TODAS las tablas de negocio hacia la primera empresa existente (en una
+// instalación ya migrada, esa es SOCCOING S.A.S.) y luego bloquea la columna con NOT NULL. Recorre
+// sequelize.models en vez de una lista de tablas a mano, así que cubre automáticamente cualquier
+// modelo nuevo que se agregue más adelante sin tener que acordarse de tocar este archivo.
+// En una instalación recién creada (sin ninguna empresa todavía, ej. antes de correr seed.js por
+// primera vez) no hay nada que backfillear: todas las tablas están vacías, así que SET NOT NULL
+// es seguro igual (no hay filas que puedan violarlo).
+async function backfillTenantColumns() {
+  const company = await Company.findOne({ order: [['createdAt', 'ASC']] });
+
+  for (const model of Object.values(sequelize.models)) {
+    if (!model.rawAttributes.companyId) continue; // Company y Permission quedan afuera
+    const table = model.getTableName();
+    if (company) {
+      await sequelize.query(
+        `UPDATE "${table}" SET "companyId" = :companyId WHERE "companyId" IS NULL`,
+        { replacements: { companyId: company.id } }
+      );
+    }
+    await sequelize.query(`ALTER TABLE "${table}" ALTER COLUMN "companyId" SET NOT NULL`);
+  }
+
+  return company;
+}
+
+// sync({alter:true}) tiene un problema conocido con `unique: true` puesto directo en una columna
+// (a diferencia de un `indexes: [...]` con nombre explícito, que si se detecta bien entre
+// reinicios): en cada arranque, si no reconoce la restricción existente como "la misma", agrega
+// OTRA restricción UNIQUE nueva en vez de dejar la que ya había — llevaba así, acumulando, desde
+// mucho antes de esta migración (67 duplicadas en Roles.name, 68 en Users.email, etc., una por
+// cada reinicio del servidor a lo largo de la vida del proyecto). No afecta la integridad de los
+// datos (la primera restricción ya garantizaba la unicidad, las demás eran puro peso extra en
+// cada INSERT/UPDATE), pero vale la pena dejarlo limpio ya que se está tocando esta misma zona del
+// esquema. Idempotente: agrupa por tabla+columnas, y si hay más de una restricción para el mismo
+// grupo, deja la primera y borra el resto.
+// La unicidad de Roles.name e InventoryItems.code cambió de significado con esta migración: antes
+// era global (una sola restricción por columna), ahora es por empresa (companyId + name/code, ver
+// Role.js/InventoryItem.js). Las restricciones viejas de una sola columna no se pueden dejar
+// NINGUNA — a diferencia de las duplicadas de abajo, donde sí conviene dejar una — porque
+// impedirían que dos empresas usen el mismo nombre de rol o código de equipo.
+async function dropStaleGlobalUniqueConstraints() {
+  const stale = await sequelize.query(`
+    SELECT conrelid::regclass::text AS table_name, conname
+    FROM pg_constraint c
+    JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey)
+    WHERE c.contype = 'u' AND cardinality(c.conkey) = 1
+      AND ((c.conrelid::regclass::text = '"Roles"' AND a.attname = 'name')
+        OR (c.conrelid::regclass::text = '"InventoryItems"' AND a.attname = 'code'))
+  `, { type: sequelize.QueryTypes.SELECT });
+
+  for (const { table_name: tableName, conname } of stale) {
+    await sequelize.query(`ALTER TABLE ${tableName} DROP CONSTRAINT "${conname}"`);
+  }
+}
+
+async function dropDuplicateUniqueConstraints() {
+  await dropStaleGlobalUniqueConstraints();
+
+  const duplicates = await sequelize.query(`
+    SELECT conrelid::regclass::text AS table_name, array_agg(conname::text ORDER BY conname) AS names
+    FROM pg_constraint
+    WHERE contype = 'u' AND connamespace = 'public'::regnamespace
+    GROUP BY conrelid, conkey
+    HAVING count(*) > 1
+  `, { type: sequelize.QueryTypes.SELECT });
+
+  for (const { table_name: tableName, names } of duplicates) {
+    for (const name of names.slice(1)) {
+      // eslint-disable-next-line no-await-in-loop
+      await sequelize.query(`ALTER TABLE ${tableName} DROP CONSTRAINT "${name}"`);
+    }
+  }
+}
+
 async function applyPostSyncFixups() {
+  await dropDuplicateUniqueConstraints();
+
   await sequelize.query('ALTER TABLE "APUComponents" ALTER COLUMN "priceItemId" DROP NOT NULL;');
   await sequelize.query('ALTER TABLE "PurchaseOrders" ALTER COLUMN "projectId" DROP NOT NULL;');
   await sequelize.query(`
@@ -34,14 +112,25 @@ async function applyPostSyncFixups() {
   // filas con cashBoxId NULL y el SET NOT NULL es un no-op si ya estaba así, por lo que es seguro
   // ejecutar esto en cada arranque.
   await sequelize.query('ALTER TABLE "Expenses" ALTER COLUMN "projectId" DROP NOT NULL;');
-  const [defaultCashBox] = await CashBox.findOrCreate({
-    where: { name: 'Caja general' },
-    defaults: { initialBalance: 0, status: 'activa' },
-  });
-  await sequelize.query(
-    'UPDATE "Expenses" SET "cashBoxId" = :cashBoxId WHERE "cashBoxId" IS NULL;',
-    { replacements: { cashBoxId: defaultCashBox.id } }
-  );
+
+  // Migración multi-tenant: companyId en cada tabla de negocio, backfilleado hacia la primera
+  // empresa existente (ver backfillTenantColumns). Debe correr ANTES de crear la "Caja general"
+  // de abajo, porque CashBox ya está protegida por los hooks de aislamiento y necesita un
+  // companyId de contexto para poder crearse.
+  const company = await backfillTenantColumns();
+
+  if (company) {
+    await runWithCompany(company.id, async () => {
+      const [defaultCashBox] = await CashBox.findOrCreate({
+        where: { name: 'Caja general' },
+        defaults: { initialBalance: 0, status: 'activa' },
+      });
+      await sequelize.query(
+        'UPDATE "Expenses" SET "cashBoxId" = :cashBoxId WHERE "cashBoxId" IS NULL;',
+        { replacements: { cashBoxId: defaultCashBox.id } }
+      );
+    });
+  }
   await sequelize.query('ALTER TABLE "Expenses" ALTER COLUMN "cashBoxId" SET NOT NULL;');
 }
 

@@ -1,6 +1,8 @@
 const sequelize = require('../config/database');
+const { applyTenantScoping } = require('../utils/applyTenantScoping');
 
 const modelDefiners = [
+  require('./Company'),
   require('./User'),
   require('./Role'),
   require('./Permission'),
@@ -34,7 +36,6 @@ const modelDefiners = [
   require('./ExpenseTax'),
   require('./ExpenseBudget'),
   require('./Risk'),
-  require('./CompanySettings'),
   require('./ThirdParty'),
   require('./PriceListImport'),
   require('./APUPriceHistory'),
@@ -55,6 +56,14 @@ modelDefiners.forEach((define) => {
 
 Object.values(models).forEach((model) => {
   if (model.associate) model.associate(models);
+});
+
+// Aislamiento multi-tenant: todos los modelos de negocio quedan protegidos por los hooks de
+// applyTenantScoping.js. Company (la tabla de empresas en sí) y Permission (catálogo global fijo
+// de permisos, no datos de una empresa) quedan explícitamente afuera.
+const TENANT_SCOPING_EXCLUDED = ['Company', 'Permission'];
+Object.entries(models).forEach(([name, model]) => {
+  if (!TENANT_SCOPING_EXCLUDED.includes(name)) applyTenantScoping(model);
 });
 
 module.exports = { sequelize, ...models };

@@ -8,6 +8,9 @@ const TRANSPORT_MODES = ['distancia_peso', 'porcentaje_materiales'];
 module.exports = (sequelize) => {
   const APUComponent = sequelize.define('APUComponent', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    // Aislamiento multi-tenant (ver applyTenantScoping.js): asignado automáticamente por los
+    // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
+    companyId: { type: DataTypes.UUID, allowNull: true },
     apuId: { type: DataTypes.UUID, allowNull: false },
     category: { type: DataTypes.STRING, allowNull: false, defaultValue: 'material', validate: { isIn: [CATEGORIES] } },
     // Insumo de la base de precios. Obligatorio salvo en transporte, donde puede ser una tarifa manual.

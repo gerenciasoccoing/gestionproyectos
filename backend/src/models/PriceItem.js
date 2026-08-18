@@ -3,6 +3,9 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const PriceItem = sequelize.define('PriceItem', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    // Aislamiento multi-tenant (ver applyTenantScoping.js): asignado automáticamente por los
+    // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
+    companyId: { type: DataTypes.UUID, allowNull: true },
     type: { type: DataTypes.ENUM('material', 'mano_obra', 'equipo'), allowNull: false },
     // Código de referencia externo (ej. listado oficial de precios unitarios). Opcional, pero si
     // se informa se usa como criterio principal de coincidencia al reimportar/actualizar.

@@ -9,6 +9,9 @@ const { DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   const CashBox = sequelize.define('CashBox', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    // Aislamiento multi-tenant (ver applyTenantScoping.js): asignado automáticamente por los
+    // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
+    companyId: { type: DataTypes.UUID, allowNull: true },
     name: { type: DataTypes.STRING, allowNull: false },
     initialBalance: { type: DataTypes.DECIMAL(18, 2), allowNull: false, defaultValue: 0, validate: { min: 0 } },
     status: { type: DataTypes.ENUM('activa', 'cerrada'), allowNull: false, defaultValue: 'activa' },
