@@ -40,6 +40,11 @@ services:
     restart: always
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      # Certificados de Let's Encrypt del host (emitidos por certbot fuera de Docker), montados
+      # de solo lectura para que nginx los sirva. Ver nginx.conf.
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - backend
 
