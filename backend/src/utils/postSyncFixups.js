@@ -1,5 +1,12 @@
-const { sequelize, Company, CashBox } = require('../models');
+const fs = require('fs');
+const path = require('path');
+const {
+  sequelize, Company, CashBox,
+  Contract, Employee, Expense, InventoryItem, Minute, PaymentReceipt, Policy,
+  ProgressPhoto, Severance, SocialSecurityDocument, ThirdParty,
+} = require('../models');
 const { runWithCompany } = require('../utils/tenantContext');
+const { UPLOAD_ROOT } = require('../middleware/upload');
 
 // sequelize.sync({ alter: true }) añade columnas nuevas de forma segura, pero no siempre
 // relaja restricciones NOT NULL en columnas existentes (limitación conocida en Postgres).
@@ -88,6 +95,61 @@ async function dropDuplicateUniqueConstraints() {
   }
 }
 
+// Namespacing de archivos por empresa (gap señalado en el diseño multi-tenant, endurecido acá):
+// hasta ahora todo se guardaba en uploads/{subfolder}/... sin distinguir empresa, así que en
+// teoría (adivinando el nombre exacto de un archivo, 64 bits al azar) un usuario de otra empresa
+// podía llegar a un archivo ajeno vía /api/files/. middleware/upload.js ya guarda los archivos
+// NUEVOS bajo uploads/{companyId}/{subfolder}/... — esto migra los que ya existían de instalaciones
+// previas a esa migración, moviéndolos a la carpeta de la primera empresa (que es a quien
+// pertenecen: no existía ninguna otra empresa todavía cuando se subieron) y reescribiendo la ruta
+// relativa guardada en cada tabla que la referencia. Idempotente: el rename de carpeta es un no-op
+// si el destino ya existe (ya migrado), y el UPDATE de cada columna solo toca valores que todavía
+// no empiezan con "{companyId}/".
+const LEGACY_UPLOAD_SUBFOLDERS = [
+  'contracts', 'employee-contracts', 'social-security', 'payment-receipts', 'paz-y-salvo',
+  'progress-photos', 'third-parties', 'inventory', 'company', 'policies', 'minutes', 'expenses',
+];
+
+const UPLOAD_PATH_COLUMNS = [
+  [Contract, 'filePath'],
+  [Employee, 'contractFilePath'],
+  [Expense, 'supportFilePath'],
+  [Expense, 'paymentReceiptFilePath'],
+  [InventoryItem, 'photoPath'],
+  [Minute, 'filePath'],
+  [PaymentReceipt, 'filePath'],
+  [Policy, 'filePath'],
+  [ProgressPhoto, 'filePath'],
+  [Severance, 'pazYSalvoFilePath'],
+  [SocialSecurityDocument, 'filePath'],
+  [ThirdParty, 'rutFilePath'],
+  [ThirdParty, 'bankCertificationFilePath'],
+  [Company, 'logoPath'],
+];
+
+async function migrateUploadsToCompanyFolders(companyId) {
+  if (!companyId) return;
+
+  const companyDir = path.join(UPLOAD_ROOT, companyId);
+  for (const subfolder of LEGACY_UPLOAD_SUBFOLDERS) {
+    const oldDir = path.join(UPLOAD_ROOT, subfolder);
+    const newDir = path.join(companyDir, subfolder);
+    if (fs.existsSync(oldDir) && !fs.existsSync(newDir)) {
+      fs.mkdirSync(companyDir, { recursive: true });
+      fs.renameSync(oldDir, newDir);
+    }
+  }
+
+  for (const [model, column] of UPLOAD_PATH_COLUMNS) {
+    const table = model.getTableName();
+    await sequelize.query(
+      `UPDATE "${table}" SET "${column}" = :prefix || "${column}"
+       WHERE "${column}" IS NOT NULL AND "${column}" NOT LIKE :prefixLike`,
+      { replacements: { prefix: `${companyId}/`, prefixLike: `${companyId}/%` } }
+    );
+  }
+}
+
 async function applyPostSyncFixups() {
   await dropDuplicateUniqueConstraints();
 
@@ -118,6 +180,7 @@ async function applyPostSyncFixups() {
   // de abajo, porque CashBox ya está protegida por los hooks de aislamiento y necesita un
   // companyId de contexto para poder crearse.
   const company = await backfillTenantColumns();
+  await migrateUploadsToCompanyFolders(company?.id);
 
   if (company) {
     await runWithCompany(company.id, async () => {

@@ -2,6 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { getCurrentCompanyId } = require('../utils/tenantContext');
 
 const UPLOAD_ROOT = path.resolve(process.env.UPLOAD_DIR || 'uploads');
 
@@ -16,10 +17,18 @@ function ensureDir(dir) {
 }
 
 // kind: 'document' | 'image' | 'any' -> valida extensión permitida
+// Aislamiento multi-tenant: cada archivo se guarda bajo uploads/{companyId}/{subfolder}/..., con
+// el companyId tomado del contexto de la petición (ver tenantContext.js) — nunca del cliente. El
+// endpoint /api/files/* (app.js) exige que ese primer segmento coincida con la empresa del usuario
+// que pide el archivo, así que un archivo de otra empresa no es servible aunque se adivine el
+// nombre. relativePath() ya queda con ese prefijo sin cambios, porque solo calcula la ruta relativa
+// a UPLOAD_ROOT.
 function makeUploader(subfolder, kind = 'any') {
   const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-      const dir = path.join(UPLOAD_ROOT, subfolder);
+      const companyId = getCurrentCompanyId();
+      if (!companyId) return cb(new Error('No hay empresa en el contexto de la petición'));
+      const dir = path.join(UPLOAD_ROOT, companyId, subfolder);
       ensureDir(dir);
       cb(null, dir);
     },
