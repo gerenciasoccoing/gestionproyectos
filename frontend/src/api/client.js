@@ -13,7 +13,12 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    // Solo trata el 401 como "sesión vencida" si la petición llevaba un token de sesión: un 401
+    // en una petición pública (ej. clave de operador equivocada en /register-company, o un enlace
+    // de confirmación por WhatsApp vencido) no es una sesión que expiró, es un error normal que la
+    // propia página debe mostrar — redirigir a /login en ese caso le ocultaba el mensaje al usuario.
+    const hadSessionToken = Boolean(err.config?.headers?.Authorization);
+    if (err.response?.status === 401 && hadSessionToken) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       if (!window.location.pathname.includes('/login')) {
