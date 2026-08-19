@@ -342,7 +342,9 @@
       "project": "Project",
       "delete": "Delete",
       "confirmDelete": "Delete this purchase order? This action cannot be undone.",
-      "editOrder": "Edit order"
+      "editOrder": "Edit order",
+      "itemHasDeliveries": "Already has {{qty}} delivered: cannot be removed",
+      "closedOrderNotEditable": "This order is closed and cannot be edited (header or items)."
     },
     "milestones": {
       "title": "Milestones",

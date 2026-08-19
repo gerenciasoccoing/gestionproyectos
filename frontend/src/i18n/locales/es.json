@@ -342,7 +342,9 @@
       "project": "Proyecto",
       "delete": "Eliminar",
       "confirmDelete": "¿Eliminar esta orden de compra? Esta acción no se puede deshacer.",
-      "editOrder": "Editar orden"
+      "editOrder": "Editar orden",
+      "itemHasDeliveries": "Ya tiene {{qty}} entregado(s): no se puede quitar",
+      "closedOrderNotEditable": "Esta orden está cerrada y no se puede editar (ni cabecera ni ítems)."
     },
     "milestones": {
       "title": "Hitos",

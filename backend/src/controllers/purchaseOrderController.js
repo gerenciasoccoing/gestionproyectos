@@ -198,20 +198,36 @@ const updateItem = asyncHandler(async (req, res) => {
   res.json({ ...order.toJSON(), items, totals });
 });
 
-// Edita los datos de cabecera de la orden (proveedor, fecha, proyecto, caja, % retención) — no los
-// ítems, eso es updateItem. Bloqueada si la orden está cerrada. cashBoxId solo puede cambiarse si
-// la orden TODAVÍA no generó ningún gasto real (ni recepciones ni traslado a gastos): una vez que
-// el dinero ya salió de una caja, cambiar este campo después haría que la orden mostrara una caja
-// distinta a la que realmente se usó en esos gastos históricos (los gastos ya registrados no se
-// tocan ni se mueven de caja retroactivamente).
+// Edita la orden completa: cabecera (proveedor, fecha, proyecto, caja, % retención) e ítems
+// (cambiar cantidad/valor/IVA, agregar nuevos, quitar existentes) en una sola operación. Bloqueada
+// por completo si la orden está cerrada (con o sin faltantes): una orden cerrada es un registro
+// terminado del ciclo de recepción, y ya pudo haber afectado caja/entregas — no se permite tocarla
+// ni en cabecera ni en ítems (si hace falta corregir algo ahí, es un caso de soporte, no de
+// autoservicio). cashBoxId solo puede cambiarse si la orden TODAVÍA no generó ningún gasto real (ni
+// recepciones ni traslado a gastos): una vez que el dinero ya salió de una caja, cambiar este campo
+// después haría que la orden mostrara una caja distinta a la que realmente se usó en esos gastos
+// históricos (los gastos ya registrados no se tocan ni se mueven de caja retroactivamente).
+//
+// `items` es OPCIONAL: si no viene, solo se tocan los campos de cabecera (comportamiento anterior).
+// Si viene, es la lista COMPLETA deseada de ítems: los que traen `id` son ítems existentes que se
+// actualizan, los que no traen `id` son ítems nuevos, y cualquier ítem existente que no aparezca en
+// la lista se elimina — con dos resguardos: no se puede bajar la cantidad de un ítem por debajo de
+// lo ya entregado, y no se puede eliminar un ítem que ya tiene entregas registradas (esas entregas
+// ya generaron su propio gasto histórico, que no se reescribe). Si la orden ya se convirtió a un
+// gasto único (order.expenseId, ver convertToExpense), ese gasto se recalcula en la misma
+// transacción para reflejar el nuevo total — así nunca queda desincronizado.
 const updateOrder = asyncHandler(async (req, res) => {
-  const order = await PurchaseOrder.findOne({ where: scopeWhere(req), include: [{ model: PurchaseOrderItem, as: 'items' }] });
+  const order = await PurchaseOrder.findOne({
+    where: scopeWhere(req),
+    include: [{ model: PurchaseOrderItem, as: 'items', include: [{ model: PurchaseReceipt, as: 'receipts' }] }],
+  });
   if (!order) throw new ApiError(404, 'Orden de compra no encontrada');
   if (order.status === 'cerrada' || order.status === 'cerrada_con_faltantes') {
     throw new ApiError(400, 'No se puede editar una orden cerrada');
   }
 
-  const { supplier, supplierId, date, projectId, cashBoxId, retentionPercent } = req.body;
+  const { supplier, supplierId, date, projectId, cashBoxId, retentionPercent, items } = req.body;
+  const nextProjectId = projectId !== undefined ? (projectId || null) : order.projectId;
 
   if (projectId && projectId !== order.projectId && !req.user.isAdmin && !req.user.projectIds.includes(projectId)) {
     throw new ApiError(403, 'No tiene acceso a este proyecto');
@@ -230,16 +246,103 @@ const updateOrder = asyncHandler(async (req, res) => {
   if (supplier !== undefined) order.supplier = supplier;
   if (supplierId !== undefined) order.supplierId = supplierId || null;
   if (date !== undefined) order.date = date;
-  if (projectId !== undefined) order.projectId = projectId || null;
+  if (projectId !== undefined) order.projectId = nextProjectId;
   if (retentionPercent !== undefined) {
     if (Number(retentionPercent) < 0 || Number(retentionPercent) > 100) throw new ApiError(400, 'retentionPercent debe estar entre 0 y 100');
     order.retentionPercent = retentionPercent;
   }
-  await order.save();
 
-  const items = await getOrderItemsWithDelivery(order.id);
-  const totals = computeOrderTotals(items, order.retentionPercent);
-  res.json({ ...order.toJSON(), items, totals });
+  if (items !== undefined) {
+    if (!Array.isArray(items) || items.length === 0) throw new ApiError(400, 'La orden debe tener al menos un ítem');
+    for (const it of items) {
+      if (!it.name || !it.unit || it.quantityOrdered === undefined || it.unitPrice === undefined) {
+        throw new ApiError(400, 'Cada ítem requiere name, unit, quantityOrdered y unitPrice');
+      }
+      if (Number(it.quantityOrdered) < 0 || Number(it.unitPrice) < 0) {
+        throw new ApiError(400, 'Cantidad y precio unitario no pueden ser negativos');
+      }
+      if (it.vatPercent !== undefined && (Number(it.vatPercent) < 0 || Number(it.vatPercent) > 100)) {
+        throw new ApiError(400, 'vatPercent debe estar entre 0 y 100');
+      }
+    }
+    const budgetItemIds = items.filter((it) => it.budgetItemId).map((it) => it.budgetItemId);
+    if (budgetItemIds.length) {
+      if (!nextProjectId) throw new ApiError(400, 'No se puede vincular ítems de presupuesto sin asignar un proyecto a la orden');
+      const linked = await BudgetItem.findAll({ where: { id: budgetItemIds }, include: [{ association: 'Budget' }] });
+      const validIds = new Set(linked.filter((b) => b.Budget.projectId === nextProjectId).map((b) => b.id));
+      for (const id of budgetItemIds) {
+        if (!validIds.has(id)) throw new ApiError(400, `El ítem de presupuesto ${id} no pertenece a este proyecto`);
+      }
+    }
+
+    await sequelize.transaction(async (t) => {
+      const existingById = new Map(order.items.map((it) => [it.id, it]));
+      const submittedIds = new Set(items.filter((it) => it.id).map((it) => it.id));
+
+      for (const existing of order.items) {
+        if (submittedIds.has(existing.id)) continue;
+        const delivered = existing.receipts.reduce((s, r) => s + Number(r.quantityReceived), 0);
+        if (delivered > 0) {
+          throw new ApiError(400, `No se puede quitar el ítem "${existing.name}": ya tiene entregas registradas.`);
+        }
+        await existing.destroy({ transaction: t });
+      }
+
+      for (const it of items) {
+        const nextQuantity = Number(it.quantityOrdered);
+        const nextUnitPrice = Number(it.unitPrice);
+        const totalValue = nextQuantity * nextUnitPrice;
+        if (it.id && existingById.has(it.id)) {
+          const existing = existingById.get(it.id);
+          const delivered = existing.receipts.reduce((s, r) => s + Number(r.quantityReceived), 0);
+          if (nextQuantity < delivered) {
+            throw new ApiError(400, `La cantidad de "${it.name}" (${nextQuantity}) no puede ser menor a la ya entregada (${delivered})`);
+          }
+          existing.name = it.name;
+          existing.unit = it.unit;
+          existing.quantityOrdered = it.quantityOrdered;
+          existing.unitPrice = it.unitPrice;
+          existing.vatPercent = it.vatPercent !== undefined ? it.vatPercent : existing.vatPercent;
+          existing.budgetItemId = it.budgetItemId || null;
+          existing.totalValue = totalValue;
+          await existing.save({ transaction: t });
+        } else {
+          await PurchaseOrderItem.create({
+            purchaseOrderId: order.id,
+            budgetItemId: it.budgetItemId || null,
+            name: it.name,
+            unit: it.unit,
+            quantityOrdered: it.quantityOrdered,
+            unitPrice: it.unitPrice,
+            totalValue,
+            vatPercent: it.vatPercent !== undefined ? it.vatPercent : 19,
+          }, { transaction: t });
+        }
+      }
+
+      if (order.expenseId) {
+        const freshItems = await PurchaseOrderItem.findAll({ where: { purchaseOrderId: order.id }, transaction: t });
+        const newTotals = computeOrderTotals(freshItems, order.retentionPercent);
+        await Expense.update({ amount: newTotals.grandTotal }, { where: { id: order.expenseId }, transaction: t });
+        await ExpenseItem.destroy({ where: { expenseId: order.expenseId }, transaction: t });
+        await ExpenseItem.bulkCreate(freshItems.map((it) => ({
+          expenseId: order.expenseId,
+          description: it.name,
+          quantity: it.quantityOrdered,
+          unitPrice: it.unitPrice,
+          totalPrice: it.totalValue,
+        })), { transaction: t });
+      }
+
+      await order.save({ transaction: t });
+    });
+  } else {
+    await order.save();
+  }
+
+  const freshItems = await getOrderItemsWithDelivery(order.id);
+  const totals = computeOrderTotals(freshItems, order.retentionPercent);
+  res.json({ ...order.toJSON(), items: freshItems, totals });
 });
 
 // Elimina la orden completa (sus ítems se borran en cascada). Bloqueada si ya generó cualquier
