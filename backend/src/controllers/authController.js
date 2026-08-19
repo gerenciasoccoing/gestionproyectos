@@ -2,7 +2,13 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { User, Role, Permission, Company } = require('../models');
+const { Company } = require('../models');
+// La búsqueda del login es la única del sistema que no puede tener companyId en el where (es
+// justo lo que resuelve) — con la Capa 2 (RLS) activa, la conexión normal de la app ya no puede
+// ver NINGUNA fila de "Users" sin ese filtro (antes solo era un problema a nivel de hooks, ahora
+// también a nivel de PostgreSQL). Se usa la conexión de administración, exenta de RLS, solo para
+// esta consulta puntual — mismo espíritu que hooks:false, ahora también en la Capa 2.
+const { User: AdminUser, Role: AdminRole, Permission: AdminPermission } = require('../models/adminModels');
 
 function signToken(user) {
   return jwt.sign({ sub: user.id, companyId: user.companyId }, process.env.JWT_SECRET, {
@@ -19,9 +25,9 @@ const login = asyncHandler(async (req, res) => {
   // usuario pertenece a una sola empresa) y porque después de este login, cada petición queda
   // anclada a esa empresa vía el JWT (ver middleware/auth.js) — este es el único lugar del código
   // donde se busca un usuario sin ese filtro.
-  const user = await User.findOne({
+  const user = await AdminUser.findOne({
     where: { email },
-    include: [{ model: Role, include: [Permission] }],
+    include: [{ model: AdminRole, include: [AdminPermission] }],
     hooks: false,
   });
   if (!user || !user.active) throw new ApiError(401, 'Credenciales inválidas');

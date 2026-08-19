@@ -1,4 +1,4 @@
-const { getCurrentCompanyId } = require('./tenantContext');
+const { getCurrentCompanyId, getCurrentTransaction } = require('./tenantContext');
 
 // Agrega companyId a un `where` de Sequelize sin importar su forma (objeto plano, con
 // operadores Op.and/Op.or a nivel raíz, o vacío/undefined) — un merge superficial es suficiente
@@ -8,16 +8,33 @@ function mergeCompanyWhere(where, companyId) {
   return { ...(where || {}), companyId };
 }
 
+// Capa 2 (RLS, ver postSyncFixups.js#applyRowLevelSecurity): las políticas solo pueden aplicarse si
+// la consulta corre en la MISMA conexión/transacción donde se dejó seteado el GUC
+// app.current_company_id (ver tenantContext.js) — SET LOCAL no sobrevive fuera de esa transacción,
+// y el pool de conexiones podría reutilizar una física distinta en la siguiente consulta. Por eso
+// cada hook además fuerza options.transaction a la transacción activa, salvo que el que llama ya
+// haya puesto una explícita a mano (no se pisa esa decisión).
+function attachTransaction(options) {
+  if (!options.transaction) {
+    const transaction = getCurrentTransaction();
+    if (transaction) options.transaction = transaction;
+  }
+}
+
 // Aplica aislamiento multi-tenant automático a un modelo "de empresa": intercepta toda lectura
 // (find/count/update masivo/destroy masivo) para exigir companyId = empresa de la petición
 // actual, e intercepta toda creación para asignar ese companyId si no vino ya puesto. No requiere
-// que cada controlador se acuerde de filtrar — el filtro vive acá, una sola vez.
+// que cada controlador se acuerde de filtrar — el filtro vive acá, una sola vez. Esta es la Capa 1
+// del aislamiento (a nivel de aplicación); la Capa 2 (RLS a nivel de PostgreSQL, ver
+// postSyncFixups.js) es un respaldo independiente por si algún día un hook como este tuviera un bug
+// o se agregara una consulta que lo esquivara sin querer.
 //
-// Debe llamarse en models/index.js para cada modelo de negocio (todos menos Permission, que es un
-// catálogo global fijo, y Company, que ES la tabla de empresas).
+// Debe llamarse en models/defineModels.js para cada modelo de negocio (todos menos Permission, que
+// es un catálogo global fijo, y Company, que ES la tabla de empresas).
 //
 // Fuera de este alcance quedan las consultas SQL crudas (sequelize.query(...)) — esas se auditan
-// y se les agrega companyId a mano en cada caso; están documentadas en MULTI_TENANT_AUDIT.md.
+// y se les agrega companyId (y transaction, para la Capa 2) a mano en cada caso; están
+// documentadas en MULTI_TENANT_AUDIT.md.
 function applyTenantScoping(model) {
   const requireCompanyId = () => {
     const companyId = getCurrentCompanyId();
@@ -31,6 +48,7 @@ function applyTenantScoping(model) {
 
   const scopeWhereOptions = (options) => {
     options.where = mergeCompanyWhere(options.where, requireCompanyId());
+    attachTransaction(options);
   };
 
   model.addHook('beforeFind', scopeWhereOptions);
@@ -38,18 +56,31 @@ function applyTenantScoping(model) {
   model.addHook('beforeBulkUpdate', scopeWhereOptions);
   model.addHook('beforeBulkDestroy', scopeWhereOptions);
 
-  model.addHook('beforeCreate', (instance) => {
+  model.addHook('beforeCreate', (instance, options) => {
     if (!instance.companyId) instance.companyId = requireCompanyId();
+    attachTransaction(options);
   });
-  model.addHook('beforeBulkCreate', (instances) => {
+  model.addHook('beforeBulkCreate', (instances, options) => {
     const companyId = requireCompanyId();
     instances.forEach((instance) => {
       if (!instance.companyId) instance.companyId = companyId;
     });
+    attachTransaction(options);
   });
-  model.addHook('beforeUpsert', (values) => {
+  model.addHook('beforeUpsert', (values, options) => {
     if (!values.companyId) values.companyId = requireCompanyId();
+    attachTransaction(options);
   });
+
+  // instance.update()/instance.save()/instance.destroy() (el patrón más común en los
+  // controladores: primero un find ya scopeado por beforeFind, después modificar la instancia)
+  // no pasan por beforeBulkUpdate/beforeBulkDestroy — son hooks de instancia aparte. No hace falta
+  // volver a filtrar por companyId acá (la fila ya se obtuvo de un find scopeado), pero SÍ hace
+  // falta engancharlas a la transacción activa: sin esto, la Capa 2 (RLS) las bloquearía en
+  // silencio (0 filas afectadas) por correr en una conexión sin el GUC seteado.
+  model.addHook('beforeUpdate', (instance, options) => attachTransaction(options));
+  model.addHook('beforeDestroy', (instance, options) => attachTransaction(options));
+  model.addHook('beforeSave', (instance, options) => attachTransaction(options));
 }
 
 module.exports = { applyTenantScoping, mergeCompanyWhere };

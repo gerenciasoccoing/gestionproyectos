@@ -4,6 +4,18 @@ const {
   sequelize, InventoryItem, InventoryCheckout, InventoryCheckoutItem, InventoryCheckin, InventoryConfirmation,
   Project, Employee, ThirdParty, User,
 } = require('../models');
+// Los dos endpoints públicos de confirmación (sin sesión, ver inventoryConfirmationRoutes.js)
+// resuelven la empresa a partir del token — no hay companyId de contexto todavía, igual que el
+// login. Con la Capa 2 (RLS) activa eso ya no alcanza con hooks:false: la conexión normal de la
+// app tampoco podría VER la fila en PostgreSQL sin ese filtro. Se usa la conexión de
+// administración (exenta de RLS) solo para estas dos consultas puntuales; todo el include tiene
+// que salir de esa misma conexión (Sequelize no mezcla modelos de instancias distintas en un
+// include).
+const {
+  sequelize: adminSequelize, InventoryCheckout: AdminInventoryCheckout, InventoryCheckoutItem: AdminInventoryCheckoutItem,
+  InventoryCheckin: AdminInventoryCheckin, InventoryConfirmation: AdminInventoryConfirmation,
+  InventoryItem: AdminInventoryItem, Project: AdminProject, Employee: AdminEmployee, ThirdParty: AdminThirdParty, User: AdminUser,
+} = require('../models/adminModels');
 
 // Cuántas horas queda vigente un enlace de confirmación antes de considerarse vencido (ver
 // isExpired). Configurable porque distintos clientes pueden necesitar más o menos margen según
@@ -25,6 +37,23 @@ const CHECKOUT_DETAIL_INCLUDE = [
     ],
   },
   { model: InventoryConfirmation, as: 'confirmations' },
+];
+
+// Mismo árbol de includes que CHECKOUT_DETAIL_INCLUDE, pero con los modelos de la conexión de
+// administración — solo para getConfirmationByToken/confirmToken (ver arriba).
+const ADMIN_CHECKOUT_DETAIL_INCLUDE = [
+  { model: AdminProject },
+  { model: AdminEmployee, as: 'responsibleEmployee' },
+  { model: AdminThirdParty, as: 'responsibleThirdParty' },
+  { model: AdminUser, as: 'authorizedByUser', attributes: ['id', 'name', 'email'] },
+  {
+    model: AdminInventoryCheckoutItem,
+    as: 'items',
+    include: [
+      { model: AdminInventoryItem },
+      { model: AdminInventoryCheckin, as: 'checkins', include: [{ model: AdminUser, as: 'receivedByUser', attributes: ['id', 'name', 'email'] }] },
+    ],
+  },
 ];
 
 // Token opaco de 192 bits, independiente de cualquier id interno (no expone ni permite inferir
@@ -307,13 +336,10 @@ async function getItemHistory(inventoryItemId) {
 // (buildPublicSummary). No valida vigencia acá: eso lo decide quien llama (get vs. confirm tratan
 // el vencimiento distinto — get lo muestra, confirm lo rechaza).
 async function getConfirmationByToken(token) {
-  // hooks:false: endpoint público (sin sesión, ver inventoryConfirmationRoutes.js) — no hay
-  // companyId de contexto todavía porque justamente esta consulta es la que lo resuelve, a
-  // partir del token (192 bits aleatorios, imposible de adivinar). Es la única consulta de todo
-  // este flujo, gracias al include, así que es el único punto que necesita este escape.
-  const confirmation = await InventoryConfirmation.findOne({
+  // hooks:false + conexión de administración: ver comentario junto al import de arriba.
+  const confirmation = await AdminInventoryConfirmation.findOne({
     where: { token },
-    include: [{ model: InventoryCheckout, as: 'checkout', include: CHECKOUT_DETAIL_INCLUDE }],
+    include: [{ model: AdminInventoryCheckout, as: 'checkout', include: ADMIN_CHECKOUT_DETAIL_INCLUDE }],
     hooks: false,
   });
   if (!confirmation) throw new ApiError(404, 'Enlace de confirmación no encontrado o inválido');
@@ -324,9 +350,9 @@ async function getConfirmationByToken(token) {
 // reconfirmar). No registra "quién" más allá del responsable ya conocido del movimiento (el
 // enlace se asume enviado solo a esa persona); solo queda el timestamp de confirmación.
 async function confirmToken(token) {
-  return sequelize.transaction(async (t) => {
-    // hooks:false: mismo motivo que en getConfirmationByToken — endpoint público sin sesión.
-    const confirmation = await InventoryConfirmation.findOne({ where: { token }, transaction: t, lock: t.LOCK.UPDATE, hooks: false });
+  return adminSequelize.transaction(async (t) => {
+    // hooks:false + conexión de administración: mismo motivo que en getConfirmationByToken.
+    const confirmation = await AdminInventoryConfirmation.findOne({ where: { token }, transaction: t, lock: t.LOCK.UPDATE, hooks: false });
     if (!confirmation) throw new ApiError(404, 'Enlace de confirmación no encontrado o inválido');
     if (confirmation.status === 'confirmado') throw new ApiError(409, 'Este movimiento ya fue confirmado anteriormente.');
     if (new Date() > new Date(confirmation.expiresAt)) throw new ApiError(410, 'Este enlace de confirmación venció. Contacta al administrador para gestionarlo manualmente.');

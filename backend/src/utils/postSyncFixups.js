@@ -1,12 +1,25 @@
 const fs = require('fs');
 const path = require('path');
+// Conexión de administración: este archivo hace DDL (ALTER TABLE, políticas RLS, creación del rol
+// restringido) y backfills que cruzan empresas — todo eso exige el rol dueño de las tablas, no el
+// restringido que usa la app en tiempo real (ver models/adminModels.js).
 const {
   sequelize, Company, CashBox,
   Contract, Employee, Expense, InventoryItem, Minute, PaymentReceipt, Policy,
   ProgressPhoto, Severance, SocialSecurityDocument, ThirdParty,
-} = require('../models');
-const { runWithCompany } = require('../utils/tenantContext');
+} = require('../models/adminModels');
+const { TENANT_SCOPING_EXCLUDED } = require('../models/defineModels');
+const { runInTransactionContext } = require('../utils/tenantContext');
 const { UPLOAD_ROOT } = require('../middleware/upload');
+
+// Mismo criterio que applyTenantScoping.js: algunos modelos excluidos del aislamiento (ej.
+// SupportAccessLog) igual tienen una columna companyId como dato simple (a qué empresa se accedió),
+// sin que la FILA esté scopeada a esa empresa — no deben backfillearse como si lo estuvieran ni
+// llevar política RLS, o cualquier operador vería solo su propio "companyId" de referencia en vez
+// del historial completo de todas las empresas.
+function isTenantScopedModel(model) {
+  return Boolean(model.rawAttributes.companyId) && !TENANT_SCOPING_EXCLUDED.includes(model.name);
+}
 
 // sequelize.sync({ alter: true }) añade columnas nuevas de forma segura, pero no siempre
 // relaja restricciones NOT NULL en columnas existentes (limitación conocida en Postgres).
@@ -32,7 +45,7 @@ async function backfillTenantColumns() {
   const company = await Company.findOne({ order: [['createdAt', 'ASC']] });
 
   for (const model of Object.values(sequelize.models)) {
-    if (!model.rawAttributes.companyId) continue; // Company y Permission quedan afuera
+    if (!isTenantScopedModel(model)) continue;
     const table = model.getTableName();
     if (company) {
       await sequelize.query(
@@ -150,6 +163,65 @@ async function migrateUploadsToCompanyFolders(companyId) {
   }
 }
 
+// Capa 2 del aislamiento multi-tenant (Row-Level Security): un respaldo a nivel de PostgreSQL,
+// independiente del código de la aplicación (Capa 1, ver applyTenantScoping.js) — protege incluso
+// si algún día un desarrollador agrega una consulta nueva y se olvida el filtro. Solo tiene efecto
+// real para un rol de base de datos que NO sea dueño de las tablas (por defecto, PostgreSQL exime
+// al dueño de sus propias políticas RLS, a propósito acá — así los scripts de migración/backfill
+// de esta misma conexión de administración, que necesitan ver/tocar filas de cualquier empresa,
+// siguen funcionando sin choques). Por eso el rol restringido de ensureAppDbRole() es la pieza que
+// hace que esto sea protección real y no solo teoría.
+const APP_DB_USER = process.env.APP_DB_USER || 'gestionproyectos_app';
+
+async function ensureAppDbRole() {
+  const password = process.env.APP_DB_PASSWORD;
+  if (!password) {
+    throw new Error('Falta APP_DB_PASSWORD: es la contraseña del rol restringido de base de datos que usa la app en tiempo real (Capa 2, RLS).');
+  }
+
+  const [[{ exists }]] = await sequelize.query(
+    'SELECT EXISTS (SELECT FROM pg_roles WHERE rolname = :user) AS exists',
+    { replacements: { user: APP_DB_USER } }
+  );
+  if (exists) {
+    await sequelize.query(`ALTER ROLE "${APP_DB_USER}" WITH LOGIN PASSWORD :password`, { replacements: { password } });
+  } else {
+    await sequelize.query(`CREATE ROLE "${APP_DB_USER}" WITH LOGIN PASSWORD :password`, { replacements: { password } });
+    console.log(`[postSyncFixups] Rol de base de datos "${APP_DB_USER}" creado (Capa 2, RLS).`);
+  }
+
+  const dbName = sequelize.getDatabaseName();
+  await sequelize.query(`GRANT CONNECT ON DATABASE "${dbName}" TO "${APP_DB_USER}"`);
+  await sequelize.query(`GRANT USAGE ON SCHEMA public TO "${APP_DB_USER}"`);
+  await sequelize.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO "${APP_DB_USER}"`);
+  // Para que las tablas que se creen en un sync() futuro (un modelo nuevo, en un despliegue
+  // posterior) queden con estos mismos permisos sin tener que acordarse de correr este GRANT de
+  // nuevo — aplica a lo que cree ESTA MISMA conexión (dueña), que es quien siempre corre sync().
+  await sequelize.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO "${APP_DB_USER}"`);
+}
+
+// Política de aislamiento por tabla: USING controla qué filas se pueden ver/actualizar/borrar,
+// WITH CHECK controla qué filas se pueden insertar/dejar tras un update — sin WITH CHECK, un
+// UPDATE podría "mover" una fila a otra empresa aunque no pudiera verla después. NULLIF(...,'')
+// sobre current_setting(..., true) (el true = no lanzar error si no está seteado) hace que, si el
+// GUC no está seteado (cualquier código que no haya pasado por el contexto de empresa), la
+// comparación sea contra NULL y por lo tanto nunca sea verdadera — sin GUC, cero filas visibles;
+// nunca "todas las filas" por accidente. Sin FORCE ROW LEVEL SECURITY a propósito (ver comentario
+// de más arriba): el rol dueño de las tablas (esta misma conexión) queda exento.
+async function applyRowLevelSecurity() {
+  for (const model of Object.values(sequelize.models)) {
+    if (!isTenantScopedModel(model)) continue;
+    const table = model.getTableName();
+    await sequelize.query(`ALTER TABLE "${table}" ENABLE ROW LEVEL SECURITY`);
+    await sequelize.query(`DROP POLICY IF EXISTS tenant_isolation ON "${table}"`);
+    await sequelize.query(`
+      CREATE POLICY tenant_isolation ON "${table}"
+        USING ("companyId" = NULLIF(current_setting('app.current_company_id', true), '')::uuid)
+        WITH CHECK ("companyId" = NULLIF(current_setting('app.current_company_id', true), '')::uuid)
+    `);
+  }
+}
+
 async function applyPostSyncFixups() {
   await dropDuplicateUniqueConstraints();
 
@@ -183,7 +255,9 @@ async function applyPostSyncFixups() {
   await migrateUploadsToCompanyFolders(company?.id);
 
   if (company) {
-    await runWithCompany(company.id, async () => {
+    // No hace falta transacción/GUC acá: esta conexión (administración) no está sujeta a RLS, solo
+    // necesita companyId en el contexto de JS para que el hook de la Capa 1 estampe la fila nueva.
+    await runInTransactionContext(company.id, null, async () => {
       const [defaultCashBox] = await CashBox.findOrCreate({
         where: { name: 'Caja general' },
         defaults: { initialBalance: 0, status: 'activa' },
@@ -195,6 +269,9 @@ async function applyPostSyncFixups() {
     });
   }
   await sequelize.query('ALTER TABLE "Expenses" ALTER COLUMN "cashBoxId" SET NOT NULL;');
+
+  await ensureAppDbRole();
+  await applyRowLevelSecurity();
 }
 
 module.exports = { applyPostSyncFixups };

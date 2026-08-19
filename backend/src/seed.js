@@ -1,21 +1,21 @@
 require('dotenv').config();
-const { sequelize, Company } = require('./models');
+const { sequelize: adminSequelize, Company: AdminCompany } = require('./models/adminModels');
 const { applyPreSyncFixups } = require('./utils/preSyncFixups');
 const { applyPostSyncFixups } = require('./utils/postSyncFixups');
 const { seedDefaultsForCompany } = require('./services/companyProvisioningService');
 
 async function seed() {
-  await sequelize.authenticate();
+  await adminSequelize.authenticate();
   await applyPreSyncFixups();
-  await sequelize.sync({ alter: true });
+  await adminSequelize.sync({ alter: true });
   await applyPostSyncFixups();
 
   // Instalación existente (ej. producción, ya migrada a multi-tenant): usa la primera empresa que
   // encuentre — no crea una nueva ni pisa sus datos. Instalación nueva (ej. este sandbox de
   // desarrollo, sin ninguna empresa todavía): crea una empresa por defecto para arrancar.
-  let company = await Company.findOne({ order: [['createdAt', 'ASC']] });
+  let company = await AdminCompany.findOne({ order: [['createdAt', 'ASC']] });
   if (!company) {
-    company = await Company.create({ companyName: 'Mi Empresa Constructora' });
+    company = await AdminCompany.create({ companyName: 'Mi Empresa Constructora' });
   }
   // El default de % prestaciones subió de 70% a 85%: si la instancia ya tenía guardado el valor
   // viejo (nunca personalizado a mano), se actualiza; si alguien ya lo cambió a otra cosa, se respeta.
@@ -25,6 +25,9 @@ async function seed() {
 
   const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@empresa.com';
   const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'Admin123!';
+  // seedDefaultsForCompany usa la conexión restringida (companyProvisioningService.js) — ya
+  // funciona bajo RLS sin cambios, porque runWithCompany abre su propia transacción de corta vida
+  // y setea el GUC cuando no hay una ambiente (ver tenantContext.js).
   await seedDefaultsForCompany(company, { adminName: 'Administrador', adminEmail, adminPassword });
 
   console.log('Seed completado.');

@@ -7,7 +7,7 @@
 require('dotenv').config();
 const { sequelize, Company, APU, APUComponent, PriceItem } = require('../models');
 const { computeSectionCosts } = require('../services/budgetService');
-const { runWithCompany } = require('../utils/tenantContext');
+const { runWithCompany, getCurrentTransaction } = require('../utils/tenantContext');
 
 // APU está protegido por aislamiento multi-tenant: recorre cada empresa por separado (en vez de
 // una sola consulta global) para que el backfill de cada una solo toque su propio catálogo.
@@ -32,8 +32,11 @@ async function run() {
         const batch = updates.slice(i, i + BATCH_SIZE);
         const values = batch.map((u) => `(${sequelize.escape(u.id)}, ${u.directCost})`).join(',');
         // eslint-disable-next-line no-await-in-loop
+        // Capa 2 (RLS): sin pasar la transacción activa a mano, este UPDATE crudo correría en una
+        // conexión sin el GUC app.current_company_id seteado y quedaría bloqueado en silencio.
         await sequelize.query(
-          `UPDATE "APUs" AS a SET "directCost" = v.dc FROM (VALUES ${values}) AS v(id, dc) WHERE a.id = v.id::uuid`
+          `UPDATE "APUs" AS a SET "directCost" = v.dc FROM (VALUES ${values}) AS v(id, dc) WHERE a.id = v.id::uuid`,
+          { transaction: getCurrentTransaction() }
         );
         console.log(`  ${Math.min(i + BATCH_SIZE, updates.length)}/${updates.length}`);
       }

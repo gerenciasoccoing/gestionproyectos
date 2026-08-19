@@ -19,7 +19,15 @@ services:
     restart: always
     environment:
       PORT: 4000
-      DATABASE_URL: postgres://gestionproyectos:${POSTGRES_PASSWORD}@db:5432/gestionproyectos
+      # Conexión restringida (Capa 2/RLS): la que atiende peticiones HTTP reales, con un rol de
+      # base de datos que NO es dueño de las tablas (ver backend/src/utils/postSyncFixups.js#ensureAppDbRole
+      # — el rol se crea solo, en el primer arranque, con esta misma contraseña).
+      DATABASE_URL: postgres://gestionproyectos_app:${APP_DB_PASSWORD}@db:5432/gestionproyectos
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+      # Conexión de administración (dueña de las tablas): solo para sync/DDL/migraciones y scripts
+      # de mantenimiento (seed.js, createPlatformAdmin.js) — mismas credenciales que siempre tuvo
+      # DATABASE_URL antes de separar los dos roles.
+      ADMIN_DATABASE_URL: postgres://gestionproyectos:${POSTGRES_PASSWORD}@db:5432/gestionproyectos
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: 8h
       UPLOAD_DIR: uploads
