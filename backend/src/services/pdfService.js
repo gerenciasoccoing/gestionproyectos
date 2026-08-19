@@ -495,34 +495,61 @@ function generatePurchaseOrderPdf({ order, items, company, lang = 'es' }) {
   }
 
   sectionTitle(doc, L.itemsSection);
-  const tableTop = doc.y + 5;
   const colX = { code: 50, desc: 95, unit: 245, ordered: 292, delivered: 345, unitValue: 405, total: 475 };
-  doc.font('Helvetica-Bold').fontSize(8);
-  doc.text(L.code, colX.code, tableTop, { width: 43 });
-  doc.text(L.description, colX.desc, tableTop, { width: 148 });
-  doc.text(L.unit, colX.unit, tableTop, { width: 45 });
-  doc.text(L.ordered, colX.ordered, tableTop, { width: 51 });
-  doc.text(L.delivered, colX.delivered, tableTop, { width: 58 });
-  doc.text(L.unitValue, colX.unitValue, tableTop, { width: 68 });
-  doc.text(L.total, colX.total, tableTop, { width: 70 });
-  doc.moveTo(50, tableTop + 14).lineTo(545, tableTop + 14).stroke();
+  const colW = { code: 43, desc: 148, unit: 45, ordered: 51, delivered: 58, unitValue: 68, total: 70 };
+  // Alto de fila FIJO (18pt) era el bug: si item.name envolvía a más de una línea dentro de sus
+  // 148pt de ancho, la fila siguiente arrancaba 18pt después de todos modos, quedando escrita
+  // encima del texto que ya se había desbordado — de ahí las filas sobrepuestas/ilegibles con
+  // descripciones largas. Acá el alto de cada fila se mide con heightOfString ANTES de dibujarla
+  // (el máximo entre las columnas que pueden envolver texto), y el salto de página también se
+  // decide antes de dibujar en base a ese alto real — así nunca se corta una fila a la mitad entre
+  // dos páginas, sin importar cuántos ítems tenga la orden.
+  const ITEMS_BOTTOM_LIMIT = 730; // margen inferior de la página (margin:50, alto carta 792)
+  const ROW_PADDING = 8;
 
-  let y = tableTop + 20;
-  doc.font('Helvetica').fontSize(8);
+  function drawItemsTableHeader(yPos) {
+    doc.font('Helvetica-Bold').fontSize(8);
+    doc.text(L.code, colX.code, yPos, { width: colW.code });
+    doc.text(L.description, colX.desc, yPos, { width: colW.desc });
+    doc.text(L.unit, colX.unit, yPos, { width: colW.unit });
+    doc.text(L.ordered, colX.ordered, yPos, { width: colW.ordered });
+    doc.text(L.delivered, colX.delivered, yPos, { width: colW.delivered });
+    doc.text(L.unitValue, colX.unitValue, yPos, { width: colW.unitValue });
+    doc.text(L.total, colX.total, yPos, { width: colW.total });
+    doc.moveTo(50, yPos + 14).lineTo(545, yPos + 14).stroke();
+    doc.font('Helvetica').fontSize(8);
+    return yPos + 20;
+  }
+
+  let y = drawItemsTableHeader(doc.y + 5);
   let subtotal = 0;
   items.forEach((item) => {
-    if (y > 700) { doc.addPage(); y = 50; }
-    doc.text(item.code || '-', colX.code, y, { width: 43 });
-    doc.text(item.name, colX.desc, y, { width: 148 });
-    doc.text(item.unit, colX.unit, y, { width: 45 });
-    doc.text(String(Number(item.quantityOrdered)), colX.ordered, y, { width: 51 });
-    doc.text(String(Number(item.delivered || 0)), colX.delivered, y, { width: 58 });
-    doc.text(money(item.unitPrice), colX.unitValue, y, { width: 68 });
-    doc.text(money(item.totalValue), colX.total, y, { width: 70 });
+    const codeText = item.code || '-';
+    const rowHeight = ROW_PADDING + Math.max(
+      10,
+      doc.heightOfString(codeText, { width: colW.code }),
+      doc.heightOfString(item.name, { width: colW.desc }),
+      doc.heightOfString(item.unit, { width: colW.unit })
+    );
+    if (y + rowHeight > ITEMS_BOTTOM_LIMIT) {
+      doc.addPage();
+      y = drawItemsTableHeader(50);
+    }
+    doc.text(codeText, colX.code, y, { width: colW.code });
+    doc.text(item.name, colX.desc, y, { width: colW.desc });
+    doc.text(item.unit, colX.unit, y, { width: colW.unit });
+    doc.text(String(Number(item.quantityOrdered)), colX.ordered, y, { width: colW.ordered });
+    doc.text(String(Number(item.delivered || 0)), colX.delivered, y, { width: colW.delivered });
+    doc.text(money(item.unitPrice), colX.unitValue, y, { width: colW.unitValue });
+    doc.text(money(item.totalValue), colX.total, y, { width: colW.total });
     subtotal += Number(item.totalValue);
-    y += 18;
+    y += rowHeight;
   });
 
+  // El bloque de totales (línea + 3 renglones) ocupa ~78pt fijos: si la última fila de ítems
+  // terminó cerca del límite de la página, se reserva espacio en una página nueva en vez de
+  // escribir más allá del margen inferior (donde quedaría invisible/cortado).
+  if (y + 78 > ITEMS_BOTTOM_LIMIT + 12) { doc.addPage(); y = 50; }
   y += 8;
   doc.moveTo(350, y).lineTo(545, y).stroke();
   y += 8;
