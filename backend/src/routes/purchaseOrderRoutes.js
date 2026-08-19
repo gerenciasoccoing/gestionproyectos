@@ -10,6 +10,8 @@ router.get('/', requirePermission('ordenes_compra', 'view'), purchaseOrderContro
 router.post('/', requirePermission('ordenes_compra', 'create'), purchaseOrderController.create);
 router.get('/:id', requirePermission('ordenes_compra', 'view'), purchaseOrderController.get);
 router.get('/:id/pdf', requirePermission('ordenes_compra', 'view'), purchaseOrderController.exportPdf);
+router.put('/:id', requirePermission('ordenes_compra', 'edit'), purchaseOrderController.updateOrder);
+router.delete('/:id', requirePermission('ordenes_compra', 'delete'), purchaseOrderController.remove);
 router.put('/:id/items/:itemId', requirePermission('ordenes_compra', 'edit'), purchaseOrderController.updateItem);
 router.post('/:id/convert-to-expense', requirePermission('ordenes_compra', 'edit'), purchaseOrderController.convertToExpense);
 router.post('/:id/items/:itemId/receipts', requirePermission('ordenes_compra', 'edit'), purchaseOrderController.addReceipt);

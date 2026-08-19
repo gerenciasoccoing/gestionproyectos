@@ -1,54 +1,61 @@
 import { useEffect, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { purchaseOrdersApi, budgetApi, thirdPartiesApi, cashBoxesApi } from '../../api';
+import { supplierPurchaseOrdersApi, thirdPartiesApi, projectsApi, budgetApi, cashBoxesApi } from '../../api';
 import { Card, Button, Input, Select, SearchSelect, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { purchaseOrderPdfUrl } from '../../api/client';
 import Can from '../../components/Can';
 
-const STATUS_COLORS = {
-  abierta: 'yellow',
-  parcial: 'blue',
-  cerrada: 'green',
-  cerrada_con_faltantes: 'red',
-};
-
+const STATUS_COLORS = { abierta: 'yellow', parcial: 'blue', cerrada: 'green', cerrada_con_faltantes: 'red' };
 const CATEGORIES = ['mano_obra', 'materiales', 'equipos', 'viaticos', 'imprevistos'];
 
 function emptyOrderLine() { return { name: '', unit: '', quantityOrdered: '', unitPrice: '', budgetItemId: '', vatPercent: 19 }; }
 
-export default function PurchaseOrdersPage() {
+// Vista general de Órdenes de Compra (menú principal): mismo modelo/backend que la creación desde
+// Ejecución de Proyecto (PurchaseOrdersPage.jsx) y desde la ficha de un Proveedor
+// (SuppliersPage.jsx) — los tres puntos de entrada llaman al mismo endpoint /purchase-orders y
+// leen/escriben la misma tabla. Una orden creada acá con projectId aparece automáticamente en el
+// listado de Ejecución de ese proyecto, y viceversa.
+export default function PurchaseOrdersMenuPage() {
   const { t, i18n } = useTranslation();
-  const { projectId } = useOutletContext();
   const [orders, setOrders] = useState([]);
-  const [budgetItems, setBudgetItems] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [budgetItems, setBudgetItems] = useState([]);
   const [cashBoxes, setCashBoxes] = useState([]);
-  const [expandedId, setExpandedId] = useState(null);
+  const [filterSupplierId, setFilterSupplierId] = useState('');
+  const [filterProjectId, setFilterProjectId] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ projectId: '', supplier: '', supplierId: '', date: '', cashBoxId: '', retentionPercent: 0, items: [emptyOrderLine()] });
   const [error, setError] = useState('');
-  const [form, setForm] = useState({ supplier: '', supplierId: '', date: '', cashBoxId: '', retentionPercent: 0, items: [emptyOrderLine()] });
-  const [report, setReport] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
   const [editingOrderId, setEditingOrderId] = useState(null);
-  const [editForm, setEditForm] = useState({ date: '', cashBoxId: '', retentionPercent: 0 });
+  const [editForm, setEditForm] = useState({ projectId: '', date: '', cashBoxId: '', retentionPercent: 0 });
 
   const cashBoxOptions = cashBoxes.filter((cb) => cb.status === 'activa');
 
-  const load = () => purchaseOrdersApi.list(projectId).then(setOrders);
+  const load = () => {
+    const params = {};
+    if (filterSupplierId) params.supplierId = filterSupplierId;
+    if (filterProjectId) params.projectId = filterProjectId;
+    supplierPurchaseOrdersApi.list(params).then(setOrders);
+  };
+  useEffect(() => { load(); }, [filterSupplierId, filterProjectId]);
   useEffect(() => {
-    load();
-    budgetApi.get(projectId).then((d) => setBudgetItems(d.items));
+    projectsApi.list().then(setProjects);
     thirdPartiesApi.list({ type: 'proveedor' }).then(setSuppliers);
     cashBoxesApi.list().then(setCashBoxes);
-  }, [projectId]);
+  }, []);
+  useEffect(() => {
+    if (form.projectId) budgetApi.get(form.projectId).then((d) => setBudgetItems(d.items)).catch(() => setBudgetItems([]));
+    else setBudgetItems([]);
+  }, [form.projectId]);
 
-  const updateItemRow = (idx, field, value) => {
-    setForm((f) => {
-      const items = [...f.items];
-      items[idx] = { ...items[idx], [field]: value };
-      return { ...f, items };
-    });
-  };
+  const resetForm = () => setForm({ projectId: '', supplier: '', supplierId: '', date: '', cashBoxId: '', retentionPercent: 0, items: [emptyOrderLine()] });
+  const updateItemRow = (idx, field, value) => setForm((f) => {
+    const items = [...f.items];
+    items[idx] = { ...items[idx], [field]: value };
+    return { ...f, items };
+  });
   const addRow = () => setForm((f) => ({ ...f, items: [...f.items, emptyOrderLine()] }));
   const removeRow = (idx) => setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
 
@@ -62,16 +69,16 @@ export default function PurchaseOrdersPage() {
     setError('');
     if (!form.cashBoxId) { setError(t('expenses.cashBoxRequired')); return; }
     try {
-      const payload = {
+      await supplierPurchaseOrdersApi.create({
         supplier: form.supplier,
         supplierId: form.supplierId || undefined,
+        projectId: form.projectId || undefined,
         date: form.date,
         cashBoxId: form.cashBoxId,
         retentionPercent: form.retentionPercent || 0,
         items: form.items.map((it) => ({ ...it, budgetItemId: it.budgetItemId || undefined })),
-      };
-      await purchaseOrdersApi.create(projectId, payload);
-      setForm({ supplier: '', supplierId: '', date: '', cashBoxId: '', retentionPercent: 0, items: [emptyOrderLine()] });
+      });
+      resetForm();
       setShowForm(false);
       load();
     } catch (err) {
@@ -81,13 +88,19 @@ export default function PurchaseOrdersPage() {
 
   const startEditOrder = (order) => {
     setEditingOrderId(order.id);
-    setEditForm({ date: order.date, cashBoxId: order.cashBoxId || '', retentionPercent: order.retentionPercent ?? 0 });
+    setEditForm({
+      projectId: order.projectId || '',
+      date: order.date,
+      cashBoxId: order.cashBoxId || '',
+      retentionPercent: order.retentionPercent ?? 0,
+    });
   };
 
   const saveEditOrder = async () => {
     setError('');
     try {
-      await purchaseOrdersApi.update(projectId, editingOrderId, {
+      await supplierPurchaseOrdersApi.update(editingOrderId, {
+        projectId: editForm.projectId || null,
         date: editForm.date,
         cashBoxId: editForm.cashBoxId || undefined,
         retentionPercent: editForm.retentionPercent,
@@ -103,7 +116,7 @@ export default function PurchaseOrdersPage() {
     if (!confirm(t('execution.purchaseOrders.confirmDelete'))) return;
     setError('');
     try {
-      await purchaseOrdersApi.remove(projectId, id);
+      await supplierPurchaseOrdersApi.remove(id);
       if (expandedId === id) setExpandedId(null);
       load();
     } catch (err) {
@@ -111,21 +124,54 @@ export default function PurchaseOrdersPage() {
     }
   };
 
-  const loadReport = async () => setReport(await purchaseOrdersApi.report(projectId, {}));
-
   return (
     <div>
-      <Card title={t('execution.purchaseOrders.title')} actions={
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={loadReport}>{t('execution.purchaseOrders.report')}</Button>
+      <Card
+        title={t('purchaseOrdersMenu.title')}
+        actions={
           <Can module="ordenes_compra" action="create">
-            <Button onClick={() => setShowForm((s) => !s)}>{showForm ? t('common.cancel') : t('execution.purchaseOrders.newOrder')}</Button>
+            <Button onClick={() => { if (showForm) resetForm(); setShowForm((s) => !s); }}>
+              {showForm ? t('common.cancel') : t('execution.purchaseOrders.newOrder')}
+            </Button>
           </Can>
+        }
+      >
+        <p className="text-sm text-gray-500 mb-3">{t('purchaseOrdersMenu.subtitle')}</p>
+
+        <div className="flex flex-wrap items-end gap-3 mb-4">
+          <SearchSelect
+            label={t('purchaseOrdersMenu.filterSupplier')}
+            options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+            value={filterSupplierId}
+            onChange={setFilterSupplierId}
+            placeholder={t('purchaseOrdersMenu.allSuppliers')}
+            className="w-64"
+          />
+          <SearchSelect
+            label={t('purchaseOrdersMenu.filterProject')}
+            options={projects.map((p) => ({ value: p.id, label: p.name }))}
+            value={filterProjectId}
+            onChange={setFilterProjectId}
+            placeholder={t('purchaseOrdersMenu.allProjects')}
+            className="w-64"
+          />
+          {(filterSupplierId || filterProjectId) && (
+            <Button variant="secondary" onClick={() => { setFilterSupplierId(''); setFilterProjectId(''); }}>
+              {t('purchaseOrdersMenu.clearFilters')}
+            </Button>
+          )}
         </div>
-      }>
+
         {showForm && (
-          <form onSubmit={submit} className="mb-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-3">
+          <form onSubmit={submit} className="mb-4 border rounded p-3 bg-gray-50">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+              <SearchSelect
+                label={t('suppliers.orders.assignProject')}
+                options={projects.map((p) => ({ value: p.id, label: p.name }))}
+                value={form.projectId}
+                onChange={(v) => setForm((f) => ({ ...f, projectId: v, items: f.items.map((it) => ({ ...it, budgetItemId: '' })) }))}
+                placeholder={t('suppliers.orders.noProjectPlaceholder')}
+              />
               <SearchSelect
                 label={t('execution.purchaseOrders.registeredSupplier')}
                 options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
@@ -154,7 +200,8 @@ export default function PurchaseOrdersPage() {
                   options={budgetItems.map((bi) => ({ value: bi.id, label: bi.description }))}
                   value={it.budgetItemId}
                   onChange={(v) => updateItemRow(idx, 'budgetItemId', v)}
-                  placeholder={t('execution.purchaseOrders.nonePlaceholder')}
+                  placeholder={form.projectId ? t('execution.purchaseOrders.nonePlaceholder') : t('suppliers.orders.noProjectPlaceholder')}
+                  disabled={!form.projectId}
                 />
                 <Button type="button" variant="danger" onClick={() => removeRow(idx)}>{t('execution.purchaseOrders.removeRow')}</Button>
               </div>
@@ -165,12 +212,19 @@ export default function PurchaseOrdersPage() {
           </form>
         )}
 
-        <Table columns={[t('execution.purchaseOrders.table.supplier'), t('execution.purchaseOrders.table.date'), t('execution.purchaseOrders.table.status'), t('execution.purchaseOrders.table.items'), t('execution.purchaseOrders.table.expenses'), '']}>
+        <Table columns={[t('suppliers.orders.table.number'), t('suppliers.orders.table.project'), t('execution.purchaseOrders.table.supplier'), t('execution.purchaseOrders.table.date'), t('execution.purchaseOrders.table.status'), t('execution.purchaseOrders.table.items'), '']}>
           {orders.map((o) => (
             editingOrderId === o.id ? (
               <tr key={o.id} className="border-b border-gray-100 bg-blue-50">
-                <td className="py-2 pr-3" colSpan={5}>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <td className="py-2 pr-3" colSpan={6}>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <SearchSelect
+                      label={t('suppliers.orders.assignProject')}
+                      options={projects.map((p) => ({ value: p.id, label: p.name }))}
+                      value={editForm.projectId}
+                      onChange={(v) => setEditForm({ ...editForm, projectId: v })}
+                      placeholder={t('suppliers.orders.noProjectPlaceholder')}
+                    />
                     <Input label={t('execution.purchaseOrders.date')} type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} />
                     <Select label={t('expenses.cashBox')} value={editForm.cashBoxId} onChange={(e) => setEditForm({ ...editForm, cashBoxId: e.target.value })}>
                       <option value="">{t('common.selectPlaceholder')}</option>
@@ -187,15 +241,14 @@ export default function PurchaseOrdersPage() {
               </tr>
             ) : (
               <tr key={o.id} className="border-b border-gray-100">
-                <td className="py-2 pr-3">{o.supplier}</td>
-                <td className="py-2 pr-3">{formatDate(o.date)}</td>
-                <td className="py-2 pr-3"><Badge color={STATUS_COLORS[o.status]}>{t(`execution.purchaseOrders.status.${o.status}`, o.status)}</Badge></td>
-                <td className="py-2 pr-3">{o.items?.length || 0}</td>
-                <td className="py-2 pr-3">{o.expenseId ? <Badge color="green">{t('execution.purchaseOrders.transferred')}</Badge> : <span className="text-gray-400 text-xs">-</span>}</td>
-                <td className="py-2 pr-3 text-right whitespace-nowrap">
-                  <Button variant="secondary" onClick={() => window.open(purchaseOrderPdfUrl(o.id, i18n.language), '_blank')}>
-                    {t('suppliers.orders.pdf')}
-                  </Button>
+                <td className="py-1 pr-3">{o.orderNumber || '-'}</td>
+                <td className="py-1 pr-3">{o.Project?.name || <span className="text-gray-400">{t('purchaseOrdersMenu.noProject')}</span>}</td>
+                <td className="py-1 pr-3">{o.supplier}</td>
+                <td className="py-1 pr-3">{formatDate(o.date)}</td>
+                <td className="py-1 pr-3"><Badge color={STATUS_COLORS[o.status]}>{t(`execution.purchaseOrders.status.${o.status}`, o.status)}</Badge></td>
+                <td className="py-1 pr-3">{o.items?.length || 0}</td>
+                <td className="py-1 pr-3 text-right whitespace-nowrap">
+                  <Button variant="secondary" onClick={() => window.open(purchaseOrderPdfUrl(o.id, i18n.language), '_blank')}>{t('suppliers.orders.pdf')}</Button>
                   <Button variant="secondary" className="ml-2" onClick={() => setExpandedId(expandedId === o.id ? null : o.id)}>
                     {expandedId === o.id ? t('common.close') : t('execution.purchaseOrders.detail')}
                   </Button>
@@ -209,49 +262,30 @@ export default function PurchaseOrdersPage() {
               </tr>
             )
           ))}
-          {orders.length === 0 && <tr><td colSpan={6} className="py-3 text-center text-gray-400">{t('execution.purchaseOrders.empty')}</td></tr>}
+          {orders.length === 0 && <tr><td colSpan={7} className="py-3 text-center text-gray-400">{t('suppliers.orders.empty')}</td></tr>}
         </Table>
       </Card>
 
-      {expandedId && <OrderDetail projectId={projectId} orderId={expandedId} budgetItems={budgetItems} cashBoxes={cashBoxes} onChange={load} />}
-
-      {report && (
-        <Card title={t('execution.purchaseOrders.reportTitle')}>
-          <Table columns={[t('execution.purchaseOrders.reportTable.date'), t('execution.purchaseOrders.reportTable.material'), t('execution.purchaseOrders.reportTable.quantity'), t('execution.purchaseOrders.reportTable.unitValue'), t('execution.purchaseOrders.reportTable.total'), t('execution.purchaseOrders.reportTable.supplier'), t('execution.purchaseOrders.reportTable.budgetItem'), t('execution.purchaseOrders.reportTable.orderStatus')]}>
-            {report.rows.map((r) => (
-              <tr key={r.receiptId} className="border-b border-gray-100">
-                <td className="py-1 pr-3">{formatDate(r.date)}</td>
-                <td className="py-1 pr-3">{r.material}</td>
-                <td className="py-1 pr-3">{r.quantityReceived} {r.unit}</td>
-                <td className="py-1 pr-3">{money(r.unitCost)}</td>
-                <td className="py-1 pr-3">{money(r.totalCost)}</td>
-                <td className="py-1 pr-3">{r.supplier}</td>
-                <td className="py-1 pr-3">{r.budgetItemDescription || '-'}</td>
-                <td className="py-1 pr-3"><Badge color={STATUS_COLORS[r.orderStatus]}>{t(`execution.purchaseOrders.status.${r.orderStatus}`, r.orderStatus)}</Badge></td>
-              </tr>
-            ))}
-          </Table>
-          <p className="text-sm font-semibold mt-2">{t('execution.purchaseOrders.reportTotal', { amount: money(report.totals.cost), quantity: report.totals.quantity })}</p>
-        </Card>
-      )}
+      {expandedId && <PurchaseOrderMenuDetail orderId={expandedId} cashBoxes={cashBoxes} onChange={load} />}
     </div>
   );
 }
 
-function OrderDetail({ projectId, orderId, budgetItems, cashBoxes, onChange }) {
+// Detalle de una orden vista desde el menú principal: mismo comportamiento que SupplierOrderDetail
+// (SuppliersPage.jsx) y OrderDetail (execution/PurchaseOrdersPage.jsx) — registrar recepciones,
+// cerrar y pasar a gastos usan el mismo endpoint global /purchase-orders.
+function PurchaseOrderMenuDetail({ orderId, cashBoxes, onChange }) {
   const { t } = useTranslation();
   const [order, setOrder] = useState(null);
   const [receiptForms, setReceiptForms] = useState({});
   const [closureReason, setClosureReason] = useState('');
-  const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({});
   const [convertForm, setConvertForm] = useState({ category: 'materiales', date: '' });
   const [showConvert, setShowConvert] = useState(false);
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
 
-  const load = () => purchaseOrdersApi.get(projectId, orderId).then(setOrder);
-  useEffect(() => { load(); }, [projectId, orderId]);
+  const load = () => supplierPurchaseOrdersApi.get(orderId).then(setOrder);
+  useEffect(() => { load(); }, [orderId]);
 
   const assignedCashBox = order && cashBoxes.find((cb) => cb.id === order.cashBoxId);
 
@@ -260,7 +294,7 @@ function OrderDetail({ projectId, orderId, budgetItems, cashBoxes, onChange }) {
     const data = receiptForms[itemId] || {};
     if (!data.date || !data.quantityReceived) { setError(t('execution.purchaseOrders.receiptRequired')); return; }
     try {
-      const res = await purchaseOrdersApi.addReceipt(projectId, orderId, itemId, data);
+      const res = await supplierPurchaseOrdersApi.addReceipt(orderId, itemId, data);
       if (res.warning) setWarning(res.warning);
       if (res.cashBoxWarning) setWarning((w) => (w ? `${w} ${res.cashBoxWarning}` : res.cashBoxWarning));
       setReceiptForms((f) => ({ ...f, [itemId]: {} }));
@@ -271,30 +305,10 @@ function OrderDetail({ projectId, orderId, budgetItems, cashBoxes, onChange }) {
     }
   };
 
-  const startEdit = (it) => {
-    setEditingId(it.id);
-    setEditForm({ name: it.name, unit: it.unit, quantityOrdered: it.quantityOrdered, unitPrice: it.unitPrice, budgetItemId: it.budgetItemId || '', vatPercent: it.vatPercent ?? 19 });
-  };
-
-  const saveEdit = async (itemId) => {
-    setError('');
-    try {
-      await purchaseOrdersApi.updateItem(projectId, orderId, itemId, {
-        ...editForm,
-        budgetItemId: editForm.budgetItemId || null,
-      });
-      setEditingId(null);
-      load();
-      onChange();
-    } catch (err) {
-      setError(extractError(err));
-    }
-  };
-
   const close = async (withReason) => {
     setError('');
     try {
-      await purchaseOrdersApi.close(projectId, orderId, withReason ? closureReason : undefined);
+      await supplierPurchaseOrdersApi.close(orderId, withReason ? closureReason : undefined);
       load();
       onChange();
     } catch (err) {
@@ -306,7 +320,7 @@ function OrderDetail({ projectId, orderId, budgetItems, cashBoxes, onChange }) {
     setError('');
     if (!confirm(t('execution.purchaseOrders.confirmConvertDialog'))) return;
     try {
-      const res = await purchaseOrdersApi.convertToExpense(projectId, orderId, convertForm);
+      const res = await supplierPurchaseOrdersApi.convertToExpense(orderId, convertForm);
       if (res.warning) setWarning(res.warning);
       setShowConvert(false);
       load();
@@ -319,10 +333,15 @@ function OrderDetail({ projectId, orderId, budgetItems, cashBoxes, onChange }) {
   if (!order) return null;
   const canClose = order.status !== 'cerrada' && order.status !== 'cerrada_con_faltantes';
   const fullyDelivered = order.items?.every((i) => i.pending <= 0);
-  const itemsLocked = !canClose || !!order.expenseId;
+  const hasProject = !!order.projectId;
 
   return (
-    <Card title={t('execution.purchaseOrders.orderDetail', { supplier: order.supplier })}>
+    <Card title={t('execution.purchaseOrders.orderDetail', { supplier: order.supplier })} className="mt-3">
+      {!hasProject && (
+        <p className="text-sm text-yellow-700 mb-3 bg-yellow-50 border border-yellow-200 rounded px-3 py-2">
+          {t('suppliers.orders.noProjectNote')}
+        </p>
+      )}
       {order.expenseId && (
         <p className="text-sm text-green-700 mb-3 bg-green-50 border border-green-200 rounded px-3 py-2">
           {t('execution.purchaseOrders.transferredNote')}
@@ -335,60 +354,26 @@ function OrderDetail({ projectId, orderId, budgetItems, cashBoxes, onChange }) {
           {t('execution.purchaseOrders.noCashBoxAssigned')}
         </p>
       )}
-      <Table columns={[t('execution.purchaseOrders.detailTable.item'), t('execution.purchaseOrders.detailTable.ordered'), t('execution.purchaseOrders.detailTable.delivered'), t('execution.purchaseOrders.detailTable.pending'), t('execution.purchaseOrders.detailTable.registerReceipt'), '']}>
+      <Table columns={[t('execution.purchaseOrders.detailTable.item'), t('execution.purchaseOrders.detailTable.ordered'), t('execution.purchaseOrders.detailTable.delivered'), t('execution.purchaseOrders.detailTable.pending'), hasProject ? t('execution.purchaseOrders.detailTable.registerReceipt') : '']}>
         {order.items?.map((it) => (
           <tr key={it.id} className="border-b border-gray-100 align-top">
-            {editingId === it.id ? (
-              <>
-                <td className="py-2 pr-3" colSpan={4}>
-                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
-                    <Input label={t('execution.purchaseOrders.itemName')} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
-                    <Input label={t('execution.purchaseOrders.unit')} value={editForm.unit} onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })} />
-                    <Input label={t('execution.purchaseOrders.orderedQty')} type="number" min="0" step="0.01" value={editForm.quantityOrdered} onChange={(e) => setEditForm({ ...editForm, quantityOrdered: e.target.value })} />
-                    <Input label={t('execution.purchaseOrders.unitValue')} type="number" min="0" step="0.01" value={editForm.unitPrice} onChange={(e) => setEditForm({ ...editForm, unitPrice: e.target.value })} />
-                    <Input label={t('execution.purchaseOrders.vatPercent')} type="number" min="0" max="100" step="0.01" value={editForm.vatPercent} onChange={(e) => setEditForm({ ...editForm, vatPercent: e.target.value })} />
-                    <SearchSelect
-                      label={t('execution.purchaseOrders.budgetItemPlain')}
-                      options={budgetItems.map((bi) => ({ value: bi.id, label: bi.description }))}
-                      value={editForm.budgetItemId}
-                      onChange={(v) => setEditForm({ ...editForm, budgetItemId: v })}
-                      placeholder={t('execution.purchaseOrders.nonePlaceholder')}
-                    />
-                  </div>
-                </td>
-                <td className="py-2 pr-3 text-right">
-                  <div className="flex gap-2 justify-end">
-                    <Button onClick={() => saveEdit(it.id)}>{t('execution.purchaseOrders.save')}</Button>
-                    <Button variant="secondary" onClick={() => setEditingId(null)}>{t('execution.purchaseOrders.cancel')}</Button>
-                  </div>
-                </td>
-              </>
-            ) : (
-              <>
-                <td className="py-2 pr-3">
-                  {it.name} ({it.unit})
-                  {!itemsLocked && (
-                    <Can module="ordenes_compra" action="edit">
-                      <button type="button" className="ml-2 text-xs text-blue-600 hover:underline" onClick={() => startEdit(it)}>{t('execution.purchaseOrders.edit')}</button>
-                    </Can>
+            <td className="py-2 pr-3">{it.name} ({it.unit})</td>
+            <td className="py-2 pr-3">{Number(it.quantityOrdered)}</td>
+            <td className="py-2 pr-3">{it.delivered}</td>
+            <td className="py-2 pr-3">{it.pending}</td>
+            <td className="py-2 pr-3">
+              {hasProject && (
+                <Can module="ordenes_compra" action="edit">
+                  {canClose && order.cashBoxId && (
+                    <div className="flex flex-wrap gap-2">
+                      <Input type="date" value={receiptForms[it.id]?.date || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], date: e.target.value } }))} />
+                      <Input type="number" min="0" step="0.01" placeholder={t('execution.purchaseOrders.receiptQty')} value={receiptForms[it.id]?.quantityReceived || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], quantityReceived: e.target.value } }))} />
+                      <Button onClick={() => submitReceipt(it.id)}>{t('execution.purchaseOrders.register')}</Button>
+                    </div>
                   )}
-                </td>
-                <td className="py-2 pr-3">{Number(it.quantityOrdered)}</td>
-                <td className="py-2 pr-3">{it.delivered}</td>
-                <td className="py-2 pr-3">{it.pending}</td>
-                <td className="py-2 pr-3">
-                  <Can module="ordenes_compra" action="edit">
-                    {canClose && order.cashBoxId && (
-                      <div className="flex flex-wrap gap-2">
-                        <Input type="date" value={receiptForms[it.id]?.date || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], date: e.target.value } }))} />
-                        <Input type="number" min="0" step="0.01" placeholder={t('execution.purchaseOrders.receiptQty')} value={receiptForms[it.id]?.quantityReceived || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], quantityReceived: e.target.value } }))} />
-                        <Button onClick={() => submitReceipt(it.id)}>{t('execution.purchaseOrders.register')}</Button>
-                      </div>
-                    )}
-                  </Can>
-                </td>
-              </>
-            )}
+                </Can>
+              )}
+            </td>
           </tr>
         ))}
       </Table>
@@ -423,7 +408,7 @@ function OrderDetail({ projectId, orderId, budgetItems, cashBoxes, onChange }) {
       )}
       {order.closureReason && <p className="text-sm text-gray-500 mt-2">{t('execution.purchaseOrders.closureReasonLabel')}: {order.closureReason}</p>}
 
-      {!order.expenseId && order.cashBoxId && (
+      {hasProject && !order.expenseId && order.cashBoxId && (
         <Can module="ordenes_compra" action="edit">
           <div className="mt-4 border-t pt-3">
             {!showConvert ? (

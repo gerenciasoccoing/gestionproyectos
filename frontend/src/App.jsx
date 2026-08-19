@@ -31,6 +31,8 @@ import ApuPage from './pages/quotations/ApuPage';
 import SuppliersPage from './pages/thirdparties/SuppliersPage';
 import ClientsPage from './pages/thirdparties/ClientsPage';
 
+import PurchaseOrdersMenuPage from './pages/purchaseorders/PurchaseOrdersMenuPage';
+
 import CashBoxesPage from './pages/cashboxes/CashBoxesPage';
 
 import InventoryLayout from './pages/inventory/InventoryLayout';
@@ -62,6 +64,7 @@ export default function App() {
         <Route path="clients" element={<ClientsPage />} />
         <Route path="third-parties" element={<Navigate to="/suppliers" replace />} />
 
+        <Route path="purchase-orders" element={<ProtectedRoute module="ordenes_compra" action="view"><PurchaseOrdersMenuPage /></ProtectedRoute>} />
         <Route path="expenses" element={<ProtectedRoute module="gastos" action="view"><ExpensesPage /></ProtectedRoute>} />
         <Route path="cash-boxes" element={<ProtectedRoute module="cajas" action="view"><CashBoxesPage /></ProtectedRoute>} />
 

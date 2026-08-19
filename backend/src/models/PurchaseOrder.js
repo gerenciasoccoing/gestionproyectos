@@ -25,12 +25,24 @@ module.exports = (sequelize) => {
     // Una vez asignado, la orden no puede convertirse de nuevo ni editar sus ítems.
     expenseId: { type: DataTypes.UUID, allowNull: true },
     createdBy: { type: DataTypes.UUID, allowNull: true },
+    // Caja de la que sale el pago de TODA la orden, elegida una sola vez (antes se pedía de nuevo
+    // en cada recepción/traslado a gastos, lo que permitía — por error — pagar ítems de una misma
+    // orden desde cajas distintas). addReceipt y convertToExpense ya no reciben cashBoxId: usan
+    // este campo. Nullable solo por las órdenes que ya existían antes de esta migración y cuyo
+    // historial mezcló más de una caja entre sus ítems (ver postSyncFixups#backfillPurchaseOrderCashBox);
+    // esas quedan en revisión manual y no admiten nuevas recepciones/traslados hasta que alguien les
+    // asigne una caja (ver updateOrder).
+    cashBoxId: { type: DataTypes.UUID, allowNull: true },
+    // Retención en la fuente de la orden completa: porcentaje aplicado sobre el subtotal (antes de
+    // IVA), se resta del total general. 0 = sin retención.
+    retentionPercent: { type: DataTypes.DECIMAL(5, 2), allowNull: false, defaultValue: 0, validate: { min: 0, max: 100 } },
   });
 
   PurchaseOrder.associate = (models) => {
     PurchaseOrder.belongsTo(models.Project, { foreignKey: 'projectId' });
     PurchaseOrder.belongsTo(models.ThirdParty, { foreignKey: 'supplierId', as: 'supplierParty' });
     PurchaseOrder.belongsTo(models.Expense, { foreignKey: 'expenseId', as: 'expense' });
+    PurchaseOrder.belongsTo(models.CashBox, { foreignKey: 'cashBoxId' });
     PurchaseOrder.hasMany(models.PurchaseOrderItem, { foreignKey: 'purchaseOrderId', as: 'items', onDelete: 'CASCADE' });
   };
 

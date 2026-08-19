@@ -17,6 +17,8 @@ router.get('/', requirePermission('ordenes_compra', 'view'), purchaseOrderContro
 router.post('/', requirePermission('ordenes_compra', 'create'), purchaseOrderController.create);
 router.get('/:id', requirePermission('ordenes_compra', 'view'), requireOptionalProjectAccess(byIdParam), purchaseOrderController.get);
 router.get('/:id/pdf', requirePermission('ordenes_compra', 'view'), requireOptionalProjectAccess(byIdParam), purchaseOrderController.exportPdf);
+router.put('/:id', requirePermission('ordenes_compra', 'edit'), requireOptionalProjectAccess(byIdParam), purchaseOrderController.updateOrder);
+router.delete('/:id', requirePermission('ordenes_compra', 'delete'), requireOptionalProjectAccess(byIdParam), purchaseOrderController.remove);
 router.put('/:id/items/:itemId', requirePermission('ordenes_compra', 'edit'), requireOptionalProjectAccess(byIdParam), purchaseOrderController.updateItem);
 router.post('/:id/convert-to-expense', requirePermission('ordenes_compra', 'edit'), requireOptionalProjectAccess(byIdParam), purchaseOrderController.convertToExpense);
 router.post('/:id/items/:itemId/receipts', requirePermission('ordenes_compra', 'edit'), requireOptionalProjectAccess(byIdParam), purchaseOrderController.addReceipt);

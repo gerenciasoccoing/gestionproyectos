@@ -42,6 +42,7 @@
     "suppliers": "Proveedores",
     "clients": "Clientes",
     "inventory": "Inventario",
+    "purchaseOrders": "Órdenes de Compra",
     "expenses": "Gastos",
     "cashBoxes": "Cajas",
     "admin": "Administración",
@@ -50,6 +51,16 @@
     "openMenu": "Abrir menú",
     "toggleSidebar": "Mostrar/ocultar menú",
     "language": "Idioma"
+  },
+  "purchaseOrdersMenu": {
+    "title": "Órdenes de Compra",
+    "subtitle": "Todas las órdenes de compra de la empresa, con o sin proyecto asignado.",
+    "filterSupplier": "Filtrar por proveedor",
+    "filterProject": "Filtrar por proyecto",
+    "allSuppliers": "Todos los proveedores",
+    "allProjects": "Todos los proyectos",
+    "clearFilters": "Limpiar filtros",
+    "noProject": "Sin proyecto asignado"
   },
   "motivational": {
     "admin_lideres": {
@@ -318,7 +329,20 @@
       "expenseDate": "Fecha del gasto",
       "confirmTransfer": "Confirmar traslado a Gastos",
       "confirmConvertDialog": "¿Trasladar todos los ítems de esta orden a un gasto del proyecto? Esta acción no se puede deshacer ni repetir para la misma orden.",
-      "transferNote": "Traslada todos los ítems de la orden ({{count}}) a un gasto del proyecto, con la misma descripción, cantidad y valor. Solo se puede hacer una vez por orden."
+      "transferNote": "Traslada todos los ítems de la orden ({{count}}) a un gasto del proyecto, con la misma descripción, cantidad y valor. Solo se puede hacer una vez por orden.",
+      "vatPercent": "% IVA",
+      "retentionPercent": "% Retención en la fuente",
+      "cashBox": "Caja",
+      "noCashBoxAssigned": "Esta orden no tiene una caja asignada. Usa \"Editar\" para asignarle una antes de registrar recepciones o trasladarla a gastos.",
+      "cashBoxAssigned": "Caja: {{name}}",
+      "totalsSubtotal": "Subtotal",
+      "totalsVat": "IVA",
+      "totalsRetention": "Retención en la fuente",
+      "totalsGrandTotal": "Total general",
+      "project": "Proyecto",
+      "delete": "Eliminar",
+      "confirmDelete": "¿Eliminar esta orden de compra? Esta acción no se puede deshacer.",
+      "editOrder": "Editar orden"
     },
     "milestones": {
       "title": "Hitos",

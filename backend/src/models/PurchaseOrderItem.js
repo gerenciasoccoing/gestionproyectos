@@ -13,6 +13,9 @@ module.exports = (sequelize) => {
     quantityOrdered: { type: DataTypes.DECIMAL(18, 4), allowNull: false, validate: { min: 0 } },
     unitPrice: { type: DataTypes.DECIMAL(18, 2), allowNull: false, validate: { min: 0 } },
     totalValue: { type: DataTypes.DECIMAL(18, 2), allowNull: false, validate: { min: 0 } },
+    // % de IVA de este ítem (Colombia: 19% general). Editable por ítem porque una misma orden
+    // puede mezclar productos gravados a distinta tarifa (ej. exentos al 0%).
+    vatPercent: { type: DataTypes.DECIMAL(5, 2), allowNull: false, defaultValue: 19, validate: { min: 0, max: 100 } },
   });
 
   PurchaseOrderItem.associate = (models) => {

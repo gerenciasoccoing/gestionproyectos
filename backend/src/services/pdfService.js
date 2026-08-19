@@ -398,7 +398,7 @@ const PO_LABELS = {
     total: 'Vr. Total',
     subtotal: 'Subtotal',
     tax: 'IVA',
-    taxNotApplicable: 'No se registra en esta orden',
+    retention: 'Retención en la fuente',
     grandTotal: 'TOTAL GENERAL',
     status: 'Estado de la orden',
     statusOpen: 'Abierta',
@@ -433,8 +433,8 @@ const PO_LABELS = {
     unitValue: 'Unit Value',
     total: 'Total Value',
     subtotal: 'Subtotal',
-    tax: 'Tax (VAT)',
-    taxNotApplicable: 'Not tracked on this order',
+    tax: 'VAT',
+    retention: 'Withholding tax',
     grandTotal: 'GRAND TOTAL',
     status: 'Order status',
     statusOpen: 'Open',
@@ -454,76 +454,146 @@ const PO_LABELS = {
 // purchaseOrderController.create), tabla de ítems con cantidad entregada vs. ordenada, totales,
 // estado (con motivo del faltante si aplica) y firmas. items: [{ code, name, unit, quantityOrdered,
 // delivered, unitPrice, totalValue }] (ver exportPdf en purchaseOrderController.js).
-function generatePurchaseOrderPdf({ order, items, company, lang = 'es' }) {
+// Paleta de marca del PDF: mismo azul primario que usa el sidebar de la app (bg-blue-600/700),
+// llevado a un tono un poco más oscuro para que el texto blanco tenga buen contraste sobre la
+// franja de encabezado impresa.
+const PO_COLORS = {
+  brand: '#1e40af',
+  brandLight: '#eff6ff',
+  border: '#e2e8f0',
+  dark: '#0f172a',
+  muted: '#64748b',
+  rowAlt: '#f8fafc',
+  white: '#ffffff',
+};
+
+// Mismos colores que STATUS_COLORS del badge de estado en el frontend (PurchaseOrdersPage.jsx),
+// llevados a versión clara-de-fondo/oscura-de-texto para imprimirse legible como badge en el PDF.
+const PO_STATUS_BADGE = {
+  abierta: { bg: '#fef3c7', text: '#92400e' },
+  parcial: { bg: '#dbeafe', text: '#1e40af' },
+  cerrada: { bg: '#dcfce7', text: '#166534' },
+  cerrada_con_faltantes: { bg: '#fee2e2', text: '#991b1b' },
+};
+
+function poBrandHeading(doc, text, y) {
+  doc.rect(50, y, 4, 14).fill(PO_COLORS.brand);
+  doc.fillColor(PO_COLORS.dark).font('Helvetica-Bold').fontSize(12).text(text, 62, y - 1);
+  doc.fillColor(PO_COLORS.dark).font('Helvetica').fontSize(9);
+  return y + 22;
+}
+
+// Orden de compra: layout moderno con franja de marca en el encabezado (logo + datos de la
+// empresa a la izquierda, título/consecutivo/badge de estado a la derecha), tarjetas para
+// proveedor/proyecto, y tabla de ítems con encabezado de color, filas en cebra y altura DINÁMICA
+// por fila (ver comentario en el loop de abajo: esto es lo que corrige el bug de filas
+// sobrepuestas cuando una descripción larga envuelve a más de una línea). items: [{ code, name,
+// unit, quantityOrdered, delivered, unitPrice, totalValue }] (ver exportPdf en
+// purchaseOrderController.js).
+function generatePurchaseOrderPdf({ order, items, company, lang = 'es', totals }) {
   const L = PO_LABELS[lang] || PO_LABELS.es;
+  const C = PO_COLORS;
   const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
 
+  // Franja de encabezado
+  const HEADER_H = 110;
+  doc.rect(0, 0, doc.page.width, HEADER_H).fill(C.brand);
+  let textX = 50;
   if (company && company.logoPath && require('fs').existsSync(company.logoPath)) {
-    try { doc.image(company.logoPath, 50, 45, { width: 90 }); } catch (e) { /* logo ilegible: se omite */ }
+    try {
+      doc.roundedRect(50, 25, 70, 60, 4).fill(C.white);
+      doc.image(company.logoPath, 55, 30, { fit: [60, 50], align: 'center', valign: 'center' });
+      textX = 132;
+    } catch (e) { /* logo ilegible: se omite */ }
   }
-  doc.fontSize(16).font('Helvetica-Bold').text(company ? company.companyName : 'Empresa', 160, 50);
-  doc.fontSize(9).font('Helvetica').fillColor('#555')
-    .text(company?.nit ? `NIT: ${company.nit}` : '', 160, 70)
-    .text(company?.address || '', 160, 84)
-    .text(company?.phone || '', 160, 98);
-  doc.fillColor('#000');
+  doc.fillColor(C.white).font('Helvetica-Bold').fontSize(16).text(company ? company.companyName : 'Empresa', textX, 30, { width: 210 });
+  doc.font('Helvetica').fontSize(8.5).fillColor('#dbeafe')
+    .text(company?.nit ? `NIT: ${company.nit}` : '', textX, 54, { width: 210 })
+    .text(company?.address || '', textX, 68, { width: 210 })
+    .text(company?.phone || '', textX, 82, { width: 210 });
 
-  doc.moveDown(3);
-  doc.fontSize(18).font('Helvetica-Bold').text(L.title, { align: 'center' });
-  doc.moveDown(0.2);
-  doc.fontSize(10).font('Helvetica').fillColor('#555').text(
-    `${L.orderNumber} ${order.orderNumber || '-'}   |   ${L.date}: ${order.date}`,
-    { align: 'center' }
-  );
-  doc.fillColor('#000');
-  doc.moveDown(1);
+  doc.fillColor(C.white).font('Helvetica-Bold').fontSize(16).text(L.title, 300, 30, { width: 245, align: 'right' });
+  doc.font('Helvetica').fontSize(9).fillColor('#dbeafe')
+    .text(`${L.orderNumber} ${order.orderNumber || '-'}`, 300, 54, { width: 245, align: 'right' })
+    .text(`${L.date}: ${order.date}`, 300, 68, { width: 245, align: 'right' });
 
-  sectionTitle(doc, L.supplierSection);
+  const STATUS_LABEL = {
+    abierta: L.statusOpen,
+    parcial: L.statusPartial,
+    cerrada: L.statusClosed,
+    cerrada_con_faltantes: L.statusClosedShortage,
+  };
+  const badge = PO_STATUS_BADGE[order.status] || PO_STATUS_BADGE.abierta;
+  const badgeLabel = STATUS_LABEL[order.status] || order.status;
+  doc.font('Helvetica-Bold').fontSize(8);
+  const badgeW = doc.widthOfString(badgeLabel) + 16;
+  const badgeX = 545 - badgeW;
+  doc.roundedRect(badgeX, 84, badgeW, 16, 8).fill(badge.bg);
+  doc.fillColor(badge.text).text(badgeLabel, badgeX, 88, { width: badgeW, align: 'center' });
+
+  // Tarjetas de proveedor / proyecto, lado a lado
+  const boxY = HEADER_H + 20;
+  const boxH = 108;
+  const boxGap = 15;
+  const boxW = (495 - boxGap) / 2;
+  doc.roundedRect(50, boxY, boxW, boxH, 6).fillAndStroke(C.brandLight, C.border);
+  doc.fillColor(C.brand).font('Helvetica-Bold').fontSize(10).text(L.supplierSection, 62, boxY + 12, { width: boxW - 24 });
+  doc.fillColor(C.dark).font('Helvetica').fontSize(8.5);
   const supplierParty = order.supplierParty;
-  doc.text(`${L.name}: ${supplierParty?.name || order.supplier}`);
-  doc.text(`${L.nit}: ${supplierParty?.nit || '-'}`);
-  doc.text(`${L.phone}: ${supplierParty?.phone || '-'}`);
-  doc.text(`${L.email}: ${supplierParty?.email || '-'}`);
-  doc.text(`${L.address}: ${supplierParty?.address || '-'}`);
+  let sy = boxY + 30;
+  [
+    `${L.name}: ${supplierParty?.name || order.supplier}`,
+    `${L.nit}: ${supplierParty?.nit || '-'}`,
+    `${L.phone}: ${supplierParty?.phone || '-'}`,
+    `${L.email}: ${supplierParty?.email || '-'}`,
+    `${L.address}: ${supplierParty?.address || '-'}`,
+  ].forEach((line) => { doc.text(line, 62, sy, { width: boxW - 24 }); sy += 14; });
 
-  sectionTitle(doc, L.projectSection);
+  const box2X = 50 + boxW + boxGap;
+  doc.roundedRect(box2X, boxY, boxW, boxH, 6).fillAndStroke(C.brandLight, C.border);
+  doc.fillColor(C.brand).font('Helvetica-Bold').fontSize(10).text(L.projectSection, box2X + 12, boxY + 12, { width: boxW - 24 });
+  doc.fillColor(C.dark).font('Helvetica').fontSize(8.5);
+  let py = boxY + 30;
   if (order.Project) {
-    doc.text(`${L.project}: ${order.Project.name}`);
-    doc.text(`${L.client}: ${order.Project.client || '-'}`);
+    doc.text(`${L.project}: ${order.Project.name}`, box2X + 12, py, { width: boxW - 24 }); py += 14;
+    doc.text(`${L.client}: ${order.Project.client || '-'}`, box2X + 12, py, { width: boxW - 24 });
   } else {
-    doc.text(L.noProject);
+    doc.text(L.noProject, box2X + 12, py, { width: boxW - 24 });
   }
 
-  sectionTitle(doc, L.itemsSection);
+  doc.fillColor(C.dark).strokeColor('#000000');
+  let itemsHeadingY = poBrandHeading(doc, L.itemsSection, boxY + boxH + 20);
+
   const colX = { code: 50, desc: 95, unit: 245, ordered: 292, delivered: 345, unitValue: 405, total: 475 };
   const colW = { code: 43, desc: 148, unit: 45, ordered: 51, delivered: 58, unitValue: 68, total: 70 };
-  // Alto de fila FIJO (18pt) era el bug: si item.name envolvía a más de una línea dentro de sus
-  // 148pt de ancho, la fila siguiente arrancaba 18pt después de todos modos, quedando escrita
-  // encima del texto que ya se había desbordado — de ahí las filas sobrepuestas/ilegibles con
-  // descripciones largas. Acá el alto de cada fila se mide con heightOfString ANTES de dibujarla
-  // (el máximo entre las columnas que pueden envolver texto), y el salto de página también se
-  // decide antes de dibujar en base a ese alto real — así nunca se corta una fila a la mitad entre
-  // dos páginas, sin importar cuántos ítems tenga la orden.
+  // Alto de fila FIJO (18pt) era el bug original: si item.name envolvía a más de una línea dentro
+  // de sus 148pt de ancho, la fila siguiente arrancaba 18pt después de todos modos, quedando
+  // escrita encima del texto que ya se había desbordado — de ahí las filas sobrepuestas e
+  // ilegibles con descripciones largas. Acá el alto de cada fila se mide con heightOfString ANTES
+  // de dibujarla (el máximo entre las columnas que pueden envolver texto), y el salto de página
+  // también se decide antes de dibujar en base a ese alto real — así nunca se corta una fila a la
+  // mitad entre dos páginas, sin importar cuántos ítems tenga la orden.
   const ITEMS_BOTTOM_LIMIT = 730; // margen inferior de la página (margin:50, alto carta 792)
-  const ROW_PADDING = 8;
+  const ROW_PADDING = 10;
+  const HEADER_ROW_H = 22;
 
   function drawItemsTableHeader(yPos) {
-    doc.font('Helvetica-Bold').fontSize(8);
-    doc.text(L.code, colX.code, yPos, { width: colW.code });
-    doc.text(L.description, colX.desc, yPos, { width: colW.desc });
-    doc.text(L.unit, colX.unit, yPos, { width: colW.unit });
-    doc.text(L.ordered, colX.ordered, yPos, { width: colW.ordered });
-    doc.text(L.delivered, colX.delivered, yPos, { width: colW.delivered });
-    doc.text(L.unitValue, colX.unitValue, yPos, { width: colW.unitValue });
-    doc.text(L.total, colX.total, yPos, { width: colW.total });
-    doc.moveTo(50, yPos + 14).lineTo(545, yPos + 14).stroke();
-    doc.font('Helvetica').fontSize(8);
-    return yPos + 20;
+    doc.rect(50, yPos, 495, HEADER_ROW_H).fill(C.brand);
+    doc.fillColor(C.white).font('Helvetica-Bold').fontSize(8);
+    const ty = yPos + 7;
+    doc.text(L.code, colX.code, ty, { width: colW.code });
+    doc.text(L.description, colX.desc, ty, { width: colW.desc });
+    doc.text(L.unit, colX.unit, ty, { width: colW.unit });
+    doc.text(L.ordered, colX.ordered, ty, { width: colW.ordered });
+    doc.text(L.delivered, colX.delivered, ty, { width: colW.delivered });
+    doc.text(L.unitValue, colX.unitValue, ty, { width: colW.unitValue });
+    doc.text(L.total, colX.total, ty, { width: colW.total });
+    doc.fillColor(C.dark).font('Helvetica').fontSize(8);
+    return yPos + HEADER_ROW_H + 2;
   }
 
-  let y = drawItemsTableHeader(doc.y + 5);
-  let subtotal = 0;
-  items.forEach((item) => {
+  let y = drawItemsTableHeader(itemsHeadingY);
+  items.forEach((item, idx) => {
     const codeText = item.code || '-';
     const rowHeight = ROW_PADDING + Math.max(
       10,
@@ -535,6 +605,8 @@ function generatePurchaseOrderPdf({ order, items, company, lang = 'es' }) {
       doc.addPage();
       y = drawItemsTableHeader(50);
     }
+    if (idx % 2 === 1) doc.rect(50, y - 5, 495, rowHeight).fill(C.rowAlt);
+    doc.fillColor(C.dark).font('Helvetica').fontSize(8);
     doc.text(codeText, colX.code, y, { width: colW.code });
     doc.text(item.name, colX.desc, y, { width: colW.desc });
     doc.text(item.unit, colX.unit, y, { width: colW.unit });
@@ -542,41 +614,63 @@ function generatePurchaseOrderPdf({ order, items, company, lang = 'es' }) {
     doc.text(String(Number(item.delivered || 0)), colX.delivered, y, { width: colW.delivered });
     doc.text(money(item.unitPrice), colX.unitValue, y, { width: colW.unitValue });
     doc.text(money(item.totalValue), colX.total, y, { width: colW.total });
-    subtotal += Number(item.totalValue);
+    doc.strokeColor(C.border).moveTo(50, y + rowHeight - 5).lineTo(545, y + rowHeight - 5).stroke();
     y += rowHeight;
   });
+  doc.strokeColor('#000000');
 
-  // El bloque de totales (línea + 3 renglones) ocupa ~78pt fijos: si la última fila de ítems
-  // terminó cerca del límite de la página, se reserva espacio en una página nueva en vez de
-  // escribir más allá del margen inferior (donde quedaría invisible/cortado).
-  if (y + 78 > ITEMS_BOTTOM_LIMIT + 12) { doc.addPage(); y = 50; }
-  y += 8;
-  doc.moveTo(350, y).lineTo(545, y).stroke();
-  y += 8;
-  doc.fontSize(9).font('Helvetica').text(`${L.subtotal}: ${money(subtotal)}`, 300, y, { align: 'right', width: 245 });
-  y += 16;
-  doc.text(`${L.tax}: ${L.taxNotApplicable}`, 300, y, { align: 'right', width: 245 });
-  y += 16;
-  doc.font('Helvetica-Bold').fontSize(11).text(`${L.grandTotal}: ${money(subtotal)}`, 300, y, { align: 'right', width: 245 });
-  y += 30;
+  // totals lo calcula el controlador (mismo cálculo que ve la pantalla de detalle, ver
+  // purchaseOrderService#computeOrderTotals); este fallback solo cubre llamadas directas al
+  // servicio sin ese dato (scripts de prueba).
+  const T = totals || items.reduce((acc, it) => {
+    acc.subtotal += Number(it.totalValue);
+    acc.vatTotal += Number(it.totalValue) * (Number(it.vatPercent ?? 19) / 100);
+    return acc;
+  }, { subtotal: 0, vatTotal: 0, retentionAmount: 0, grandTotal: 0 });
+  if (!totals) T.grandTotal = T.subtotal + T.vatTotal - T.retentionAmount;
+  const hasRetention = Number(T.retentionAmount) > 0;
+
+  // El bloque de totales ocupa ~92pt (3 renglones) o ~108pt (4, con retención): si la última fila
+  // de ítems terminó cerca del límite de la página, se reserva espacio en una página nueva en vez
+  // de escribir más allá del margen inferior (donde quedaría invisible/cortado).
+  const totalsH = hasRetention ? 90 : 72;
+  if (y + totalsH + 20 > ITEMS_BOTTOM_LIMIT + 12) { doc.addPage(); y = 50; }
+  y += 12;
+  const totalsW = 245;
+  const totalsX = 300;
+  doc.roundedRect(totalsX, y, totalsW, totalsH, 6).fillAndStroke(C.brandLight, C.border);
+  doc.strokeColor('#000000');
+  doc.fillColor(C.dark).font('Helvetica').fontSize(9);
+  let ty = y + 10;
+  doc.text(`${L.subtotal}: ${money(T.subtotal)}`, totalsX + 12, ty, { width: totalsW - 24, align: 'right' });
+  ty += 17;
+  doc.text(`${L.tax}: ${money(T.vatTotal)}`, totalsX + 12, ty, { width: totalsW - 24, align: 'right' });
+  ty += 17;
+  if (hasRetention) {
+    doc.fillColor('#991b1b').text(`${L.retention}: -${money(T.retentionAmount)}`, totalsX + 12, ty, { width: totalsW - 24, align: 'right' });
+    doc.fillColor(C.dark);
+    ty += 17;
+  }
+  doc.strokeColor(C.border).moveTo(totalsX + 12, ty).lineTo(totalsX + totalsW - 12, ty).stroke();
+  doc.strokeColor('#000000');
+  ty += 6;
+  doc.fillColor(C.brand).font('Helvetica-Bold').fontSize(12).text(`${L.grandTotal}: ${money(T.grandTotal)}`, totalsX + 12, ty, { width: totalsW - 24, align: 'right' });
+  y += totalsH + 20;
+
+  if (order.status === 'cerrada_con_faltantes' && order.closureReason) {
+    doc.fillColor(PO_STATUS_BADGE.cerrada_con_faltantes.text).font('Helvetica-Bold').fontSize(9)
+      .text(`${L.shortageReason}: `, 50, y, { continued: true })
+      .font('Helvetica').text(order.closureReason);
+    y = doc.y + 12;
+  }
+  doc.fillColor(C.dark);
 
   doc.y = y;
-  sectionTitle(doc, L.status);
-  const STATUS_LABEL = {
-    abierta: L.statusOpen,
-    parcial: L.statusPartial,
-    cerrada: L.statusClosed,
-    cerrada_con_faltantes: L.statusClosedShortage,
-  };
-  doc.text(STATUS_LABEL[order.status] || order.status);
-  if (order.status === 'cerrada_con_faltantes' && order.closureReason) {
-    doc.text(`${L.shortageReason}: ${order.closureReason}`);
-  }
-
-  doc.moveDown(2);
   if (doc.y > 680) { doc.addPage(); doc.y = 50; }
   let sigY = doc.y + 10;
-  doc.font('Helvetica-Bold').fontSize(9);
+  doc.strokeColor(C.border).moveTo(50, sigY - 6).lineTo(545, sigY - 6).stroke();
+  doc.strokeColor('#000000');
+  doc.font('Helvetica-Bold').fontSize(9).fillColor(C.dark);
   doc.text(L.elaborated, 50, sigY, { width: 220 });
   doc.text(L.authorized, 320, sigY, { width: 220 });
   sigY += 30;
@@ -584,7 +678,7 @@ function generatePurchaseOrderPdf({ order, items, company, lang = 'es' }) {
   doc.text('_______________________', 50, sigY, { width: 220 });
   doc.text('_______________________', 320, sigY, { width: 220 });
   sigY += 16;
-  doc.fontSize(8).fillColor('#555');
+  doc.fontSize(8).fillColor(C.muted);
   doc.text(`${L.dateLabel}: ______________`, 50, sigY, { width: 220 });
   doc.text(`${L.dateLabel}: ______________`, 320, sigY, { width: 220 });
   doc.fillColor('#000');

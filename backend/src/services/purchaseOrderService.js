@@ -78,6 +78,20 @@ async function getPurchaseReport(projectId, { from, to } = {}) {
   };
 }
 
+// Totales de la orden: subtotal (suma de totalValue, antes de impuestos), IVA total (por ítem,
+// cada uno puede tener su propio % — ver PurchaseOrderItem.vatPercent), retención en la fuente
+// (porcentaje de la orden aplicado sobre el SUBTOTAL, no sobre el subtotal+IVA) y el total general
+// resultante. Centralizado acá para que el detalle en pantalla y el PDF muestren siempre el mismo
+// cálculo.
+function computeOrderTotals(items, retentionPercent = 0) {
+  const subtotal = items.reduce((s, it) => s + Number(it.totalValue), 0);
+  const vatTotal = items.reduce((s, it) => s + Number(it.totalValue) * (Number(it.vatPercent ?? 19) / 100), 0);
+  const retentionAmount = subtotal * (Number(retentionPercent) / 100);
+  const grandTotal = subtotal + vatTotal - retentionAmount;
+  return { subtotal, vatTotal, retentionAmount, grandTotal };
+}
+
 module.exports = {
   getItemWithDelivery, getOrderItemsWithDelivery, isOrderFullyDelivered, getPurchaseReport, nextOrderNumber,
+  computeOrderTotals,
 };

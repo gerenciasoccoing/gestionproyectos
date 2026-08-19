@@ -42,6 +42,7 @@
     "suppliers": "Suppliers",
     "clients": "Clients",
     "inventory": "Inventory",
+    "purchaseOrders": "Purchase Orders",
     "expenses": "Expenses",
     "cashBoxes": "Cash Boxes",
     "admin": "Administration",
@@ -50,6 +51,16 @@
     "openMenu": "Open menu",
     "toggleSidebar": "Show/hide menu",
     "language": "Language"
+  },
+  "purchaseOrdersMenu": {
+    "title": "Purchase Orders",
+    "subtitle": "All purchase orders across the company, with or without a project assigned.",
+    "filterSupplier": "Filter by supplier",
+    "filterProject": "Filter by project",
+    "allSuppliers": "All suppliers",
+    "allProjects": "All projects",
+    "clearFilters": "Clear filters",
+    "noProject": "No project assigned"
   },
   "motivational": {
     "admin_lideres": {
@@ -318,7 +329,20 @@
       "expenseDate": "Expense date",
       "confirmTransfer": "Confirm transfer to Expenses",
       "confirmConvertDialog": "Transfer all items of this order to a project expense? This action cannot be undone or repeated for the same order.",
-      "transferNote": "Transfers all items of the order ({{count}}) to a project expense, with the same description, quantity and value. This can only be done once per order."
+      "transferNote": "Transfers all items of the order ({{count}}) to a project expense, with the same description, quantity and value. This can only be done once per order.",
+      "vatPercent": "VAT %",
+      "retentionPercent": "Withholding tax %",
+      "cashBox": "Cash box",
+      "noCashBoxAssigned": "This order has no cash box assigned. Use \"Edit\" to assign one before registering deliveries or transferring it to expenses.",
+      "cashBoxAssigned": "Cash box: {{name}}",
+      "totalsSubtotal": "Subtotal",
+      "totalsVat": "VAT",
+      "totalsRetention": "Withholding tax",
+      "totalsGrandTotal": "Grand total",
+      "project": "Project",
+      "delete": "Delete",
+      "confirmDelete": "Delete this purchase order? This action cannot be undone.",
+      "editOrder": "Edit order"
     },
     "milestones": {
       "title": "Milestones",

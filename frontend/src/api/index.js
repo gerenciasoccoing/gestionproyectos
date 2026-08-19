@@ -105,6 +105,8 @@ export const purchaseOrdersApi = {
   list: (pid) => client.get(`/projects/${pid}/purchase-orders`).then((r) => r.data),
   get: (pid, id) => client.get(`/projects/${pid}/purchase-orders/${id}`).then((r) => r.data),
   create: (pid, data) => client.post(`/projects/${pid}/purchase-orders`, data).then((r) => r.data),
+  update: (pid, id, data) => client.put(`/projects/${pid}/purchase-orders/${id}`, data).then((r) => r.data),
+  remove: (pid, id) => client.delete(`/projects/${pid}/purchase-orders/${id}`),
   updateItem: (pid, id, itemId, data) => client.put(`/projects/${pid}/purchase-orders/${id}/items/${itemId}`, data).then((r) => r.data),
   convertToExpense: (pid, id, data) => client.post(`/projects/${pid}/purchase-orders/${id}/convert-to-expense`, data).then((r) => r.data),
   addReceipt: (pid, id, itemId, data) => client.post(`/projects/${pid}/purchase-orders/${id}/items/${itemId}/receipts`, data).then((r) => r.data),
@@ -175,9 +177,11 @@ export const thirdPartiesApi = {
 // cambia el punto de entrada: /purchase-orders en vez de /projects/:id/purchase-orders. Una orden
 // creada aquí con projectId aparece automáticamente en el listado de ese proyecto en Ejecución.
 export const supplierPurchaseOrdersApi = {
-  list: (supplierId) => client.get('/purchase-orders', { params: { supplierId } }).then((r) => r.data),
+  list: (params) => client.get('/purchase-orders', { params }).then((r) => r.data),
   get: (id) => client.get(`/purchase-orders/${id}`).then((r) => r.data),
   create: (data) => client.post('/purchase-orders', data).then((r) => r.data),
+  update: (id, data) => client.put(`/purchase-orders/${id}`, data).then((r) => r.data),
+  remove: (id) => client.delete(`/purchase-orders/${id}`),
   updateItem: (id, itemId, data) => client.put(`/purchase-orders/${id}/items/${itemId}`, data).then((r) => r.data),
   convertToExpense: (id, data) => client.post(`/purchase-orders/${id}/convert-to-expense`, data).then((r) => r.data),
   addReceipt: (id, itemId, data) => client.post(`/purchase-orders/${id}/items/${itemId}/receipts`, data).then((r) => r.data),

@@ -9,7 +9,7 @@ import Logo from './Logo';
 import LanguageSwitcher from './LanguageSwitcher';
 import {
   ProjectsIcon, QuotationsIcon, PriceBookIcon, ApuIcon, SuppliersIcon, ThirdPartiesIcon, InventoryIcon, AdminIcon,
-  ExpensesIcon, CashBoxIcon, MenuIcon, LogoutIcon,
+  ExpensesIcon, CashBoxIcon, PurchaseOrdersIcon, MenuIcon, LogoutIcon,
 } from './NavIcons';
 
 // Ancho del sidebar expandido/colapsado (a íconos). Se comparte entre el <aside> y el spacer del
@@ -105,6 +105,9 @@ export default function Layout() {
             ))}
             <Can module="inventario" action="view">
               <SidebarLink to="/inventory" label={t('nav.inventory')} icon={<InventoryIcon />} collapsed={collapsed} />
+            </Can>
+            <Can module="ordenes_compra" action="view">
+              <SidebarLink to="/purchase-orders" label={t('nav.purchaseOrders')} icon={<PurchaseOrdersIcon />} collapsed={collapsed} />
             </Can>
             <Can module="gastos" action="view">
               <SidebarLink to="/expenses" label={t('nav.expenses')} icon={<ExpensesIcon />} collapsed={collapsed} />

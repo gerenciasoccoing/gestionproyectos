@@ -87,6 +87,16 @@ export function ExpensesIcon(props) {
   );
 }
 
+export function PurchaseOrdersIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" {...common} {...props}>
+      <rect x="5" y="4" width="14" height="17" rx="1.5" />
+      <path d="M9 3.5h6a1 1 0 011 1V6H8V4.5a1 1 0 011-1z" />
+      <path d="M8.5 11h7M8.5 14h7M8.5 17h4.5" />
+    </svg>
+  );
+}
+
 export function CashBoxIcon(props) {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" {...common} {...props}>

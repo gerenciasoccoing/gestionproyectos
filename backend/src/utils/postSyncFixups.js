@@ -270,8 +270,44 @@ async function applyPostSyncFixups() {
   }
   await sequelize.query('ALTER TABLE "Expenses" ALTER COLUMN "cashBoxId" SET NOT NULL;');
 
+  await backfillPurchaseOrderCashBox();
+
   await ensureAppDbRole();
   await applyRowLevelSecurity();
+}
+
+// Migración de "caja por ítem" a "caja por orden" (corrección del bug de diseño reportado: antes
+// se elegía una caja distinta en cada recepción/traslado a gastos de una misma orden). Para cada
+// orden que todavía no tiene cashBoxId: mira TODOS los gastos que ya generó en su historia (el de
+// "Pasar a gastos" vía expenseId, y los de cada recepción parcial vía PurchaseReceipt.expenseId) y,
+// si todos usaron la MISMA caja, se la asigna automáticamente. Si mezcló más de una caja entre sus
+// ítems (o nunca generó ningún gasto todavía), queda en null: no se inventa una caja para una
+// orden ambigua o nueva, alguien debe asignarla a mano (ver purchaseOrderController.updateOrder)
+// antes de poder registrar más recepciones o trasladarla a gastos. Solo toca filas con cashBoxId
+// NULL, así que es idempotente y seguro de correr en cada arranque.
+async function backfillPurchaseOrderCashBox() {
+  await sequelize.query(`
+    WITH order_cashboxes AS (
+      SELECT po.id AS order_id, e."cashBoxId" AS cash_box_id
+      FROM "PurchaseOrders" po
+      JOIN "Expenses" e ON e.id = po."expenseId"
+      WHERE po."expenseId" IS NOT NULL
+      UNION
+      SELECT poi."purchaseOrderId" AS order_id, e."cashBoxId" AS cash_box_id
+      FROM "PurchaseOrderItems" poi
+      JOIN "PurchaseReceipts" pr ON pr."purchaseOrderItemId" = poi.id
+      JOIN "Expenses" e ON e.id = pr."expenseId"
+    ),
+    distinct_counts AS (
+      SELECT order_id, COUNT(DISTINCT cash_box_id) AS n, MIN(cash_box_id::text)::uuid AS only_cash_box_id
+      FROM order_cashboxes
+      GROUP BY order_id
+    )
+    UPDATE "PurchaseOrders" po
+    SET "cashBoxId" = dc.only_cash_box_id
+    FROM distinct_counts dc
+    WHERE po.id = dc.order_id AND dc.n = 1 AND po."cashBoxId" IS NULL;
+  `);
 }
 
 module.exports = { applyPostSyncFixups };

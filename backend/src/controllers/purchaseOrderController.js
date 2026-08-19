@@ -5,6 +5,7 @@ const {
 } = require('../models');
 const {
   getOrderItemsWithDelivery, getItemWithDelivery, isOrderFullyDelivered, getPurchaseReport, nextOrderNumber,
+  computeOrderTotals,
 } = require('../services/purchaseOrderService');
 const { generatePurchaseOrderPdf } = require('../services/pdfService');
 const { getSettingsForPdf } = require('./companySettingsController');
@@ -35,13 +36,18 @@ const list = asyncHandler(async (req, res) => {
   res.json(orders);
 });
 
-// Listado por proveedor (ruta global): usado desde la ficha del proveedor para mostrar sus
-// órdenes, tengan o no proyecto asignado.
+// Listado global (ruta /purchase-orders, sin :projectId en la URL): usado tanto desde la ficha de
+// un proveedor (pasando solo supplierId) como desde la página de Órdenes de Compra del menú
+// principal (supplierId y/o projectId opcionales y combinables, o ninguno para ver todas). Mismo
+// modelo/controlador que el listado anidado en proyecto (list, arriba) — no hay una tabla ni un
+// flujo distinto por punto de entrada.
 const listBySupplier = asyncHandler(async (req, res) => {
-  const { supplierId } = req.query;
-  if (!supplierId) throw new ApiError(400, 'supplierId es obligatorio');
+  const { supplierId, projectId } = req.query;
+  const where = {};
+  if (supplierId) where.supplierId = supplierId;
+  if (projectId) where.projectId = projectId;
   const orders = await PurchaseOrder.findAll({
-    where: { supplierId },
+    where,
     include: [
       { model: PurchaseOrderItem, as: 'items', include: [{ model: PurchaseReceipt, as: 'receipts' }] },
       { model: Project, attributes: ['id', 'name'] },
@@ -55,17 +61,24 @@ const get = asyncHandler(async (req, res) => {
   const order = await PurchaseOrder.findOne({ where: scopeWhere(req), include: [{ model: Project, attributes: ['id', 'name'] }] });
   if (!order) throw new ApiError(404, 'Orden de compra no encontrada');
   const items = await getOrderItemsWithDelivery(order.id);
-  res.json({ ...order.toJSON(), items });
+  const totals = computeOrderTotals(items, order.retentionPercent);
+  res.json({ ...order.toJSON(), items, totals });
 });
 
 const create = asyncHandler(async (req, res) => {
-  const { supplier, supplierId, date, items = [] } = req.body;
+  const { supplier, supplierId, date, items = [], cashBoxId, retentionPercent } = req.body;
   // Ruta anidada: projectId siempre viene en la URL. Ruta global: opcional, en el body (la
   // orden puede quedar sin proyecto hasta que se le asigne uno).
   const projectId = req.params.projectId || req.body.projectId || null;
 
   if (!supplier || !date) throw new ApiError(400, 'supplier y date son obligatorios');
   if (!Array.isArray(items) || items.length === 0) throw new ApiError(400, 'Debe incluir al menos un ítem');
+  // La caja se elige UNA sola vez, a nivel de toda la orden (ver PurchaseOrder.cashBoxId): de ahí
+  // sale el pago de cada recepción y del traslado a gastos, sin volver a preguntarla cada vez.
+  await assertCashBoxUsable(cashBoxId);
+  if (retentionPercent !== undefined && (Number(retentionPercent) < 0 || Number(retentionPercent) > 100)) {
+    throw new ApiError(400, 'retentionPercent debe estar entre 0 y 100');
+  }
 
   for (const it of items) {
     if (!it.name || !it.unit || it.quantityOrdered === undefined || it.unitPrice === undefined) {
@@ -73,6 +86,9 @@ const create = asyncHandler(async (req, res) => {
     }
     if (Number(it.quantityOrdered) < 0 || Number(it.unitPrice) < 0) {
       throw new ApiError(400, 'Cantidad y precio unitario no pueden ser negativos');
+    }
+    if (it.vatPercent !== undefined && (Number(it.vatPercent) < 0 || Number(it.vatPercent) > 100)) {
+      throw new ApiError(400, 'vatPercent debe estar entre 0 y 100');
     }
   }
 
@@ -105,6 +121,8 @@ const create = asyncHandler(async (req, res) => {
       date,
       status: 'abierta',
       createdBy: req.user.id,
+      cashBoxId,
+      retentionPercent: retentionPercent !== undefined ? retentionPercent : 0,
     }, { transaction: t });
 
     await PurchaseOrderItem.bulkCreate(
@@ -116,6 +134,7 @@ const create = asyncHandler(async (req, res) => {
         quantityOrdered: it.quantityOrdered,
         unitPrice: it.unitPrice,
         totalValue: Number(it.quantityOrdered) * Number(it.unitPrice),
+        vatPercent: it.vatPercent !== undefined ? it.vatPercent : 19,
       })),
       { transaction: t }
     );
@@ -123,7 +142,8 @@ const create = asyncHandler(async (req, res) => {
   });
 
   const items2 = await getOrderItemsWithDelivery(order.id);
-  res.status(201).json({ ...order.toJSON(), items: items2 });
+  const totals = computeOrderTotals(items2, order.retentionPercent);
+  res.status(201).json({ ...order.toJSON(), items: items2, totals });
 });
 
 // Edita un ítem existente (descripción/unidad/cantidad/valor unitario/vínculo a presupuesto).
@@ -142,10 +162,13 @@ const updateItem = asyncHandler(async (req, res) => {
   const item = await PurchaseOrderItem.findOne({ where: { id: req.params.itemId, purchaseOrderId: order.id } });
   if (!item) throw new ApiError(404, 'Ítem de orden de compra no encontrado');
 
-  const { name, unit, quantityOrdered, unitPrice, budgetItemId } = req.body;
+  const { name, unit, quantityOrdered, unitPrice, budgetItemId, vatPercent } = req.body;
   const nextQuantity = quantityOrdered !== undefined ? Number(quantityOrdered) : Number(item.quantityOrdered);
   const nextUnitPrice = unitPrice !== undefined ? Number(unitPrice) : Number(item.unitPrice);
   if (nextQuantity < 0 || nextUnitPrice < 0) throw new ApiError(400, 'Cantidad y precio unitario no pueden ser negativos');
+  if (vatPercent !== undefined && (Number(vatPercent) < 0 || Number(vatPercent) > 100)) {
+    throw new ApiError(400, 'vatPercent debe estar entre 0 y 100');
+  }
 
   const { delivered } = await getItemWithDelivery(item.id);
   if (nextQuantity < delivered) {
@@ -166,11 +189,78 @@ const updateItem = asyncHandler(async (req, res) => {
   if (unit !== undefined) item.unit = unit;
   if (quantityOrdered !== undefined) item.quantityOrdered = quantityOrdered;
   if (unitPrice !== undefined) item.unitPrice = unitPrice;
+  if (vatPercent !== undefined) item.vatPercent = vatPercent;
   item.totalValue = nextQuantity * nextUnitPrice;
   await item.save();
 
   const items = await getOrderItemsWithDelivery(order.id);
-  res.json({ ...order.toJSON(), items });
+  const totals = computeOrderTotals(items, order.retentionPercent);
+  res.json({ ...order.toJSON(), items, totals });
+});
+
+// Edita los datos de cabecera de la orden (proveedor, fecha, proyecto, caja, % retención) — no los
+// ítems, eso es updateItem. Bloqueada si la orden está cerrada. cashBoxId solo puede cambiarse si
+// la orden TODAVÍA no generó ningún gasto real (ni recepciones ni traslado a gastos): una vez que
+// el dinero ya salió de una caja, cambiar este campo después haría que la orden mostrara una caja
+// distinta a la que realmente se usó en esos gastos históricos (los gastos ya registrados no se
+// tocan ni se mueven de caja retroactivamente).
+const updateOrder = asyncHandler(async (req, res) => {
+  const order = await PurchaseOrder.findOne({ where: scopeWhere(req), include: [{ model: PurchaseOrderItem, as: 'items' }] });
+  if (!order) throw new ApiError(404, 'Orden de compra no encontrada');
+  if (order.status === 'cerrada' || order.status === 'cerrada_con_faltantes') {
+    throw new ApiError(400, 'No se puede editar una orden cerrada');
+  }
+
+  const { supplier, supplierId, date, projectId, cashBoxId, retentionPercent } = req.body;
+
+  if (projectId && projectId !== order.projectId && !req.user.isAdmin && !req.user.projectIds.includes(projectId)) {
+    throw new ApiError(403, 'No tiene acceso a este proyecto');
+  }
+
+  if (cashBoxId !== undefined && cashBoxId !== order.cashBoxId) {
+    const itemIds = order.items.map((it) => it.id);
+    const hasMoneyMovement = Boolean(order.expenseId)
+      || (itemIds.length > 0 && (await PurchaseReceipt.count({ where: { purchaseOrderItemId: itemIds } })) > 0);
+    if (hasMoneyMovement) {
+      throw new ApiError(400, 'Esta orden ya generó gastos con la caja actual; no se puede cambiar la caja de una orden con movimientos. Los gastos ya registrados no se ven afectados por este cambio.');
+    }
+    await assertCashBoxUsable(cashBoxId);
+    order.cashBoxId = cashBoxId;
+  }
+  if (supplier !== undefined) order.supplier = supplier;
+  if (supplierId !== undefined) order.supplierId = supplierId || null;
+  if (date !== undefined) order.date = date;
+  if (projectId !== undefined) order.projectId = projectId || null;
+  if (retentionPercent !== undefined) {
+    if (Number(retentionPercent) < 0 || Number(retentionPercent) > 100) throw new ApiError(400, 'retentionPercent debe estar entre 0 y 100');
+    order.retentionPercent = retentionPercent;
+  }
+  await order.save();
+
+  const items = await getOrderItemsWithDelivery(order.id);
+  const totals = computeOrderTotals(items, order.retentionPercent);
+  res.json({ ...order.toJSON(), items, totals });
+});
+
+// Elimina la orden completa (sus ítems se borran en cascada). Bloqueada si ya generó cualquier
+// gasto real (traslado a gastos o alguna recepción registrada): borrar la orden no revierte esos
+// gastos ni el saldo que ya salió de la caja — quedarían huérfanos, sin la orden que los originó,
+// mientras el dinero ya se movió. Hay que resolver esos gastos desde el módulo de Gastos primero.
+const remove = asyncHandler(async (req, res) => {
+  const order = await PurchaseOrder.findOne({ where: scopeWhere(req), include: [{ model: PurchaseOrderItem, as: 'items' }] });
+  if (!order) throw new ApiError(404, 'Orden de compra no encontrada');
+
+  if (order.expenseId) {
+    throw new ApiError(400, 'Esta orden ya fue trasladada a un gasto. Elimina o reversa ese gasto desde el módulo de Gastos antes de eliminar la orden.');
+  }
+  const itemIds = order.items.map((it) => it.id);
+  const receiptCount = itemIds.length ? await PurchaseReceipt.count({ where: { purchaseOrderItemId: itemIds } }) : 0;
+  if (receiptCount > 0) {
+    throw new ApiError(400, 'Esta orden ya tiene recepciones registradas, cada una con su propio gasto. Elimina esos gastos desde el módulo de Gastos antes de eliminar la orden.');
+  }
+
+  await order.destroy();
+  res.status(204).end();
 });
 
 // Traslada todos los ítems de la orden a un gasto del proyecto (trazable por sourceId = orden de
@@ -187,14 +277,22 @@ const convertToExpense = asyncHandler(async (req, res) => {
   if (!order.projectId) throw new ApiError(400, 'Esta orden no tiene un proyecto asignado. Asígnale un proyecto antes de trasladarla a gastos.');
   if (order.expenseId) throw new ApiError(400, 'Esta orden de compra ya fue trasladada a gastos');
   if (!order.items.length) throw new ApiError(400, 'La orden no tiene ítems para trasladar');
+  // La caja ya no se elige acá: es la que se fijó una sola vez al crear la orden (ver
+  // PurchaseOrder.cashBoxId). Una orden migrada de antes de este cambio, cuyo historial mezcló más
+  // de una caja entre sus ítems, queda sin cashBoxId hasta que alguien se la asigne a mano
+  // (updateOrder) — no se le puede adivinar cuál usar.
+  if (!order.cashBoxId) {
+    throw new ApiError(400, 'Esta orden no tiene una caja asignada. Edítala para asignarle una antes de trasladarla a gastos.');
+  }
+  const cashBoxId = order.cashBoxId;
 
-  const { category, date, cashBoxId } = req.body;
-  if (!cashBoxId) throw new ApiError(400, 'cashBoxId es obligatorio');
+  const { category, date } = req.body;
   const CATEGORIES = ['mano_obra', 'materiales', 'equipos', 'viaticos', 'imprevistos'];
   const expenseCategory = category && CATEGORIES.includes(category) ? category : 'materiales';
   const expenseDate = date || order.date;
 
-  const totalAmount = order.items.reduce((s, it) => s + Number(it.totalValue), 0);
+  const { subtotal: subtotalAmount, vatTotal, retentionAmount } = computeOrderTotals(order.items, order.retentionPercent);
+  const totalAmount = subtotalAmount + vatTotal - retentionAmount;
 
   const { expense, warning } = await sequelize.transaction(async (t) => {
     await assertCashBoxUsable(cashBoxId, { transaction: t });
@@ -247,10 +345,15 @@ const addReceipt = asyncHandler(async (req, res) => {
   const item = await PurchaseOrderItem.findOne({ where: { id: req.params.itemId, purchaseOrderId: order.id } });
   if (!item) throw new ApiError(404, 'Ítem de orden de compra no encontrado');
 
-  const { date, quantityReceived, notes, cashBoxId } = req.body;
+  const { date, quantityReceived, notes } = req.body;
   if (!date || quantityReceived === undefined) throw new ApiError(400, 'date y quantityReceived son obligatorios');
   if (Number(quantityReceived) < 0) throw new ApiError(400, 'La cantidad recibida no puede ser negativa');
-  if (!cashBoxId) throw new ApiError(400, 'cashBoxId es obligatorio');
+  // Misma caja para toda la orden (ver comentario en convertToExpense): ya no se vuelve a
+  // preguntar en cada recepción.
+  if (!order.cashBoxId) {
+    throw new ApiError(400, 'Esta orden no tiene una caja asignada. Edítala para asignarle una antes de registrar recepciones.');
+  }
+  const cashBoxId = order.cashBoxId;
 
   const existingReceipts = await PurchaseReceipt.findAll({ where: { purchaseOrderItemId: item.id } });
   const deliveredBefore = existingReceipts.reduce((sum, r) => sum + Number(r.quantityReceived), 0);
@@ -362,13 +465,14 @@ const exportPdf = asyncHandler(async (req, res) => {
 
   const company = await getSettingsForPdf();
   const lang = req.query.lang === 'en' ? 'en' : 'es';
+  const totals = computeOrderTotals(itemsWithDelivery, order.retentionPercent);
 
-  const doc = generatePurchaseOrderPdf({ order, items: itemsWithDelivery, company, lang });
+  const doc = generatePurchaseOrderPdf({ order, items: itemsWithDelivery, company, lang, totals });
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="orden-compra-${order.orderNumber || order.id}.pdf"`);
   doc.pipe(res);
 });
 
 module.exports = {
-  list, listBySupplier, get, create, updateItem, convertToExpense, addReceipt, close, report, exportPdf,
+  list, listBySupplier, get, create, updateOrder, remove, updateItem, convertToExpense, addReceipt, close, report, exportPdf,
 };
