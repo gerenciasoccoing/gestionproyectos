@@ -15,3 +15,9 @@ body {
   background-color: #f3f4f6;
   color: #111827;
 }
+
+/* Titular del login/landing público — ver LoginPage.jsx. Solo esas pantallas lo usan; el resto de
+   la app se queda en la tipografía de sistema de siempre. */
+.font-display {
+  font-family: 'Big Shoulders Display', system-ui, sans-serif;
+}

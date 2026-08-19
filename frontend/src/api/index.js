@@ -2,7 +2,15 @@ import client, { postAndDownload, platformAdminClient } from './client';
 
 export const authApi = {
   login: (email, password) => client.post('/auth/login', { email, password }).then((r) => r.data),
+  forgotPassword: (email) => client.post('/auth/forgot-password', { email }).then((r) => r.data),
+  resetPassword: (token, password) => client.post('/auth/reset-password', { token, password }).then((r) => r.data),
   me: () => client.get('/auth/me').then((r) => r.data),
+};
+
+// Registro público de empresa (sin sesión, desde el login) — queda "pendiente" hasta que un
+// operador de plataforma la apruebe o rechace (ver platformAdminApi.listRegistrationRequests).
+export const companyRegistrationApi = {
+  create: (data) => client.post('/register-company', data).then((r) => r.data),
 };
 
 // Panel de super-admin (multi-tenant) — sesión propia de operador, ver client.js/platformAdminClient
@@ -15,6 +23,9 @@ export const platformAdminApi = {
   updateCompanyPlan: (id, data) => platformAdminClient.patch(`/platform-admin/companies/${id}/plan`, data).then((r) => r.data),
   impersonateCompany: (id, reason) => platformAdminClient.post(`/platform-admin/companies/${id}/impersonate`, { reason }).then((r) => r.data),
   listSupportAccessLog: () => platformAdminClient.get('/platform-admin/support-access-log').then((r) => r.data),
+  listRegistrationRequests: (status) => platformAdminClient.get('/platform-admin/registration-requests', { params: status ? { status } : {} }).then((r) => r.data),
+  approveRegistrationRequest: (id) => platformAdminClient.post(`/platform-admin/registration-requests/${id}/approve`).then((r) => r.data),
+  rejectRegistrationRequest: (id, reason) => platformAdminClient.post(`/platform-admin/registration-requests/${id}/reject`, { reason }).then((r) => r.data),
 };
 
 export const usersApi = {

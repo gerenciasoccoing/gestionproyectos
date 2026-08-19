@@ -9,5 +9,8 @@ router.patch('/companies/:id/status', authenticatePlatformAdmin, platformAdminCo
 router.patch('/companies/:id/plan', authenticatePlatformAdmin, platformAdminController.updateCompanyPlan);
 router.post('/companies/:id/impersonate', authenticatePlatformAdmin, platformAdminController.impersonateCompany);
 router.get('/support-access-log', authenticatePlatformAdmin, platformAdminController.listSupportAccessLog);
+router.get('/registration-requests', authenticatePlatformAdmin, platformAdminController.listRegistrationRequests);
+router.post('/registration-requests/:id/approve', authenticatePlatformAdmin, platformAdminController.approveRegistrationRequest);
+router.post('/registration-requests/:id/reject', authenticatePlatformAdmin, platformAdminController.rejectRegistrationRequest);
 
 module.exports = router;

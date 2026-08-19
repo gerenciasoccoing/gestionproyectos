@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { Company } = require('../models');
@@ -8,7 +9,22 @@ const { Company } = require('../models');
 // ver NINGUNA fila de "Users" sin ese filtro (antes solo era un problema a nivel de hooks, ahora
 // también a nivel de PostgreSQL). Se usa la conexión de administración, exenta de RLS, solo para
 // esta consulta puntual — mismo espíritu que hooks:false, ahora también en la Capa 2.
-const { User: AdminUser, Role: AdminRole, Permission: AdminPermission } = require('../models/adminModels');
+// forgot/reset-password son endpoints públicos con el mismo problema (sin sesión, sin companyId de
+// contexto), así que también resuelven contra la conexión de administración — PasswordResetToken
+// está excluido del aislamiento multi-tenant por esta misma razón (ver defineModels.js).
+const { User: AdminUser, Role: AdminRole, Permission: AdminPermission, PasswordResetToken: AdminPasswordResetToken } = require('../models/adminModels');
+const { sendPasswordResetEmail } = require('../services/emailService');
+
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
+
+function hashToken(rawToken) {
+  return crypto.createHash('sha256').update(rawToken).digest('hex');
+}
+
+function frontendUrl(path) {
+  const base = (process.env.FRONTEND_PUBLIC_URL || 'http://localhost:5173').replace(/\/$/, '');
+  return `${base}${path}`;
+}
 
 function signToken(user) {
   return jwt.sign({ sub: user.id, companyId: user.companyId }, process.env.JWT_SECRET, {
@@ -55,6 +71,58 @@ const login = asyncHandler(async (req, res) => {
   });
 });
 
+// Siempre responde con el mismo mensaje genérico exista o no ese correo (evita que alguien use
+// este endpoint para averiguar qué correos están registrados). Si existe un usuario activo, crea
+// un token de un solo uso y le manda el enlace — el envío real puede fallar silenciosamente (ver
+// emailService) sin que eso cambie la respuesta al cliente.
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) throw new ApiError(400, 'El correo es obligatorio');
+
+  const genericResponse = { message: 'Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.' };
+
+  const user = await AdminUser.findOne({ where: { email }, hooks: false });
+  if (!user || !user.active) return res.json(genericResponse);
+
+  const rawToken = crypto.randomBytes(32).toString('base64url');
+  await AdminPasswordResetToken.create({
+    userId: user.id,
+    tokenHash: hashToken(rawToken),
+    expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+  });
+
+  await sendPasswordResetEmail({
+    to: user.email,
+    name: user.name,
+    resetUrl: frontendUrl(`/reset-password/${rawToken}`),
+  });
+
+  res.json(genericResponse);
+});
+
+// Válido una sola vez y solo dentro de la 1 hora de emitido (ver forgotPassword). El token nunca se
+// guarda en claro: se busca por el hash del que llega en la URL.
+const resetPassword = asyncHandler(async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) throw new ApiError(400, 'token y password son obligatorios');
+  if (password.length < 8) throw new ApiError(400, 'La contraseña debe tener al menos 8 caracteres');
+
+  const record = await AdminPasswordResetToken.findOne({ where: { tokenHash: hashToken(token) } });
+  if (!record || record.usedAt || record.expiresAt < new Date()) {
+    throw new ApiError(400, 'El enlace no es válido o ya venció. Solicita uno nuevo.');
+  }
+
+  const user = await AdminUser.findByPk(record.userId, { hooks: false });
+  if (!user || !user.active) throw new ApiError(400, 'El enlace no es válido o ya venció. Solicita uno nuevo.');
+
+  user.passwordHash = await bcrypt.hash(password, 10);
+  await user.save({ hooks: false });
+  record.usedAt = new Date();
+  await record.save();
+
+  res.json({ message: 'Contraseña actualizada. Ya puedes ingresar con tu nueva contraseña.' });
+});
+
 const me = asyncHandler(async (req, res) => {
   res.json({
     id: req.user.id,
@@ -67,4 +135,4 @@ const me = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { login, me };
+module.exports = { login, forgotPassword, resetPassword, me };

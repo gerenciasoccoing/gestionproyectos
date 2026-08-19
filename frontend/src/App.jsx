@@ -2,6 +2,9 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import RegisterCompanyPage from './pages/RegisterCompanyPage';
 import ConfirmationPage from './pages/public/ConfirmationPage';
 import PlatformAdminLoginPage from './pages/platformAdmin/PlatformAdminLoginPage';
 import PlatformAdminDashboardPage from './pages/platformAdmin/PlatformAdminDashboardPage';
@@ -49,6 +52,9 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+      <Route path="/register-company" element={<RegisterCompanyPage />} />
       <Route path="/confirm/:token" element={<ConfirmationPage />} />
       <Route path="/platform-admin/login" element={<PlatformAdminLoginPage />} />
       <Route path="/platform-admin" element={<PlatformAdminDashboardPage />} />

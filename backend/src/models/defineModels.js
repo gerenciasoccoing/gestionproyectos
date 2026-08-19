@@ -4,6 +4,8 @@ const modelDefiners = [
   require('./Company'),
   require('./PlatformAdmin'),
   require('./SupportAccessLog'),
+  require('./CompanyRegistrationRequest'),
+  require('./PasswordResetToken'),
   require('./User'),
   require('./Role'),
   require('./Permission'),
@@ -54,7 +56,10 @@ const modelDefiners = [
 // SupportAccessLog (auditoría de plataforma, se escribe desde fuera de cualquier contexto de
 // empresa) quedan explícitamente afuera del aislamiento multi-tenant — ni los hooks de la Capa 1
 // (applyTenantScoping) ni las políticas RLS de la Capa 2 (ver postSyncFixups.js) se les aplican.
-const TENANT_SCOPING_EXCLUDED = ['Company', 'Permission', 'PlatformAdmin', 'SupportAccessLog'];
+const TENANT_SCOPING_EXCLUDED = [
+  'Company', 'Permission', 'PlatformAdmin', 'SupportAccessLog',
+  'CompanyRegistrationRequest', 'PasswordResetToken',
+];
 
 // Fábrica reutilizable: models/index.js la llama con la conexión restringida (atiende peticiones
 // HTTP, con Row-Level Security activa) y models/adminModels.js con la conexión dueña (sync/DDL/

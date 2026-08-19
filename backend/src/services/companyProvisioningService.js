@@ -1,6 +1,13 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const ApiError = require('../utils/ApiError');
 const { Company, User, Role, Permission, LaborParameters, CashBox } = require('../models');
+// Chequeo de correo duplicado ANTES de tener companyId de contexto (ver provisionCompany): con la
+// Capa 2 (RLS) activa, la conexión restringida no ve NINGUNA fila sin ese contexto — un
+// User.findOne de la conexión normal acá siempre devolvería null, sin importar si el correo ya
+// existe. Se usa la conexión de administración, exenta de RLS, mismo criterio que
+// authController#login.
+const { User: AdminUser } = require('../models/adminModels');
 const { MODULES, ACTIONS, DEFAULT_ROLE_PERMISSIONS } = require('../config/permissions');
 const { runWithCompany } = require('../utils/tenantContext');
 
@@ -64,21 +71,29 @@ async function seedDefaultsForCompany(company, { adminName, adminEmail, adminPas
 // seedDefaultsForCompany. El catálogo de APU/precios queda vacío a propósito (se decidió no
 // copiar ninguna plantilla): la empresa lo carga con la importación de Excel que ya existe, o a
 // mano desde cero.
+//
+// adminPassword es OPCIONAL: cuando la llama platformAdminController.createCompany (alta manual),
+// el operador la escribe a mano. Cuando la llama la aprobación de una solicitud de registro
+// (platformAdminController.approveRegistrationRequest), el solicitante nunca eligió una — se
+// genera una al azar, inutilizable en la práctica (nadie la conoce), y quien aprueba manda al
+// admin un enlace de "definir tu contraseña" (mismo mecanismo que forgot-password, ver
+// authController#forgotPassword) en vez de una contraseña por correo.
 async function provisionCompany({ companyName, nit, address, phone, contactEmail, adminName, adminEmail, adminPassword }) {
-  if (!companyName || !adminName || !adminEmail || !adminPassword) {
-    throw new ApiError(400, 'companyName, adminName, adminEmail y adminPassword son obligatorios');
+  if (!companyName || !adminName || !adminEmail) {
+    throw new ApiError(400, 'companyName, adminName y adminEmail son obligatorios');
   }
-  if (adminPassword.length < 8) {
+  if (adminPassword && adminPassword.length < 8) {
     throw new ApiError(400, 'adminPassword debe tener al menos 8 caracteres');
   }
+  const password = adminPassword || crypto.randomBytes(32).toString('hex');
 
-  const existingUser = await User.findOne({ where: { email: adminEmail }, hooks: false });
+  const existingUser = await AdminUser.findOne({ where: { email: adminEmail }, hooks: false });
   if (existingUser) {
     throw new ApiError(409, 'Ya existe un usuario con ese correo en la plataforma');
   }
 
   const company = await Company.create({ companyName, nit, address, phone, contactEmail });
-  const admin = await seedDefaultsForCompany(company, { adminName, adminEmail, adminPassword });
+  const admin = await seedDefaultsForCompany(company, { adminName, adminEmail, adminPassword: password });
   return { company, admin };
 }
 

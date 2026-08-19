@@ -1,10 +1,24 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { PlatformAdmin, Company, User, Project, Role, SupportAccessLog } = require('../models');
+const { PlatformAdmin, Company, User, Project, Role, SupportAccessLog, CompanyRegistrationRequest, PasswordResetToken } = require('../models');
+// Este controlador atiende con un token de operador de plataforma, que nunca trae companyId (ver
+// signToken) — con la Capa 2 (RLS) activa, cualquier consulta a un modelo tenant-scoped (User,
+// Project...) desde la conexión restringida sin ese contexto devuelve 0 filas sin importar
+// hooks:false (eso solo salta el filtro de la Capa 1, RLS es independiente). listCompanies agrega
+// datos de TODAS las empresas a la vez, así que usa la conexión de administración (exenta de RLS)
+// en vez de abrir una transacción runWithCompany por cada una.
+const { User: AdminUser, Project: AdminProject } = require('../models/adminModels');
 const { provisionCompany } = require('../services/companyProvisioningService');
 const { runWithCompany } = require('../utils/tenantContext');
+const { sendPasswordResetEmail, sendCompanyRejectedEmail } = require('../services/emailService');
+
+function frontendUrl(path) {
+  const base = (process.env.FRONTEND_PUBLIC_URL || 'http://localhost:5173').replace(/\/$/, '');
+  return `${base}${path}`;
+}
 
 function signToken(admin) {
   // Sin companyId a propósito: es lo que distingue este token de uno de usuario normal (ver
@@ -30,16 +44,16 @@ const login = asyncHandler(async (req, res) => {
 // nombre sin tener que abrir una petición aparte por cada fila.
 const listCompanies = asyncHandler(async (req, res) => {
   const companies = await Company.findAll({ order: [['createdAt', 'ASC']], hooks: false });
-  const userCounts = await User.findAll({
-    attributes: ['companyId', [User.sequelize.fn('COUNT', User.sequelize.col('id')), 'count']],
+  const userCounts = await AdminUser.findAll({
+    attributes: ['companyId', [AdminUser.sequelize.fn('COUNT', AdminUser.sequelize.col('id')), 'count']],
     group: ['companyId'],
     hooks: false,
     raw: true,
   });
   const countByCompany = Object.fromEntries(userCounts.map((r) => [r.companyId, Number(r.count)]));
 
-  const activeProjectCounts = await Project.findAll({
-    attributes: ['companyId', [Project.sequelize.fn('COUNT', Project.sequelize.col('id')), 'count']],
+  const activeProjectCounts = await AdminProject.findAll({
+    attributes: ['companyId', [AdminProject.sequelize.fn('COUNT', AdminProject.sequelize.col('id')), 'count']],
     where: { status: 'activo' },
     group: ['companyId'],
     hooks: false,
@@ -155,7 +169,80 @@ const listSupportAccessLog = asyncHandler(async (req, res) => {
   res.json(logs);
 });
 
+// Bandeja de solicitudes de registro (formulario público "Registrar empresa" del login). Por
+// defecto solo las pendientes, ?status=approved|rejected|all para revisar el historial.
+const listRegistrationRequests = asyncHandler(async (req, res) => {
+  const { status } = req.query;
+  const where = status && status !== 'all' ? { status } : { status: 'pending' };
+  const requests = await CompanyRegistrationRequest.findAll({ where, order: [['createdAt', 'ASC']] });
+  res.json(requests);
+});
+
+// Aprobar: dispara el mismo alta que createCompany (provisionCompany), pero sin contraseña elegida
+// por nadie — se genera una inutilizable y se manda al admin un enlace de "definir tu contraseña"
+// (mismo mecanismo de un solo uso que forgot-password). companyName/nit/contactEmail vienen de la
+// solicitud tal cual se registraron; el nombre del admin es el nombre del contacto.
+const approveRegistrationRequest = asyncHandler(async (req, res) => {
+  const request = await CompanyRegistrationRequest.findByPk(req.params.id);
+  if (!request) throw new ApiError(404, 'Solicitud no encontrada');
+  if (request.status !== 'pending') throw new ApiError(400, 'Esta solicitud ya fue revisada');
+
+  const { company, admin } = await provisionCompany({
+    companyName: request.companyName,
+    nit: request.nit,
+    phone: request.phone,
+    contactEmail: request.contactEmail,
+    adminName: request.contactName,
+    adminEmail: request.contactEmail,
+  });
+
+  request.status = 'approved';
+  request.decidedAt = new Date();
+  request.decidedBy = req.platformAdmin.id;
+  request.companyId = company.id;
+  await request.save();
+
+  const rawToken = crypto.randomBytes(32).toString('base64url');
+  await PasswordResetToken.create({
+    userId: admin.id,
+    tokenHash: crypto.createHash('sha256').update(rawToken).digest('hex'),
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+  });
+  await sendPasswordResetEmail({
+    to: admin.email,
+    name: admin.name,
+    resetUrl: frontendUrl(`/reset-password/${rawToken}`),
+    isFirstAccess: true,
+  });
+
+  res.json({
+    company: { id: company.id, companyName: company.companyName },
+    admin: { id: admin.id, email: admin.email },
+  });
+});
+
+// Rechazar: no crea nada, solo marca la solicitud y avisa al solicitante (mensaje genérico salvo
+// que el operador escriba un motivo). El correo sigue sin poder usarse para ingresar (nunca se
+// creó un User).
+const rejectRegistrationRequest = asyncHandler(async (req, res) => {
+  const { reason } = req.body;
+  const request = await CompanyRegistrationRequest.findByPk(req.params.id);
+  if (!request) throw new ApiError(404, 'Solicitud no encontrada');
+  if (request.status !== 'pending') throw new ApiError(400, 'Esta solicitud ya fue revisada');
+
+  request.status = 'rejected';
+  request.rejectionReason = reason || null;
+  request.decidedAt = new Date();
+  request.decidedBy = req.platformAdmin.id;
+  await request.save();
+
+  await sendCompanyRejectedEmail({ to: request.contactEmail, companyName: request.companyName, reason });
+
+  res.json({ id: request.id, status: request.status });
+});
+
 module.exports = {
   login, listCompanies, createCompany, setCompanyStatus, updateCompanyPlan,
   impersonateCompany, listSupportAccessLog,
+  listRegistrationRequests, approveRegistrationRequest, rejectRegistrationRequest,
 };

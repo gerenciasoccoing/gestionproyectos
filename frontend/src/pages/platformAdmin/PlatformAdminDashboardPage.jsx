@@ -32,8 +32,15 @@ export default function PlatformAdminDashboardPage() {
   const [showLog, setShowLog] = useState(false);
   const [supportLog, setSupportLog] = useState(null);
 
+  const [requests, setRequests] = useState(null);
+  const [requestsError, setRequestsError] = useState('');
+  const [decidingId, setDecidingId] = useState(null);
+
   const load = () => {
     platformAdminApi.listCompanies().then(setCompanies).catch((err) => setError(extractError(err)));
+  };
+  const loadRequests = () => {
+    platformAdminApi.listRegistrationRequests().then(setRequests).catch((err) => setRequestsError(extractError(err)));
   };
 
   useEffect(() => {
@@ -42,7 +49,41 @@ export default function PlatformAdminDashboardPage() {
       return;
     }
     load();
+    loadRequests();
   }, []);
+
+  // Aprobar dispara el mismo alta que "Nueva empresa", solo que sin contraseña elegida por nadie:
+  // el nuevo admin recibe un enlace de "definir tu contraseña" por correo (ver
+  // platformAdminController.approveRegistrationRequest).
+  const approveRequest = async (request) => {
+    if (!confirm(`¿Aprobar el registro de "${request.companyName}"? Se crea la empresa y se le manda al contacto un enlace para definir su contraseña.`)) return;
+    setDecidingId(request.id);
+    setRequestsError('');
+    try {
+      await platformAdminApi.approveRegistrationRequest(request.id);
+      loadRequests();
+      load();
+    } catch (err) {
+      setRequestsError(extractError(err));
+    } finally {
+      setDecidingId(null);
+    }
+  };
+
+  const rejectRequest = async (request) => {
+    const reason = window.prompt(`¿Rechazar el registro de "${request.companyName}"? Puedes escribir un motivo (opcional, se le envía al contacto) o dejarlo vacío.`);
+    if (reason === null) return;
+    setDecidingId(request.id);
+    setRequestsError('');
+    try {
+      await platformAdminApi.rejectRegistrationRequest(request.id, reason || undefined);
+      loadRequests();
+    } catch (err) {
+      setRequestsError(extractError(err));
+    } finally {
+      setDecidingId(null);
+    }
+  };
 
   const toggleActive = async (company) => {
     try {
@@ -237,6 +278,40 @@ export default function PlatformAdminDashboardPage() {
             </Table>
           )}
         </Card>
+
+        <div className="mt-6">
+          <Card title={`Solicitudes de registro pendientes${requests ? ` (${requests.length})` : ''}`}>
+            {requestsError && <ErrorText>{requestsError}</ErrorText>}
+            {!requests ? (
+              <p className="text-sm text-gray-500">Cargando…</p>
+            ) : requests.length === 0 ? (
+              <p className="text-sm text-gray-500">No hay solicitudes pendientes.</p>
+            ) : (
+              <Table columns={['Empresa', 'NIT', 'Contacto', 'Teléfono', 'Fecha', '']}>
+                {requests.map((r) => (
+                  <tr key={r.id} className="border-b border-gray-50">
+                    <td className="py-2 pr-3 font-medium text-gray-900">{r.companyName}</td>
+                    <td className="py-2 pr-3">{r.nit || '—'}</td>
+                    <td className="py-2 pr-3">
+                      <div>{r.contactName}</div>
+                      <div className="text-xs text-gray-500">{r.contactEmail}</div>
+                    </td>
+                    <td className="py-2 pr-3">{r.phone || '—'}</td>
+                    <td className="py-2 pr-3">{formatDateTime(r.createdAt)}</td>
+                    <td className="py-2 pr-3 flex gap-2">
+                      <Button type="button" disabled={decidingId === r.id} onClick={() => approveRequest(r)}>
+                        {decidingId === r.id ? 'Procesando…' : 'Aprobar'}
+                      </Button>
+                      <Button type="button" variant="secondary" disabled={decidingId === r.id} onClick={() => rejectRequest(r)}>
+                        Rechazar
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </Table>
+            )}
+          </Card>
+        </div>
 
         <div className="mt-6">
           <Card
