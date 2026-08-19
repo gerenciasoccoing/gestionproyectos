@@ -13,6 +13,8 @@ export const platformAdminApi = {
   createCompany: (data) => platformAdminClient.post('/platform-admin/companies', data).then((r) => r.data),
   setCompanyStatus: (id, active) => platformAdminClient.patch(`/platform-admin/companies/${id}/status`, { active }).then((r) => r.data),
   updateCompanyPlan: (id, data) => platformAdminClient.patch(`/platform-admin/companies/${id}/plan`, data).then((r) => r.data),
+  impersonateCompany: (id, reason) => platformAdminClient.post(`/platform-admin/companies/${id}/impersonate`, { reason }).then((r) => r.data),
+  listSupportAccessLog: () => platformAdminClient.get('/platform-admin/support-access-log').then((r) => r.data),
 };
 
 export const usersApi = {

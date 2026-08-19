@@ -4,6 +4,7 @@ const { applyTenantScoping } = require('../utils/applyTenantScoping');
 const modelDefiners = [
   require('./Company'),
   require('./PlatformAdmin'),
+  require('./SupportAccessLog'),
   require('./User'),
   require('./Role'),
   require('./Permission'),
@@ -61,9 +62,10 @@ Object.values(models).forEach((model) => {
 
 // Aislamiento multi-tenant: todos los modelos de negocio quedan protegidos por los hooks de
 // applyTenantScoping.js. Company (la tabla de empresas en sí), Permission (catálogo global fijo
-// de permisos, no datos de una empresa) y PlatformAdmin (cuentas de operador, no pertenecen a
-// ninguna empresa) quedan explícitamente afuera.
-const TENANT_SCOPING_EXCLUDED = ['Company', 'Permission', 'PlatformAdmin'];
+// de permisos, no datos de una empresa), PlatformAdmin (cuentas de operador, no pertenecen a
+// ninguna empresa) y SupportAccessLog (auditoría de plataforma, se escribe desde fuera de
+// cualquier contexto de empresa) quedan explícitamente afuera.
+const TENANT_SCOPING_EXCLUDED = ['Company', 'Permission', 'PlatformAdmin', 'SupportAccessLog'];
 Object.entries(models).forEach(([name, model]) => {
   if (!TENANT_SCOPING_EXCLUDED.includes(name)) applyTenantScoping(model);
 });

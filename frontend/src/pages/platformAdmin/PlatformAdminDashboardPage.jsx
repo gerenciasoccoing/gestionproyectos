@@ -28,6 +28,10 @@ export default function PlatformAdminDashboardPage() {
   const [planError, setPlanError] = useState('');
   const [savingPlan, setSavingPlan] = useState(false);
 
+  const [impersonating, setImpersonating] = useState(null);
+  const [showLog, setShowLog] = useState(false);
+  const [supportLog, setSupportLog] = useState(null);
+
   const load = () => {
     platformAdminApi.listCompanies().then(setCompanies).catch((err) => setError(extractError(err)));
   };
@@ -102,6 +106,33 @@ export default function PlatformAdminDashboardPage() {
     navigate('/platform-admin/login');
   };
 
+  // Acceso de soporte: pide un motivo (queda en el registro de auditoría junto con quién/cuándo/
+  // a qué empresa), pide el token de sesión de usuario resultante y navega a la app normal como
+  // ese usuario. No hay "modo soporte" visual en el resto de la app — es una sesión de usuario
+  // común, con vida corta (30 min) por seguridad. Volver al panel de operador es simplemente
+  // cerrar sesión ahí y volver a entrar en /platform-admin/login.
+  const enterAsSupport = async (company) => {
+    const reason = window.prompt(`¿Motivo del acceso de soporte a "${company.companyName}"? (queda registrado)`);
+    if (reason === null) return;
+    setImpersonating(company.id);
+    setError('');
+    try {
+      const { token } = await platformAdminApi.impersonateCompany(company.id, reason);
+      localStorage.setItem('token', token);
+      window.location.href = '/';
+    } catch (err) {
+      setError(extractError(err));
+      setImpersonating(null);
+    }
+  };
+
+  const toggleLog = () => {
+    if (!showLog && !supportLog) {
+      platformAdminApi.listSupportAccessLog().then(setSupportLog).catch((err) => setError(extractError(err)));
+    }
+    setShowLog((v) => !v);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-5xl mx-auto">
@@ -168,6 +199,14 @@ export default function PlatformAdminDashboardPage() {
                       >
                         {editingPlanId === c.id ? 'Cancelar' : 'Editar plan'}
                       </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={!c.active || impersonating === c.id}
+                        onClick={() => enterAsSupport(c)}
+                      >
+                        {impersonating === c.id ? 'Entrando…' : 'Entrar como soporte'}
+                      </Button>
                     </td>
                   </tr>
                   {editingPlanId === c.id && (
@@ -198,6 +237,33 @@ export default function PlatformAdminDashboardPage() {
             </Table>
           )}
         </Card>
+
+        <div className="mt-6">
+          <Card
+            title="Historial de acceso de soporte"
+            actions={<Button type="button" variant="secondary" onClick={toggleLog}>{showLog ? 'Ocultar' : 'Ver historial'}</Button>}
+          >
+            {showLog && (
+              !supportLog ? (
+                <p className="text-sm text-gray-500">Cargando…</p>
+              ) : supportLog.length === 0 ? (
+                <p className="text-sm text-gray-500">Sin accesos de soporte registrados todavía.</p>
+              ) : (
+                <Table columns={['Operador', 'Empresa', 'Usuario', 'Motivo', 'Fecha']}>
+                  {supportLog.map((l) => (
+                    <tr key={l.id} className="border-b border-gray-50">
+                      <td className="py-2 pr-3">{l.platformAdminName}</td>
+                      <td className="py-2 pr-3">{l.companyName}</td>
+                      <td className="py-2 pr-3">{l.impersonatedUserEmail}</td>
+                      <td className="py-2 pr-3 text-gray-600">{l.reason || '—'}</td>
+                      <td className="py-2 pr-3">{formatDate(l.createdAt)}</td>
+                    </tr>
+                  ))}
+                </Table>
+              )
+            )}
+          </Card>
+        </div>
       </div>
     </div>
   );

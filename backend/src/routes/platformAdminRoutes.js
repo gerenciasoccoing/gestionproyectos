@@ -7,5 +7,7 @@ router.get('/companies', authenticatePlatformAdmin, platformAdminController.list
 router.post('/companies', authenticatePlatformAdmin, platformAdminController.createCompany);
 router.patch('/companies/:id/status', authenticatePlatformAdmin, platformAdminController.setCompanyStatus);
 router.patch('/companies/:id/plan', authenticatePlatformAdmin, platformAdminController.updateCompanyPlan);
+router.post('/companies/:id/impersonate', authenticatePlatformAdmin, platformAdminController.impersonateCompany);
+router.get('/support-access-log', authenticatePlatformAdmin, platformAdminController.listSupportAccessLog);
 
 module.exports = router;

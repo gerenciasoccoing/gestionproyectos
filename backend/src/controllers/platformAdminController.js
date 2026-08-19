@@ -2,8 +2,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { PlatformAdmin, Company, User, Project } = require('../models');
+const { PlatformAdmin, Company, User, Project, Role, SupportAccessLog } = require('../models');
 const { provisionCompany } = require('../services/companyProvisioningService');
+const { runWithCompany } = require('../utils/tenantContext');
 
 function signToken(admin) {
   // Sin companyId a propósito: es lo que distingue este token de uno de usuario normal (ver
@@ -115,4 +116,46 @@ const updateCompanyPlan = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { login, listCompanies, createCompany, setCompanyStatus, updateCompanyPlan };
+// Acceso de soporte auditado: entra a la sesión de una empresa como su usuario administrador, sin
+// necesitar su contraseña. Cada uso queda registrado (SupportAccessLog) con quién, a qué empresa,
+// como qué usuario y por qué (reason es opcional, pero se guarda si se manda). El token que se
+// entrega es un token de USUARIO normal (mismo shape que authController.signToken) — no hay ningún
+// mecanismo especial de "modo soporte" en el resto de la app, así que la sesión resultante se
+// comporta exactamente como si el administrador de esa empresa hubiera iniciado sesión — con la
+// diferencia de que dura 30 minutos en vez de 8 horas, para acotar la ventana de exposición.
+const impersonateCompany = asyncHandler(async (req, res) => {
+  const { reason } = req.body;
+
+  const company = await Company.findByPk(req.params.id, { hooks: false });
+  if (!company) throw new ApiError(404, 'Empresa no encontrada');
+  if (!company.active) throw new ApiError(403, 'La empresa está inactiva');
+
+  const admin = await runWithCompany(company.id, async () => {
+    const adminRole = await Role.findOne({ where: { name: 'admin', companyId: company.id } });
+    if (!adminRole) return null;
+    return User.findOne({ where: { active: true }, include: [{ model: Role, where: { id: adminRole.id } }] });
+  });
+  if (!admin) throw new ApiError(404, 'La empresa no tiene un usuario administrador activo');
+
+  await SupportAccessLog.create({
+    platformAdminId: req.platformAdmin.id,
+    platformAdminName: req.platformAdmin.name,
+    companyId: company.id,
+    companyName: company.companyName,
+    impersonatedUserEmail: admin.email,
+    reason: reason || null,
+  });
+
+  const token = jwt.sign({ sub: admin.id, companyId: company.id }, process.env.JWT_SECRET, { expiresIn: '30m' });
+  res.json({ token, impersonatedUser: { name: admin.name, email: admin.email }, companyName: company.companyName });
+});
+
+const listSupportAccessLog = asyncHandler(async (req, res) => {
+  const logs = await SupportAccessLog.findAll({ order: [['createdAt', 'DESC']], limit: 100 });
+  res.json(logs);
+});
+
+module.exports = {
+  login, listCompanies, createCompany, setCompanyStatus, updateCompanyPlan,
+  impersonateCompany, listSupportAccessLog,
+};
