@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { platformAdminApi } from '../../api';
-import { Card, Table, Badge, Button, Input, ErrorText, extractError, formatDate } from '../../components/ui';
+import { Card, Table, Badge, Button, Input, ErrorText, extractError, formatDate, formatDateTime } from '../../components/ui';
 import Logo from '../../components/Logo';
 
 const emptyForm = {
@@ -256,7 +256,7 @@ export default function PlatformAdminDashboardPage() {
                       <td className="py-2 pr-3">{l.companyName}</td>
                       <td className="py-2 pr-3">{l.impersonatedUserEmail}</td>
                       <td className="py-2 pr-3 text-gray-600">{l.reason || '—'}</td>
-                      <td className="py-2 pr-3">{formatDate(l.createdAt)}</td>
+                      <td className="py-2 pr-3">{formatDateTime(l.createdAt)}</td>
                     </tr>
                   ))}
                 </Table>
