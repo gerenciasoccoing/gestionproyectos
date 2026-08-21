@@ -272,6 +272,14 @@ async function applyPostSyncFixups() {
 
   await backfillPurchaseOrderCashBox();
 
+  // PurchaseOrderItem.name y ExpenseItem.description pasaron de STRING (VARCHAR 255) a TEXT: las
+  // descripciones de dotación/EPP con tallas y medidas superan 255 caracteres y tumbaban el INSERT
+  // en producción ("value too long for type character varying(255)"). sync({alter:true}) no
+  // cambia el tipo de una columna existente (mismo problema conocido que con NOT NULL, ver arriba),
+  // así que se ajusta a mano. ALTER COLUMN ... TYPE TEXT es un no-op seguro si ya es TEXT.
+  await sequelize.query('ALTER TABLE "PurchaseOrderItems" ALTER COLUMN "name" TYPE TEXT;');
+  await sequelize.query('ALTER TABLE "ExpenseItems" ALTER COLUMN "description" TYPE TEXT;');
+
   await ensureAppDbRole();
   await applyRowLevelSecurity();
 }

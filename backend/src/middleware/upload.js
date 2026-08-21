@@ -2,6 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { getCurrentStore, runWithStore } = require('../utils/tenantContext');
 
 const UPLOAD_ROOT = path.resolve(process.env.UPLOAD_DIR || 'uploads');
 
@@ -49,7 +50,30 @@ function makeUploader(subfolder, kind = 'any') {
     cb(null, true);
   };
 
-  return multer({ storage, fileFilter, limits: { fileSize: 20 * 1024 * 1024 } });
+  const uploader = multer({ storage, fileFilter, limits: { fileSize: 20 * 1024 * 1024 } });
+
+  // El stream multipart que multer lee de `req` puede terminar de procesarse fuera del contexto
+  // async que abrió runInTransactionContext (ver comentario arriba) — no solo para el destino del
+  // archivo (ya resuelto leyendo req.user directo), sino para TODO lo que corra después de multer:
+  // el controlador y cualquier consulta Sequelize que haga. Por eso se captura el store activo
+  // ANTES de invocar multer y se reinstala explícitamente en el callback, sin importar en qué
+  // contexto haya terminado multer — así el controlador y sus consultas heredan el mismo
+  // companyId y la misma transacción (con el GUC de RLS ya seteado) que el resto de la petición.
+  function withTenantContext(multerMiddleware) {
+    return (req, res, next) => {
+      const store = getCurrentStore();
+      multerMiddleware(req, res, (err) => {
+        if (err) return next(err);
+        runWithStore(store, next);
+      });
+    };
+  }
+
+  return {
+    single: (field) => withTenantContext(uploader.single(field)),
+    array: (field, maxCount) => withTenantContext(uploader.array(field, maxCount)),
+    fields: (fieldsSpec) => withTenantContext(uploader.fields(fieldsSpec)),
+  };
 }
 
 function relativePath(file) {

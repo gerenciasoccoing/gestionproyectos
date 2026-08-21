@@ -8,7 +8,10 @@ module.exports = (sequelize) => {
     companyId: { type: DataTypes.UUID, allowNull: true },
     purchaseOrderId: { type: DataTypes.UUID, allowNull: false },
     budgetItemId: { type: DataTypes.UUID, allowNull: true }, // vínculo opcional al ítem de presupuesto
-    name: { type: DataTypes.STRING, allowNull: false },
+    // TEXT, no STRING/VARCHAR(255): las descripciones de dotación/EPP suelen incluir tallas,
+    // medidas y detalles que superan 255 caracteres (ver INSERT fallido en producción con
+    // "value too long for type character varying(255)").
+    name: { type: DataTypes.TEXT, allowNull: false },
     unit: { type: DataTypes.STRING, allowNull: false },
     quantityOrdered: { type: DataTypes.DECIMAL(18, 4), allowNull: false, validate: { min: 0 } },
     unitPrice: { type: DataTypes.DECIMAL(18, 2), allowNull: false, validate: { min: 0 } },

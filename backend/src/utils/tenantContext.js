@@ -46,4 +46,25 @@ function getCurrentTransaction() {
   return storage.getStore()?.transaction || null;
 }
 
-module.exports = { runWithCompany, runInTransactionContext, getCurrentCompanyId, getCurrentTransaction };
+// Para middleware que envuelve operaciones que pueden "escapar" del contexto async activo (ver
+// middleware/upload.js): captura el store actual (companyId + transacción) ANTES de la operación
+// y lo reinstala después con runWithStore, sin importar en qué contexto haya terminado esa
+// operación. Reinstala el MISMO objeto (misma transacción/conexión con el GUC de RLS ya seteado),
+// a diferencia de volver a abrir un contexto nuevo con solo el companyId.
+function getCurrentStore() {
+  return storage.getStore() || null;
+}
+
+function runWithStore(store, fn) {
+  if (!store) return fn();
+  return storage.run(store, fn);
+}
+
+module.exports = {
+  runWithCompany,
+  runInTransactionContext,
+  getCurrentCompanyId,
+  getCurrentTransaction,
+  getCurrentStore,
+  runWithStore,
+};
