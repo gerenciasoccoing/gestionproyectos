@@ -6,6 +6,7 @@ const { scanRut } = require('../services/rutScanService');
 const { getProjectBudgetTotal } = require('../services/budgetService');
 const aiVisionService = require('../services/aiVisionService');
 const { getExtractor } = require('../config/aiDocumentExtractors');
+const { mapSeries } = require('../utils/mapSeries');
 
 const TYPES = ['proveedor', 'cliente'];
 
@@ -130,13 +131,13 @@ const getClientProjects = asyncHandler(async (req, res) => {
   if (!client) throw new ApiError(404, 'Tercero no encontrado');
 
   const projects = await Project.findAll({ where: { clientId: client.id }, order: [['createdAt', 'DESC']] });
-  const rows = await Promise.all(projects.map(async (p) => ({
+  const rows = await mapSeries(projects, async (p) => ({
     id: p.id,
     name: p.name,
     status: p.status,
     origin: p.origin,
     budgetValue: await getProjectBudgetTotal(p.id),
-  })));
+  }));
 
   res.json({
     projects: rows,

@@ -1,5 +1,6 @@
 const ApiError = require('../utils/ApiError');
 const { sequelize, Budget, BudgetItem, APU, APUComponent, PriceItem, ProgressEntry } = require('../models');
+const { mapSeries } = require('../utils/mapSeries');
 
 // Valor unitario efectivo de un componente: el de su insumo de la base de precios,
 // o la tarifa manual (unitValue) cuando no referencia uno (ej. tarifa de transporte).
@@ -150,20 +151,18 @@ async function getBudgetItemsWithProgress(projectId) {
   const budget = await getCurrentBudgetForProject(projectId);
   if (!budget) return { budget: null, items: [] };
 
-  const items = await Promise.all(
-    budget.items.map(async (item) => {
-      const entries = await ProgressEntry.findAll({ where: { budgetItemId: item.id } });
-      const accumulatedQty = entries.reduce((sum, e) => sum + Number(e.quantityExecuted), 0);
-      const percent = Number(item.quantity) > 0 ? (accumulatedQty / Number(item.quantity)) * 100 : 0;
-      const executedValue = accumulatedQty * Number(item.unitCost);
-      return {
-        ...item.toJSON(),
-        accumulatedQty,
-        percent: Math.round(percent * 100) / 100,
-        executedValue,
-      };
-    })
-  );
+  const items = await mapSeries(budget.items, async (item) => {
+    const entries = await ProgressEntry.findAll({ where: { budgetItemId: item.id } });
+    const accumulatedQty = entries.reduce((sum, e) => sum + Number(e.quantityExecuted), 0);
+    const percent = Number(item.quantity) > 0 ? (accumulatedQty / Number(item.quantity)) * 100 : 0;
+    const executedValue = accumulatedQty * Number(item.unitCost);
+    return {
+      ...item.toJSON(),
+      accumulatedQty,
+      percent: Math.round(percent * 100) / 100,
+      executedValue,
+    };
+  });
 
   return { budget, items };
 }
@@ -189,10 +188,8 @@ function randomItemCode() {
 async function generateUniqueItemCode({ transaction } = {}) {
   for (let attempt = 0; attempt < ITEM_CODE_MAX_ATTEMPTS; attempt++) {
     const code = randomItemCode();
-    const [existingItem, existingApu] = await Promise.all([
-      BudgetItem.findOne({ where: { itemCode: code }, transaction }),
-      APU.findOne({ where: { code }, transaction }),
-    ]);
+    const existingItem = await BudgetItem.findOne({ where: { itemCode: code }, transaction });
+    const existingApu = await APU.findOne({ where: { code }, transaction });
     if (!existingItem && !existingApu) return code;
   }
   throw new ApiError(500, 'No se pudo generar un código único para el ítem, intenta de nuevo');

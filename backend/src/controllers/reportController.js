@@ -4,6 +4,7 @@ const { computeEVM, computeSCurve } = require('../services/evmService');
 const { getBudgetItemsWithProgress } = require('../services/budgetService');
 const { getPurchaseReport } = require('../services/purchaseOrderService');
 const { generateProjectReportPdf } = require('../services/pdfService');
+const { mapSeries } = require('../utils/mapSeries');
 
 const evm = asyncHandler(async (req, res) => {
   const asOfDate = req.query.asOfDate ? new Date(req.query.asOfDate) : new Date();
@@ -17,17 +18,16 @@ const sCurve = asyncHandler(async (req, res) => {
 });
 
 const milestonesAndMinutesSummary = asyncHandler(async (req, res) => {
-  const [milestones, minutes] = await Promise.all([
-    Milestone.findAll({ where: { projectId: req.params.projectId }, order: [['plannedDate', 'ASC']] }),
-    Minute.findAll({ where: { projectId: req.params.projectId }, order: [['date', 'ASC']] }),
-  ]);
+  // Secuencial, no Promise.all: comparten la transacción/conexión de la petición (RLS).
+  const milestones = await Milestone.findAll({ where: { projectId: req.params.projectId }, order: [['plannedDate', 'ASC']] });
+  const minutes = await Minute.findAll({ where: { projectId: req.params.projectId }, order: [['date', 'ASC']] });
   res.json({ milestones, minutes });
 });
 
 // Informe de avance por ítem de presupuesto, incluyendo galería de fotos.
 const progressByItem = asyncHandler(async (req, res) => {
   const { items } = await getBudgetItemsWithProgress(req.params.projectId);
-  const withPhotos = await Promise.all(items.map(async (item) => {
+  const withPhotos = await mapSeries(items, async (item) => {
     const entries = await ProgressEntry.findAll({
       where: { budgetItemId: item.id },
       include: [{ model: ProgressPhoto, as: 'photos' }],
@@ -35,19 +35,18 @@ const progressByItem = asyncHandler(async (req, res) => {
     });
     const photos = entries.flatMap((e) => e.photos.map((p) => p.filePath));
     return { ...item, photos };
-  }));
+  });
   res.json(withPhotos);
 });
 
 async function gatherReportData(projectId) {
-  const [project, evmResult, milestones, minutes, risks, progress] = await Promise.all([
-    Project.findByPk(projectId),
-    computeEVM(projectId),
-    Milestone.findAll({ where: { projectId }, order: [['plannedDate', 'ASC']] }),
-    Minute.findAll({ where: { projectId }, order: [['date', 'ASC']] }),
-    Risk.findAll({ where: { projectId } }),
-    getBudgetItemsWithProgress(projectId),
-  ]);
+  // Secuencial, no Promise.all: comparten la transacción/conexión de la petición (RLS).
+  const project = await Project.findByPk(projectId);
+  const evmResult = await computeEVM(projectId);
+  const milestones = await Milestone.findAll({ where: { projectId }, order: [['plannedDate', 'ASC']] });
+  const minutes = await Minute.findAll({ where: { projectId }, order: [['date', 'ASC']] });
+  const risks = await Risk.findAll({ where: { projectId } });
+  const progress = await getBudgetItemsWithProgress(projectId);
 
   const purchases = await getPurchaseReport(projectId, {});
 

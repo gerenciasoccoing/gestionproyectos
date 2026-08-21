@@ -6,10 +6,11 @@ const { CashBox, CashBoxMovement, Expense } = require('../models');
 async function getBalance(cashBoxId, { transaction } = {}) {
   const cashBox = await CashBox.findByPk(cashBoxId, { transaction });
   if (!cashBox) return null;
-  const [movements, expenses] = await Promise.all([
-    CashBoxMovement.findAll({ where: { cashBoxId }, transaction }),
-    Expense.findAll({ where: { cashBoxId }, transaction }),
-  ]);
+  // Secuencial, no Promise.all: dentro de una petición HTTP ambas consultas comparten la misma
+  // transacción/conexión (por RLS, ver middleware/auth.js), y Postgres no procesa dos consultas a
+  // la vez sobre la misma conexión.
+  const movements = await CashBoxMovement.findAll({ where: { cashBoxId }, transaction });
+  const expenses = await Expense.findAll({ where: { cashBoxId }, transaction });
   const income = movements.reduce((sum, m) => sum + Number(m.amount), 0);
   const spent = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
   return Number(cashBox.initialBalance) + income - spent;

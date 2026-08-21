@@ -3,6 +3,7 @@ const ApiError = require('../utils/ApiError');
 const { InventoryItem, InventoryCheckoutItem } = require('../models');
 const { relativePath } = require('../middleware/upload');
 const { getItemHistory, computeAvailableQuantity } = require('../services/inventoryService');
+const { mapSeries } = require('../utils/mapSeries');
 
 const TRACKING_TYPES = ['serializado', 'cantidad'];
 const STATUSES = ['disponible', 'en_prestamo', 'mantenimiento', 'baja'];
@@ -33,7 +34,7 @@ const list = asyncHandler(async (req, res) => {
       return it.name.toLowerCase().includes(q) || it.code.toLowerCase().includes(q);
     })
     : items;
-  res.json(await Promise.all(filtered.map(withAvailability)));
+  res.json(await mapSeries(filtered, withAvailability));
 });
 
 const get = asyncHandler(async (req, res) => {

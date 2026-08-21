@@ -7,6 +7,7 @@ const { buildApuDataByIdMap } = require('../services/apuExportService');
 const { generateQuotationPdf, generateBudgetWithApuAnnexPdf } = require('../services/pdfService');
 const { generateBudgetWithApuAnnexExcelBuffer } = require('../services/apuExcelExportService');
 const { getSettingsForPdf } = require('./companySettingsController');
+const { mapSeries } = require('../utils/mapSeries');
 
 // Extrae y valida el AIU discriminado (Administración/Imprevistos/Utilidad) del body.
 function parseAiuPercents(body) {
@@ -136,7 +137,7 @@ const exportPdf = asyncHandler(async (req, res) => {
   const { quotation, budget } = await getQuotationWithBudget(req.params.id);
   if (!quotation) throw new ApiError(404, 'Cotización no encontrada');
 
-  const items = await Promise.all((budget?.items || []).map(async (item) => {
+  const items = await mapSeries(budget?.items || [], async (item) => {
     let directSubtotal = Number(item.totalCost);
     let aiuAmount = 0;
     if (item.apuId) {
@@ -147,7 +148,7 @@ const exportPdf = asyncHandler(async (req, res) => {
       }
     }
     return { ...item.toJSON(), directSubtotal, aiuAmount };
-  }));
+  });
 
   const company = await getSettingsForPdf();
 

@@ -2,6 +2,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { BudgetItem, ProgressEntry, ProgressPhoto } = require('../models');
 const { relativePath } = require('../middleware/upload');
+const { mapSeries } = require('../utils/mapSeries');
 
 async function assertItemBelongsToProject(itemId, projectId) {
   const item = await BudgetItem.findByPk(itemId, { include: [{ association: 'Budget' }] });
@@ -39,9 +40,7 @@ const createEntry = asyncHandler(async (req, res) => {
   });
 
   const files = req.files || [];
-  const photos = await Promise.all(
-    files.map((f) => ProgressPhoto.create({ progressEntryId: entry.id, filePath: relativePath(f) }))
-  );
+  const photos = await mapSeries(files, (f) => ProgressPhoto.create({ progressEntryId: entry.id, filePath: relativePath(f) }));
 
   const warning = accumulatedAfter > Number(item.quantity)
     ? `La cantidad ejecutada acumulada (${accumulatedAfter}) supera la cantidad presupuestada (${item.quantity}).`

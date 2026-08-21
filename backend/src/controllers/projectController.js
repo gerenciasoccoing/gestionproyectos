@@ -3,6 +3,7 @@ const ApiError = require('../utils/ApiError');
 const { Project, User, ProjectUser } = require('../models');
 const { deleteProjectCascade } = require('../services/projectDeletionService');
 const { assertWithinLimit } = require('../utils/planLimits');
+const { mapSeries } = require('../utils/mapSeries');
 
 const list = asyncHandler(async (req, res) => {
   const where = req.user.isAdmin ? {} : { id: req.user.projectIds };
@@ -33,9 +34,7 @@ const create = asyncHandler(async (req, res) => {
   });
 
   const assignees = new Set([req.user.id, ...userIds]);
-  await Promise.all(
-    [...assignees].map((userId) => ProjectUser.create({ userId, projectId: project.id }))
-  );
+  await mapSeries([...assignees], (userId) => ProjectUser.create({ userId, projectId: project.id }));
 
   const full = await Project.findByPk(project.id, { include: [User] });
   res.status(201).json(full);

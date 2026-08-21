@@ -266,10 +266,9 @@ const setBudget = asyncHandler(async (req, res) => {
 // Vista consolidada: presupuesto vs. gasto acumulado vs. saldo disponible, por categoría. Solo
 // por proyecto (no se expone en la ruta general).
 const summary = asyncHandler(async (req, res) => {
-  const [budgets, expenses] = await Promise.all([
-    ExpenseBudget.findAll({ where: { projectId: req.params.projectId } }),
-    Expense.findAll({ where: { projectId: req.params.projectId } }),
-  ]);
+  // Secuencial, no Promise.all: comparten la transacción/conexión de la petición (RLS).
+  const budgets = await ExpenseBudget.findAll({ where: { projectId: req.params.projectId } });
+  const expenses = await Expense.findAll({ where: { projectId: req.params.projectId } });
 
   const summaryRows = CATEGORIES.map((category) => {
     const budgeted = budgets.find((b) => b.category === category);
