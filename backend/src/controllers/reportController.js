@@ -4,7 +4,6 @@ const { computeEVM, computeSCurve } = require('../services/evmService');
 const { getBudgetItemsWithProgress } = require('../services/budgetService');
 const { getPurchaseReport } = require('../services/purchaseOrderService');
 const { generateProjectReportPdf } = require('../services/pdfService');
-const { mapSeries } = require('../utils/mapSeries');
 
 const evm = asyncHandler(async (req, res) => {
   const asOfDate = req.query.asOfDate ? new Date(req.query.asOfDate) : new Date();
@@ -24,18 +23,23 @@ const milestonesAndMinutesSummary = asyncHandler(async (req, res) => {
   res.json({ milestones, minutes });
 });
 
-// Informe de avance por ítem de presupuesto, incluyendo galería de fotos.
+// Informe de avance por ítem de presupuesto, incluyendo galería de fotos. Una sola consulta para
+// las fotos de TODOS los ítems (agrupadas en JS después), no una por ítem — un proyecto con
+// muchos ítems de presupuesto no debe traducirse en igual de muchas consultas secuenciales.
 const progressByItem = asyncHandler(async (req, res) => {
   const { items } = await getBudgetItemsWithProgress(req.params.projectId);
-  const withPhotos = await mapSeries(items, async (item) => {
-    const entries = await ProgressEntry.findAll({
-      where: { budgetItemId: item.id },
-      include: [{ model: ProgressPhoto, as: 'photos' }],
-      order: [['date', 'ASC']],
-    });
-    const photos = entries.flatMap((e) => e.photos.map((p) => p.filePath));
-    return { ...item, photos };
+  const allEntries = await ProgressEntry.findAll({
+    where: { budgetItemId: items.map((i) => i.id) },
+    include: [{ model: ProgressPhoto, as: 'photos' }],
+    order: [['date', 'ASC']],
   });
+  const photosByItem = new Map();
+  for (const entry of allEntries) {
+    const list = photosByItem.get(entry.budgetItemId) || [];
+    list.push(...entry.photos.map((p) => p.filePath));
+    photosByItem.set(entry.budgetItemId, list);
+  }
+  const withPhotos = items.map((item) => ({ ...item, photos: photosByItem.get(item.id) || [] }));
   res.json(withPhotos);
 });
 

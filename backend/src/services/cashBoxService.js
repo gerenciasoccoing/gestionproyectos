@@ -16,6 +16,25 @@ async function getBalance(cashBoxId, { transaction } = {}) {
   return Number(cashBox.initialBalance) + income - spent;
 }
 
+// Igual que getBalance, pero para varias cajas a la vez con 2 consultas totales (no 2 por caja):
+// usada por cashBoxController#list, que se pide en casi cualquier pantalla con selector de caja
+// (Órdenes de Compra, Gastos, Proveedores...). Devuelve un Map cashBoxId -> saldo.
+async function getBalancesForCashBoxes(cashBoxes) {
+  const ids = cashBoxes.map((cb) => cb.id);
+  const movements = await CashBoxMovement.findAll({ where: { cashBoxId: ids } });
+  const expenses = await Expense.findAll({ where: { cashBoxId: ids } });
+  const incomeById = new Map();
+  for (const m of movements) incomeById.set(m.cashBoxId, (incomeById.get(m.cashBoxId) || 0) + Number(m.amount));
+  const spentById = new Map();
+  for (const e of expenses) spentById.set(e.cashBoxId, (spentById.get(e.cashBoxId) || 0) + Number(e.amount));
+
+  const balances = new Map();
+  for (const cb of cashBoxes) {
+    balances.set(cb.id, Number(cb.initialBalance) + (incomeById.get(cb.id) || 0) - (spentById.get(cb.id) || 0));
+  }
+  return balances;
+}
+
 // Valida que la caja exista y esté activa (una caja cerrada no puede elegirse como origen de un
 // gasto nuevo). No valida saldo suficiente: el sobregiro está permitido explícitamente, con
 // advertencia (ver overdraftWarning) en vez de bloqueo.
@@ -38,4 +57,4 @@ async function overdraftWarning(cashBoxId, { transaction } = {}) {
   return `Este gasto dejó la caja "${cashBox.name}" en saldo negativo (${balance.toFixed(2)}).`;
 }
 
-module.exports = { getBalance, assertCashBoxUsable, overdraftWarning };
+module.exports = { getBalance, getBalancesForCashBoxes, assertCashBoxUsable, overdraftWarning };

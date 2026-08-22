@@ -9,6 +9,17 @@ const sequelize = new Sequelize(
   {
     dialect: 'postgres',
     logging: false,
+    // Sin esto, Sequelize usa su default (max: 5) — de sobra para pruebas locales, pero
+    // middleware/auth.js mantiene UNA conexión ocupada durante TODA la duración de cada petición
+    // autenticada (no solo mientras corre una query, ver comentario ahí), así que con tráfico real
+    // (varios usuarios, o incluso un solo usuario cuya página dispara 3-5 peticiones en paralelo al
+    // cargar) el pool se agota enseguida: SequelizeConnectionAcquireTimeoutError, que
+    // middleware/auth.js hasta hace poco disfrazaba de "401 sesión expirada" (deslogueaba al
+    // usuario sin dejar rastro real del problema). max: 15 da margen para ráfagas reales sin
+    // arriesgar la memoria del servidor (cada conexión de Postgres es liviana). acquire baja de
+    // 60s (el default) a 20s: si el pool igual se agota bajo carga extrema, mejor que el usuario
+    // vea un error en 20s que se quede esperando un minuto entero.
+    pool: { max: 15, min: 0, acquire: 20000, idle: 10000 },
   }
 );
 

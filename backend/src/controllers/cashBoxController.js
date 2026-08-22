@@ -1,16 +1,12 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { CashBox, CashBoxMovement } = require('../models');
-const { getBalance } = require('../services/cashBoxService');
-const { mapSeries } = require('../utils/mapSeries');
+const { getBalance, getBalancesForCashBoxes } = require('../services/cashBoxService');
 
 const list = asyncHandler(async (req, res) => {
   const cashBoxes = await CashBox.findAll({ order: [['name', 'ASC']] });
-  const withBalance = await mapSeries(cashBoxes, async (cb) => ({
-    ...cb.toJSON(),
-    balance: await getBalance(cb.id),
-  }));
-  res.json(withBalance);
+  const balances = await getBalancesForCashBoxes(cashBoxes);
+  res.json(cashBoxes.map((cb) => ({ ...cb.toJSON(), balance: balances.get(cb.id) })));
 });
 
 const get = asyncHandler(async (req, res) => {

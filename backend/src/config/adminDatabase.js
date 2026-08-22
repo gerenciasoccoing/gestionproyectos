@@ -12,6 +12,10 @@ const adminSequelize = new Sequelize(
   {
     dialect: 'postgres',
     logging: false,
+    // Tráfico mucho menos frecuente que config/database.js (login, panel de super-admin,
+    // scripts de mantenimiento), así que un pool chico alcanza — se deja explícito, con el mismo
+    // acquire más corto, para no heredar el timeout de 60s por defecto.
+    pool: { max: 5, min: 0, acquire: 20000, idle: 10000 },
   }
 );
 

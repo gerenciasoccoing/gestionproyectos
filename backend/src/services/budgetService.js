@@ -1,6 +1,5 @@
 const ApiError = require('../utils/ApiError');
 const { sequelize, Budget, BudgetItem, APU, APUComponent, PriceItem, ProgressEntry } = require('../models');
-const { mapSeries } = require('../utils/mapSeries');
 
 // Valor unitario efectivo de un componente: el de su insumo de la base de precios,
 // o la tarifa manual (unitValue) cuando no referencia uno (ej. tarifa de transporte).
@@ -151,8 +150,23 @@ async function getBudgetItemsWithProgress(projectId) {
   const budget = await getCurrentBudgetForProject(projectId);
   if (!budget) return { budget: null, items: [] };
 
-  const items = await mapSeries(budget.items, async (item) => {
-    const entries = await ProgressEntry.findAll({ where: { budgetItemId: item.id } });
+  // Una sola consulta para TODOS los ítems del presupuesto, no una por ítem: budgetService#dashboard
+  // lo llama cada 8 segundos desde el Dashboard de Ejecución (refresco automático), y un
+  // presupuesto real puede tener decenas de ítems — a esa frecuencia, aunque las consultas corran
+  // en secuencia (obligatorio, ver mapSeries.js), seguir haciendo una por ítem satura igual el pool
+  // de conexiones bajo uso real (cada conexión queda ocupada mucho más tiempo del necesario).
+  const allEntries = await ProgressEntry.findAll({
+    where: { budgetItemId: budget.items.map((i) => i.id) },
+  });
+  const entriesByItem = new Map();
+  for (const entry of allEntries) {
+    const list = entriesByItem.get(entry.budgetItemId) || [];
+    list.push(entry);
+    entriesByItem.set(entry.budgetItemId, list);
+  }
+
+  const items = budget.items.map((item) => {
+    const entries = entriesByItem.get(item.id) || [];
     const accumulatedQty = entries.reduce((sum, e) => sum + Number(e.quantityExecuted), 0);
     const percent = Number(item.quantity) > 0 ? (accumulatedQty / Number(item.quantity)) * 100 : 0;
     const executedValue = accumulatedQty * Number(item.unitCost);

@@ -82,7 +82,18 @@ async function authenticate(req, res, next) {
   } catch (err) {
     await settle(false);
     if (err instanceof ApiError) return next(err);
-    next(new ApiError(401, 'Token inválido o expirado'));
+    // Solo un JWT inválido/vencido es realmente "401 sesión expirada" (el interceptor del
+    // frontend borra el token y redirige a /login apenas ve un 401 — ver api/client.js). Cualquier
+    // otro error (ej. no se pudo tomar una conexión del pool de la base de datos a tiempo) NO es un
+    // problema de autenticación: antes se disfrazaba igual de 401 y el usuario quedaba deslogueado
+    // sin ninguna pista real en los logs de qué pasó. Ahora se deja pasar tal cual al manejador de
+    // errores global (responde 500 y sí lo registra), para no confundir una caída del servidor con
+    // una sesión vencida.
+    if (['JsonWebTokenError', 'TokenExpiredError', 'NotBeforeError'].includes(err.name)) {
+      return next(new ApiError(401, 'Token inválido o expirado'));
+    }
+    console.error('Error inesperado en authenticate:', err);
+    next(err);
   }
 }
 
