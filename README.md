@@ -6,11 +6,6 @@ construcción/ejecución de obras: sección contractual, ejecución (actas, avan
 sociales), gastos, informes (EVM, curva S, riesgos) y cotizaciones (base de precios global,
 APU, presupuestos, PDF de propuesta y conversión a proyecto).
 
-> Este repositorio también aloja una segunda aplicación **independiente**: la plataforma SaaS
-> multi-tenant de e-commerce (`saas-backend/` + `saas-frontend/`, ver sus propios README). No
-> comparte base de datos, autenticación ni código con la app de gestión de proyectos descrita
-> abajo — son dos productos separados que conviven en el mismo repo.
-
 ## Stack
 
 - **Backend**: Node.js + Express + Sequelize + PostgreSQL, autenticación JWT, `multer` para
