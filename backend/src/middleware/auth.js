@@ -20,8 +20,15 @@ const { runInTransactionContext } = require('../utils/tenantContext');
 // respuesta HTTP (eventos 'finish'/'close' de res), que sí reflejan cuándo la petición terminó.
 async function authenticate(req, res, next) {
   let transaction = null;
+  let settled = false;
+  // Si el socket se cierra ANTES de que la petición terminara normalmente (res.writableEnded aún
+  // false), es el cliente quien abandonó la petición — navegó a otra pantalla, canceló el fetch —
+  // no un resultado real de esta petición. Pasa seguido con navegación rápida entre pantallas
+  // (varias peticiones en paralelo al montar una página, canceladas apenas se desmonta).
+  let clientAborted = false;
   const settle = async (commit) => {
-    if (!transaction || transaction.finished) return;
+    if (settled || !transaction || transaction.finished) return;
+    settled = true;
     try {
       await (commit ? transaction.commit() : transaction.rollback());
     } catch (err) {
@@ -29,7 +36,20 @@ async function authenticate(req, res, next) {
     }
   };
   res.on('finish', () => settle(res.statusCode < 500));
-  res.on('close', () => settle(false));
+  // A propósito NO se llama a settle() acá: la conexión de la petición hacia el cliente y la
+  // conexión de esta transacción hacia Postgres son sockets completamente distintos — que el
+  // cliente cierre la primera no interrumpe ni cancela la segunda. Si se revierte la transacción
+  // aquí mientras una consulta (ej. User.findByPk, más abajo) sigue en pleno vuelo sobre esa MISMA
+  // conexión, la revierte a medio camino: la consulta pendiente choca con "rollback has been called
+  // on this transaction, you can no longer use it" y ESA conexión queda para siempre "idle in
+  // transaction" en Postgres (el ROLLBACK nunca llega a enviarse) — confirmado en producción, una
+  // fuga de conexiones real y silenciosa bajo el patrón normalísimo de navegar rápido entre
+  // pantallas. Dejando que el trabajo en curso termine solo (a favor o en contra, sin que nadie del
+  // otro lado esté ya escuchando la respuesta), settle() se termina llamando una sola vez, desde
+  // 'finish' o desde el catch de abajo, nunca en carrera con una consulta que todavía no resolvió.
+  res.on('close', () => {
+    if (!res.writableEnded) clientAborted = true;
+  });
 
   try {
     transaction = await sequelize.transaction();
@@ -81,6 +101,10 @@ async function authenticate(req, res, next) {
     });
   } catch (err) {
     await settle(false);
+    // El cliente ya se fue (ver el comentario junto a clientAborted arriba): no hay a quién
+    // responder ni nada real que registrar, solo la consecuencia esperada de haber cortado la
+    // transacción a medio camino.
+    if (clientAborted) return;
     if (err instanceof ApiError) return next(err);
     // Solo un JWT inválido/vencido es realmente "401 sesión expirada" (el interceptor del
     // frontend borra el token y redirige a /login apenas ve un 401 — ver api/client.js). Cualquier

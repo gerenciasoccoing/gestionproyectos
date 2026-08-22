@@ -194,6 +194,15 @@ async function ensureAppDbRole() {
   await sequelize.query(`GRANT CONNECT ON DATABASE "${dbName}" TO "${APP_DB_USER}"`);
   await sequelize.query(`GRANT USAGE ON SCHEMA public TO "${APP_DB_USER}"`);
   await sequelize.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO "${APP_DB_USER}"`);
+  // Red de seguridad de fondo: si por cualquier motivo (un cliente que aborta la petición a medio
+  // camino, un bug futuro) una transacción se queda abierta sin que nadie mande más consultas ni la
+  // cierre, Postgres la revierte solo pasado este tiempo, en vez de dejarla ocupando una conexión
+  // del pool para siempre (visto en producción: middleware/auth.js#authenticate — ver el comentario
+  // ahí — puede dejar una transacción "idle in transaction" colgada si el cliente corta la petición
+  // en el momento exacto en que una consulta sigue en vuelo). 30s es de sobra para cualquier
+  // operación real de la app (hasta la más pesada, exportar el catálogo completo de APU, responde
+  // en menos de 1s), así que nunca debería interrumpir trabajo legítimo.
+  await sequelize.query(`ALTER ROLE "${APP_DB_USER}" SET idle_in_transaction_session_timeout = '30s'`);
   // Para que las tablas que se creen en un sync() futuro (un modelo nuevo, en un despliegue
   // posterior) queden con estos mismos permisos sin tener que acordarse de correr este GRANT de
   // nuevo — aplica a lo que cree ESTA MISMA conexión (dueña), que es quien siempre corre sync().
