@@ -72,9 +72,12 @@ const login = asyncHandler(async (req, res) => {
 });
 
 // Siempre responde con el mismo mensaje genérico exista o no ese correo (evita que alguien use
-// este endpoint para averiguar qué correos están registrados). Si existe un usuario activo, crea
-// un token de un solo uso y le manda el enlace — el envío real puede fallar silenciosamente (ver
-// emailService) sin que eso cambie la respuesta al cliente.
+// este endpoint para averiguar qué correos están registrados) — eso es a propósito y se mantiene.
+// Lo que NO debe quedar en silencio es el diagnóstico del lado del servidor: antes ni siquiera se
+// miraba el resultado de sendPasswordResetEmail (podía fallar — Resend caído, dominio remitente sin
+// verificar, RESEND_API_KEY vencida — y no quedaba ningún rastro de cuál de los dos casos ocurrió:
+// "no se encontró/no está activo" vs. "se encontró pero el envío falló"). Ambos casos ahora quedan
+// en el log del servidor (nunca en la respuesta al cliente).
 const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
   if (!email) throw new ApiError(400, 'El correo es obligatorio');
@@ -82,7 +85,10 @@ const forgotPassword = asyncHandler(async (req, res) => {
   const genericResponse = { message: 'Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.' };
 
   const user = await AdminUser.findOne({ where: { email }, hooks: false });
-  if (!user || !user.active) return res.json(genericResponse);
+  if (!user || !user.active) {
+    console.log(`[forgotPassword] Solicitud para "${email}": no hay un usuario activo con ese correo (o no existe). No se envía nada.`);
+    return res.json(genericResponse);
+  }
 
   const rawToken = crypto.randomBytes(32).toString('base64url');
   await AdminPasswordResetToken.create({
@@ -91,11 +97,17 @@ const forgotPassword = asyncHandler(async (req, res) => {
     expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
   });
 
-  await sendPasswordResetEmail({
+  const result = await sendPasswordResetEmail({
     to: user.email,
     name: user.name,
     resetUrl: frontendUrl(`/reset-password/${rawToken}`),
   });
+  if (!result.ok) {
+    // El token ya quedó creado en base de datos (sigue siendo válido si se reenvía el correo a
+    // mano), pero el usuario nunca lo va a recibir — esto es justo lo que hay que poder ver en
+    // logs para diagnosticar un "no me llegó el correo" reportado por un usuario real.
+    console.error(`[forgotPassword] El correo de recuperación para "${user.email}" NO se pudo enviar: ${result.error}`);
+  }
 
   res.json(genericResponse);
 });
