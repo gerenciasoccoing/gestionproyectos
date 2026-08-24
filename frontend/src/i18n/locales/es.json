@@ -1233,6 +1233,8 @@
       "nit": "NIT",
       "address": "Dirección",
       "phone": "Teléfono",
+      "managerName": "Nombre del gerente (para \"Autorizó\" en Órdenes de Compra)",
+      "managerNamePlaceholder": "Nombre completo del gerente",
       "prestacionalDefault": "Factor prestacional por defecto en APU (%)",
       "currency": "Moneda",
       "currencyOptions": {

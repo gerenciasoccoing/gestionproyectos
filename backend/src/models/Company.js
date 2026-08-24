@@ -14,6 +14,10 @@ module.exports = (sequelize) => {
     address: { type: DataTypes.STRING },
     phone: { type: DataTypes.STRING },
     contactEmail: { type: DataTypes.STRING, allowNull: true },
+    // Nombre del gerente que autoriza las órdenes de compra (ver PDF, campo "Autorizó"). Un único
+    // valor por empresa/tenant, editado desde Administración > Datos de la Empresa — no se toma de
+    // los usuarios del sistema porque el gerente que firma no necesariamente tiene una cuenta ahí.
+    managerName: { type: DataTypes.STRING, allowNull: true },
     // Factor prestacional (%) sugerido por defecto al agregar mano de obra a un APU.
     // Editable por ítem al momento de seleccionar el insumo de personal.
     defaultPrestacionalPercent: { type: DataTypes.DECIMAL(6, 2), allowNull: false, defaultValue: 85 },

@@ -384,10 +384,6 @@ const PO_LABELS = {
     phone: 'Teléfono',
     email: 'Correo',
     address: 'Dirección',
-    projectSection: 'Proyecto asignado',
-    project: 'Proyecto',
-    client: 'Cliente',
-    noProject: 'Sin proyecto asignado',
     itemsSection: 'Ítems',
     code: 'Código',
     description: 'Descripción',
@@ -420,10 +416,6 @@ const PO_LABELS = {
     phone: 'Phone',
     email: 'Email',
     address: 'Address',
-    projectSection: 'Assigned project',
-    project: 'Project',
-    client: 'Client',
-    noProject: 'No project assigned',
     itemsSection: 'Items',
     code: 'Code',
     description: 'Description',
@@ -449,11 +441,12 @@ const PO_LABELS = {
 };
 
 // Orden de compra: encabezado con branding + consecutivo, datos del proveedor (de Terceros si
-// está vinculada, o solo el nombre libre si no), proyecto asignado o "sin proyecto asignado" (una
-// orden puede crearse desde la ficha de un proveedor sin proyecto todavía, ver
-// purchaseOrderController.create), tabla de ítems con cantidad entregada vs. ordenada, totales,
-// estado (con motivo del faltante si aplica) y firmas. items: [{ code, name, unit, quantityOrdered,
-// delivered, unitPrice, totalValue }] (ver exportPdf en purchaseOrderController.js).
+// está vinculada, o solo el nombre libre si no), tabla de ítems con cantidad entregada vs.
+// ordenada, totales, estado (con motivo del faltante si aplica) y firmas. Este documento se le
+// entrega al proveedor: NO lleva el proyecto ni el cliente final al que está destinada la compra
+// (información interna que el proveedor no debe conocer). items: [{ code, name, unit,
+// quantityOrdered, delivered, unitPrice, totalValue }] (ver exportPdf en
+// purchaseOrderController.js).
 // Paleta de marca del PDF: mismo azul primario que usa el sidebar de la app (bg-blue-600/700),
 // llevado a un tono un poco más oscuro para que el texto blanco tenga buen contraste sobre la
 // franja de encabezado impresa.
@@ -484,13 +477,13 @@ function poBrandHeading(doc, text, y) {
 }
 
 // Orden de compra: layout moderno con franja de marca en el encabezado (logo + datos de la
-// empresa a la izquierda, título/consecutivo/badge de estado a la derecha), tarjetas para
-// proveedor/proyecto, y tabla de ítems con encabezado de color, filas en cebra y altura DINÁMICA
+// empresa a la izquierda, título/consecutivo/badge de estado a la derecha), tarjeta de
+// proveedor a todo el ancho, y tabla de ítems con encabezado de color, filas en cebra y altura DINÁMICA
 // por fila (ver comentario en el loop de abajo: esto es lo que corrige el bug de filas
 // sobrepuestas cuando una descripción larga envuelve a más de una línea). items: [{ code, name,
 // unit, quantityOrdered, delivered, unitPrice, totalValue }] (ver exportPdf en
 // purchaseOrderController.js).
-function generatePurchaseOrderPdf({ order, items, company, lang = 'es', totals }) {
+function generatePurchaseOrderPdf({ order, items, company, lang = 'es', totals, preparedByName }) {
   const L = PO_LABELS[lang] || PO_LABELS.es;
   const C = PO_COLORS;
   const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
@@ -499,18 +492,29 @@ function generatePurchaseOrderPdf({ order, items, company, lang = 'es', totals }
   const HEADER_H = 110;
   doc.rect(0, 0, doc.page.width, HEADER_H).fill(C.brand);
   let textX = 50;
+  let textW = 240;
+  // Logo agrandado (antes 70x60/imagen 60x50).
   if (company && company.logoPath && require('fs').existsSync(company.logoPath)) {
     try {
-      doc.roundedRect(50, 25, 70, 60, 4).fill(C.white);
-      doc.image(company.logoPath, 55, 30, { fit: [60, 50], align: 'center', valign: 'center' });
-      textX = 132;
+      doc.roundedRect(50, 15, 90, 80, 4).fill(C.white);
+      doc.image(company.logoPath, 55, 20, { fit: [80, 70], align: 'center', valign: 'center' });
+      textX = 152;
+      textW = 190;
     } catch (e) { /* logo ilegible: se omite */ }
   }
-  doc.fillColor(C.white).font('Helvetica-Bold').fontSize(16).text(company ? company.companyName : 'Empresa', textX, 30, { width: 210 });
-  doc.font('Helvetica').fontSize(8.5).fillColor('#dbeafe')
-    .text(company?.nit ? `NIT: ${company.nit}` : '', textX, 54, { width: 210 })
-    .text(company?.address || '', textX, 68, { width: 210 })
-    .text(company?.phone || '', textX, 82, { width: 210 });
+  // El nombre de la empresa es de longitud variable por tenant y puede envolver a más de una
+  // línea (ver mismo problema, resuelto igual, en la tabla de ítems más abajo): las líneas de
+  // NIT/dirección/teléfono se ubican DESPUÉS de medir cuánto ocupó realmente el nombre, en vez de
+  // en offsets fijos, para no terminar escritas encima de un nombre largo.
+  const companyNameText = company ? company.companyName : 'Empresa';
+  doc.font('Helvetica-Bold').fontSize(16);
+  const nameH = doc.heightOfString(companyNameText, { width: textW });
+  doc.fillColor(C.white).text(companyNameText, textX, 30, { width: textW });
+  let infoY = 30 + nameH + 3;
+  doc.font('Helvetica').fontSize(8.5).fillColor('#dbeafe');
+  [company?.nit ? `NIT: ${company.nit}` : '', company?.address || '', company?.phone || '']
+    .filter(Boolean)
+    .forEach((line) => { doc.text(line, textX, infoY, { width: textW }); infoY += 12; });
 
   doc.fillColor(C.white).font('Helvetica-Bold').fontSize(16).text(L.title, 300, 30, { width: 245, align: 'right' });
   doc.font('Helvetica').fontSize(9).fillColor('#dbeafe')
@@ -531,11 +535,12 @@ function generatePurchaseOrderPdf({ order, items, company, lang = 'es', totals }
   doc.roundedRect(badgeX, 84, badgeW, 16, 8).fill(badge.bg);
   doc.fillColor(badge.text).text(badgeLabel, badgeX, 88, { width: badgeW, align: 'center' });
 
-  // Tarjetas de proveedor / proyecto, lado a lado
+  // Tarjeta de proveedor, a todo el ancho. Ya no lleva una tarjeta de proyecto al lado: este PDF
+  // se le entrega al proveedor, y el proyecto/cliente final al que está destinada la compra es
+  // información interna que el proveedor no debe conocer.
   const boxY = HEADER_H + 20;
   const boxH = 108;
-  const boxGap = 15;
-  const boxW = (495 - boxGap) / 2;
+  const boxW = 495;
   doc.roundedRect(50, boxY, boxW, boxH, 6).fillAndStroke(C.brandLight, C.border);
   doc.fillColor(C.brand).font('Helvetica-Bold').fontSize(10).text(L.supplierSection, 62, boxY + 12, { width: boxW - 24 });
   doc.fillColor(C.dark).font('Helvetica').fontSize(8.5);
@@ -548,18 +553,6 @@ function generatePurchaseOrderPdf({ order, items, company, lang = 'es', totals }
     `${L.email}: ${supplierParty?.email || '-'}`,
     `${L.address}: ${supplierParty?.address || '-'}`,
   ].forEach((line) => { doc.text(line, 62, sy, { width: boxW - 24 }); sy += 14; });
-
-  const box2X = 50 + boxW + boxGap;
-  doc.roundedRect(box2X, boxY, boxW, boxH, 6).fillAndStroke(C.brandLight, C.border);
-  doc.fillColor(C.brand).font('Helvetica-Bold').fontSize(10).text(L.projectSection, box2X + 12, boxY + 12, { width: boxW - 24 });
-  doc.fillColor(C.dark).font('Helvetica').fontSize(8.5);
-  let py = boxY + 30;
-  if (order.Project) {
-    doc.text(`${L.project}: ${order.Project.name}`, box2X + 12, py, { width: boxW - 24 }); py += 14;
-    doc.text(`${L.client}: ${order.Project.client || '-'}`, box2X + 12, py, { width: boxW - 24 });
-  } else {
-    doc.text(L.noProject, box2X + 12, py, { width: boxW - 24 });
-  }
 
   doc.fillColor(C.dark).strokeColor('#000000');
   let itemsHeadingY = poBrandHeading(doc, L.itemsSection, boxY + boxH + 20);
@@ -665,6 +658,10 @@ function generatePurchaseOrderPdf({ order, items, company, lang = 'es', totals }
   }
   doc.fillColor(C.dark);
 
+  // Bloque de firmas: solo dos campos, cada uno con el nombre de la persona (sin cargo ni otro
+  // dato). "Elaboró" es quien generó la orden (preparedByName, ver exportPdf en
+  // purchaseOrderController.js); "Autorizó" es el gerente configurado en Administración > Datos de
+  // la Empresa (company.managerName, un único valor por empresa/tenant, no un usuario del sistema).
   doc.y = y;
   if (doc.y > 680) { doc.addPage(); doc.y = 50; }
   let sigY = doc.y + 10;
@@ -673,14 +670,10 @@ function generatePurchaseOrderPdf({ order, items, company, lang = 'es', totals }
   doc.font('Helvetica-Bold').fontSize(9).fillColor(C.dark);
   doc.text(L.elaborated, 50, sigY, { width: 220 });
   doc.text(L.authorized, 320, sigY, { width: 220 });
-  sigY += 30;
-  doc.font('Helvetica').fontSize(9);
-  doc.text('_______________________', 50, sigY, { width: 220 });
-  doc.text('_______________________', 320, sigY, { width: 220 });
   sigY += 16;
-  doc.fontSize(8).fillColor(C.muted);
-  doc.text(`${L.dateLabel}: ______________`, 50, sigY, { width: 220 });
-  doc.text(`${L.dateLabel}: ______________`, 320, sigY, { width: 220 });
+  doc.font('Helvetica').fontSize(10).fillColor(C.dark);
+  doc.text(preparedByName || '-', 50, sigY, { width: 220 });
+  doc.text(company?.managerName || '-', 320, sigY, { width: 220 });
   doc.fillColor('#000');
 
   doc.end();

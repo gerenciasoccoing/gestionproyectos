@@ -1,7 +1,7 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const {
-  sequelize, PurchaseOrder, PurchaseOrderItem, PurchaseReceipt, Expense, ExpenseItem, BudgetItem, APU, Project, ThirdParty,
+  sequelize, PurchaseOrder, PurchaseOrderItem, PurchaseReceipt, Expense, ExpenseItem, BudgetItem, APU, Project, ThirdParty, User,
 } = require('../models');
 const {
   getOrderItemsWithDelivery, getItemWithDelivery, isOrderFullyDelivered, getPurchaseReport, nextOrderNumber,
@@ -540,11 +540,12 @@ const report = asyncHandler(async (req, res) => {
 
 // Exporta la orden en PDF (ver services/pdfService.js#generatePurchaseOrderPdf). Disponible desde
 // ambos montajes de ruta. lang (query, 'es'|'en') sigue el idioma activo del usuario en la app.
+// El PDF se le entrega al proveedor, así que no se incluye el proyecto ni el cliente final al que
+// está destinada la compra (ver generatePurchaseOrderPdf): ya no hace falta traer el Project acá.
 const exportPdf = asyncHandler(async (req, res) => {
   const order = await PurchaseOrder.findOne({
     where: scopeWhere(req),
     include: [
-      { model: Project, attributes: ['id', 'name', 'client'] },
       { model: ThirdParty, as: 'supplierParty' },
     ],
   });
@@ -569,8 +570,12 @@ const exportPdf = asyncHandler(async (req, res) => {
   const company = await getSettingsForPdf();
   const lang = req.query.lang === 'en' ? 'en' : 'es';
   const totals = computeOrderTotals(itemsWithDelivery, order.retentionPercent);
+  // "Elaboró" es quien generó la orden (order.createdBy), no necesariamente quien exporta el PDF
+  // ahora (otro usuario con acceso puede reimprimirla más tarde).
+  const preparer = order.createdBy ? await User.findByPk(order.createdBy) : null;
+  const preparedByName = preparer?.name || null;
 
-  const doc = generatePurchaseOrderPdf({ order, items: itemsWithDelivery, company, lang, totals });
+  const doc = generatePurchaseOrderPdf({ order, items: itemsWithDelivery, company, lang, totals, preparedByName });
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="orden-compra-${order.orderNumber || order.id}.pdf"`);
   doc.pipe(res);

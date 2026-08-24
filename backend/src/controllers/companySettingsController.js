@@ -23,11 +23,12 @@ const CURRENCIES = ['COP', 'USD', 'EUR'];
 
 const update = asyncHandler(async (req, res) => {
   const settings = await getCompany();
-  const { companyName, nit, address, phone, defaultPrestacionalPercent, currency } = req.body;
+  const { companyName, nit, address, phone, defaultPrestacionalPercent, currency, managerName } = req.body;
   if (companyName !== undefined) settings.companyName = companyName;
   if (nit !== undefined) settings.nit = nit;
   if (address !== undefined) settings.address = address;
   if (phone !== undefined) settings.phone = phone;
+  if (managerName !== undefined) settings.managerName = managerName;
   if (defaultPrestacionalPercent !== undefined) settings.defaultPrestacionalPercent = defaultPrestacionalPercent;
   if (currency !== undefined) {
     if (!CURRENCIES.includes(currency)) throw new ApiError(400, `currency debe ser una de: ${CURRENCIES.join(', ')}`);
@@ -46,6 +47,7 @@ async function getSettingsForPdf() {
     nit: settings.nit,
     address: settings.address,
     phone: settings.phone,
+    managerName: settings.managerName,
     logoPath: settings.logoPath ? path.join(UPLOAD_ROOT, settings.logoPath) : null,
   };
 }

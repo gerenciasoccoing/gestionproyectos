@@ -7,7 +7,7 @@ import { fileUrl } from '../../api/client';
 export default function CompanySettingsPage() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState(null);
-  const [form, setForm] = useState({ companyName: '', nit: '', address: '', phone: '', defaultPrestacionalPercent: '85', currency: 'COP' });
+  const [form, setForm] = useState({ companyName: '', nit: '', address: '', phone: '', managerName: '', defaultPrestacionalPercent: '85', currency: 'COP' });
   const [logo, setLogo] = useState(null);
   const [error, setError] = useState('');
   const [ok, setOk] = useState(false);
@@ -20,6 +20,7 @@ export default function CompanySettingsPage() {
         nit: s.nit || '',
         address: s.address || '',
         phone: s.phone || '',
+        managerName: s.managerName || '',
         defaultPrestacionalPercent: String(s.defaultPrestacionalPercent ?? 85),
         currency: s.currency || 'COP',
       });
@@ -51,6 +52,12 @@ export default function CompanySettingsPage() {
         <Input label={t('admin.company.nit')} value={form.nit} onChange={(e) => setForm({ ...form, nit: e.target.value })} />
         <Input label={t('admin.company.address')} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
         <Input label={t('admin.company.phone')} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+        <Input
+          label={t('admin.company.managerName')}
+          value={form.managerName}
+          onChange={(e) => setForm({ ...form, managerName: e.target.value })}
+          placeholder={t('admin.company.managerNamePlaceholder')}
+        />
         <Input
           label={t('admin.company.prestacionalDefault')}
           type="number" min="0" step="0.01"

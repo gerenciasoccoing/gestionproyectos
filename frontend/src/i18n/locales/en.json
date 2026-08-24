@@ -1233,6 +1233,8 @@
       "nit": "Tax ID (NIT)",
       "address": "Address",
       "phone": "Phone",
+      "managerName": "Manager name (for \"Authorized by\" on Purchase Orders)",
+      "managerNamePlaceholder": "Manager's full name",
       "prestacionalDefault": "Default benefits factor in APU (%)",
       "currency": "Currency",
       "currencyOptions": {
