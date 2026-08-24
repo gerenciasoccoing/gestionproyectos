@@ -680,6 +680,57 @@ function generatePurchaseOrderPdf({ order, items, company, lang = 'es', totals, 
   return doc;
 }
 
+// Contrato/otrosí de personal: mismo membrete simple que cotizaciones/APU (logo + datos de la
+// empresa), cuerpo de párrafos justificados por cláusula, y firmas al final. `content` es la
+// estructura genérica que arma contractTemplates.js#buildContractContent — la misma que consume
+// contractDocService.js para el .docx, así que el texto legal vive en un solo lugar.
+function generateContractPdf(content, company) {
+  const doc = new PDFDocument({ margin: 50 });
+
+  if (company && company.logoPath && require('fs').existsSync(company.logoPath)) {
+    try {
+      doc.image(company.logoPath, 50, 45, { width: 90 });
+    } catch (e) { /* si el logo no puede leerse, se omite sin romper la generación */ }
+  }
+  doc.fontSize(16).font('Helvetica-Bold').text(company ? company.companyName : 'Empresa', 160, 50);
+  doc.fontSize(9).font('Helvetica').fillColor('#555')
+    .text(company?.nit ? `NIT: ${company.nit}` : '', 160, 70)
+    .text(company?.address || '', 160, 84)
+    .text(company?.phone || '', 160, 98);
+  doc.fillColor('#000');
+
+  doc.moveDown(3);
+  doc.fontSize(15).font('Helvetica-Bold').text(content.documentTitle, { align: 'center' });
+  doc.moveDown(1);
+
+  doc.fontSize(10).font('Helvetica').text(content.intro, { align: 'justify' });
+  doc.moveDown(0.8);
+
+  content.clauses.forEach((clause) => {
+    if (doc.y > 700) doc.addPage();
+    doc.font('Helvetica-Bold').fontSize(10).text(clause.heading);
+    doc.font('Helvetica').fontSize(10).text(clause.body, { align: 'justify' });
+    doc.moveDown(0.6);
+  });
+
+  if (doc.y > 620) doc.addPage();
+  doc.moveDown(1);
+  doc.fontSize(10).text(`Para constancia, se firma en ${content.signCity || '_______________'}, a los ${content.signDate || '_______________'}.`);
+  doc.moveDown(2);
+
+  content.signatureBlock.forEach((sig) => {
+    if (doc.y > 680) doc.addPage();
+    doc.text('_______________________');
+    doc.font('Helvetica-Bold').text(sig.role);
+    doc.font('Helvetica').text(sig.name || '-');
+    if (sig.idLabel) doc.text(`${sig.idLabel} ${sig.idValue || '-'}`);
+    doc.moveDown(1.5);
+  });
+
+  doc.end();
+  return doc;
+}
+
 module.exports = {
-  generateProjectReportPdf, generateQuotationPdf, generateApuPdf, generateBudgetWithApuAnnexPdf, generatePurchaseOrderPdf, money,
+  generateProjectReportPdf, generateQuotationPdf, generateApuPdf, generateBudgetWithApuAnnexPdf, generatePurchaseOrderPdf, generateContractPdf, money,
 };

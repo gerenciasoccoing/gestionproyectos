@@ -81,4 +81,15 @@ function relativePath(file) {
   return path.relative(UPLOAD_ROOT, file.path).split(path.sep).join('/');
 }
 
-module.exports = { makeUploader, relativePath, UPLOAD_ROOT };
+// Para archivos generados por el servidor (PDF/Word de contratos, ver employeeContractController.js)
+// en vez de subidos por el usuario: mismo esquema de carpetas por empresa que makeUploader, para
+// que sigan sirviéndose por /api/files/* con el mismo chequeo de aislamiento por companyId.
+function saveGeneratedFile(companyId, subfolder, filename, buffer) {
+  const dir = path.join(UPLOAD_ROOT, companyId, subfolder);
+  ensureDir(dir);
+  const fullPath = path.join(dir, filename);
+  fs.writeFileSync(fullPath, buffer);
+  return path.relative(UPLOAD_ROOT, fullPath).split(path.sep).join('/');
+}
+
+module.exports = { makeUploader, relativePath, saveGeneratedFile, UPLOAD_ROOT };

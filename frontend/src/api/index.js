@@ -139,6 +139,14 @@ export const employeesApi = {
   severancePreview: (pid, id, data) => client.post(`/projects/${pid}/employees/${id}/severance/preview`, data).then((r) => r.data),
   severanceConfirm: (pid, id, data) => client.post(`/projects/${pid}/employees/${id}/severance`, data).then((r) => r.data),
   uploadPazYSalvo: (pid, id, formData) => client.post(`/projects/${pid}/employees/${id}/severance/paz-y-salvo`, formData).then((r) => r.data),
+  uploadCedula: (pid, id, formData) => client.post(`/projects/${pid}/employees/${id}/cedula`, formData).then((r) => r.data),
+};
+
+export const employeeContractsApi = {
+  contractTypes: () => client.get('/employee-contract-types').then((r) => r.data),
+  list: (pid, employeeId) => client.get(`/projects/${pid}/employees/${employeeId}/contracts`).then((r) => r.data),
+  generate: (pid, employeeId) => client.post(`/projects/${pid}/employees/${employeeId}/contracts`).then((r) => r.data),
+  generateOtrosi: (pid, employeeId, contractId, data) => client.post(`/projects/${pid}/employees/${employeeId}/contracts/${contractId}/otrosi`, data).then((r) => r.data),
 };
 
 export const expensesApi = {

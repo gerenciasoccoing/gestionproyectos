@@ -30,6 +30,7 @@ const modelDefiners = [
   require('./PurchaseOrderItem'),
   require('./PurchaseReceipt'),
   require('./Employee'),
+  require('./EmployeeContractDocument'),
   require('./SocialSecurityDocument'),
   require('./PaymentReceipt'),
   require('./LaborParameters'),

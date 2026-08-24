@@ -32,6 +32,21 @@ const get = asyncHandler(async (req, res) => {
   res.json(employee);
 });
 
+// Campos opcionales, capturados para poder generar las minutas de contrato (ver
+// contractTemplates.js) — ninguno es obligatorio para crear/editar un trabajador; solo se exigen
+// al momento de generar un contrato según el tipo elegido (employeeContractController.js).
+const OPTIONAL_FIELDS = [
+  'documentNumber', 'address', 'city', 'phone', 'contractObject', 'contractEndDate',
+  'epsName', 'pensionFundName', 'arlName', 'subcontractorLegalName', 'subcontractorNit', 'subcontractorLegalRep',
+];
+// ENUMs de Postgres: un '' del formulario no es un valor válido, hay que normalizarlo a null.
+const ENUM_FIELDS = ['documentType', 'contractType'];
+
+function applyOptionalFields(employee, body) {
+  OPTIONAL_FIELDS.forEach((f) => { if (body[f] !== undefined) employee[f] = body[f] === '' ? null : body[f]; });
+  ENUM_FIELDS.forEach((f) => { if (body[f] !== undefined) employee[f] = body[f] === '' ? null : body[f]; });
+}
+
 const create = asyncHandler(async (req, res) => {
   const { name, position, entryDate, dedicationHours, salaryValue } = req.body;
   if (!name || !position || !entryDate || salaryValue === undefined) {
@@ -39,7 +54,7 @@ const create = asyncHandler(async (req, res) => {
   }
   if (Number(salaryValue) < 0) throw new ApiError(400, 'El salario no puede ser negativo');
 
-  const employee = await Employee.create({
+  const employee = Employee.build({
     projectId: req.params.projectId,
     name,
     position,
@@ -48,6 +63,8 @@ const create = asyncHandler(async (req, res) => {
     salaryValue,
     contractFilePath: relativePath(req.file),
   });
+  applyOptionalFields(employee, req.body);
+  await employee.save();
   res.status(201).json(employee);
 });
 
@@ -62,7 +79,17 @@ const update = asyncHandler(async (req, res) => {
     if (Number(salaryValue) < 0) throw new ApiError(400, 'El salario no puede ser negativo');
     employee.salaryValue = salaryValue;
   }
+  applyOptionalFields(employee, req.body);
   if (req.file) employee.contractFilePath = relativePath(req.file);
+  await employee.save();
+  res.json(employee);
+});
+
+const uploadCedula = asyncHandler(async (req, res) => {
+  const employee = await Employee.findOne({ where: { id: req.params.id, projectId: req.params.projectId } });
+  if (!employee) throw new ApiError(404, 'Empleado no encontrado');
+  if (!req.file) throw new ApiError(400, 'Debe adjuntar el archivo de la cédula');
+  employee.cedulaFilePath = relativePath(req.file);
   await employee.save();
   res.json(employee);
 });
@@ -101,4 +128,4 @@ const addPaymentReceipt = asyncHandler(async (req, res) => {
   res.status(201).json(receipt);
 });
 
-module.exports = { list, get, create, update, addSocialSecurityDocument, addPaymentReceipt };
+module.exports = { list, get, create, update, uploadCedula, addSocialSecurityDocument, addPaymentReceipt };

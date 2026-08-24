@@ -462,6 +462,21 @@
       "salary": "Salary",
       "dedication": "Dedication",
       "contract": "Contract",
+      "documentType": "Document type",
+      "documentNumber": "Document number",
+      "documentTypes": {
+        "CC": "National ID (CC)",
+        "CE": "Foreigner ID (CE)",
+        "PASAPORTE": "Passport",
+        "PEP": "Special Permit of Permanence (PEP)"
+      },
+      "address": "Address",
+      "city": "City",
+      "phone": "Phone",
+      "eps": "Health insurer (EPS)",
+      "pensionFund": "Pension fund",
+      "arl": "Occupational risk insurer (ARL)",
+      "cedula": "ID document",
       "socialSecurity": {
         "title": "Social Security (Health, ARL, Pension)",
         "type": "Type",
@@ -521,6 +536,35 @@
         "summaryTitle": "Severance Settlement (history)",
         "viewSigned": "View signed clearance",
         "uploadSigned": "Upload signed clearance"
+      }
+    },
+    "contract": {
+      "title": "Contracts",
+      "type": "Contract type",
+      "selectType": "Select a contract type",
+      "object": "Object / work to perform",
+      "endDate": "Contract end date",
+      "subcontractorLegalName": "Subcontractor legal name",
+      "subcontractorNit": "Subcontractor Tax ID",
+      "subcontractorLegalRep": "Legal representative",
+      "generate": "Generate contract",
+      "generating": "Generating...",
+      "missingFields": "Missing data to generate this contract",
+      "newOtrosi": "+ Amendment",
+      "newObject": "New object (optional)",
+      "newEndDate": "New end date (optional)",
+      "newValue": "New value (optional)",
+      "generateOtrosi": "Generate amendment",
+      "otrosiLabel": "Amendment No.",
+      "empty": "No contracts generated yet.",
+      "table": {
+        "type": "Type",
+        "number": "No.",
+        "from": "From",
+        "to": "To",
+        "value": "Value",
+        "pdf": "PDF",
+        "docx": "Word"
       }
     }
   },

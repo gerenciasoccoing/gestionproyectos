@@ -462,6 +462,21 @@
       "salary": "Salario",
       "dedication": "Dedicación",
       "contract": "Contrato",
+      "documentType": "Tipo de documento",
+      "documentNumber": "Número de documento",
+      "documentTypes": {
+        "CC": "Cédula de Ciudadanía",
+        "CE": "Cédula de Extranjería",
+        "PASAPORTE": "Pasaporte",
+        "PEP": "Permiso Especial de Permanencia"
+      },
+      "address": "Dirección",
+      "city": "Ciudad",
+      "phone": "Teléfono",
+      "eps": "EPS",
+      "pensionFund": "Fondo de pensión",
+      "arl": "ARL",
+      "cedula": "Cédula (documento)",
       "socialSecurity": {
         "title": "Seguridad Social (Salud, ARL, Pensión)",
         "type": "Tipo",
@@ -521,6 +536,35 @@
         "summaryTitle": "Liquidación de Prestaciones Sociales (histórico)",
         "viewSigned": "Ver paz y salvo firmado",
         "uploadSigned": "Subir paz y salvo firmado"
+      }
+    },
+    "contract": {
+      "title": "Contratos",
+      "type": "Tipo de contrato",
+      "selectType": "Selecciona un tipo de contrato",
+      "object": "Objeto / labor a realizar",
+      "endDate": "Fecha de terminación del contrato",
+      "subcontractorLegalName": "Razón social del subcontratista",
+      "subcontractorNit": "NIT del subcontratista",
+      "subcontractorLegalRep": "Representante legal",
+      "generate": "Generar contrato",
+      "generating": "Generando...",
+      "missingFields": "Faltan datos para generar este contrato",
+      "newOtrosi": "+ Otrosí",
+      "newObject": "Nuevo objeto (opcional)",
+      "newEndDate": "Nueva fecha de terminación (opcional)",
+      "newValue": "Nuevo valor (opcional)",
+      "generateOtrosi": "Generar otrosí",
+      "otrosiLabel": "Otrosí No.",
+      "empty": "Sin contratos generados todavía.",
+      "table": {
+        "type": "Tipo",
+        "number": "No.",
+        "from": "Desde",
+        "to": "Hasta",
+        "value": "Valor",
+        "pdf": "PDF",
+        "docx": "Word"
       }
     }
   },
