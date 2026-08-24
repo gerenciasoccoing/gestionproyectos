@@ -1170,6 +1170,7 @@
       "email": "Correo",
       "password": "Contraseña",
       "roles": "Roles",
+      "roleRequired": "Debes asignar al menos un rol al usuario.",
       "save": "Guardar",
       "table": {
         "name": "Nombre",

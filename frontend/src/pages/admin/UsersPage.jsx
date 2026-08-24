@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usersApi, rolesApi, projectsApi } from '../../api';
-import { Card, Button, Input, Table, Badge, ErrorText, extractError } from '../../components/ui';
+import { Card, Button, Input, Table, ErrorText, extractError } from '../../components/ui';
 
 export default function UsersPage() {
   const { t } = useTranslation();
@@ -22,6 +22,9 @@ export default function UsersPage() {
   const submit = async (e) => {
     e.preventDefault();
     setError('');
+    // El backend ya rechaza un alta sin roles (userController.js), pero se valida acá también para
+    // no hacer el viaje al servidor solo para enterarse de eso.
+    if (!form.roleIds.length) { setError(t('admin.users.roleRequired')); return; }
     try {
       await usersApi.create(form);
       setForm({ name: '', email: '', password: '', roleIds: [] });
@@ -49,6 +52,21 @@ export default function UsersPage() {
     load();
   };
 
+  // Reasigna los roles de un usuario ya creado (ver admin.users.roles en la tabla). El backend
+  // rechaza dejar al usuario sin ningún rol (mismo chequeo que en el alta, ver userController.js)
+  // así que ese error puede llegar acá si se destildan todos.
+  const updateUserRoles = async (user, roleId, checked) => {
+    const current = user.roles.map((r) => r.id);
+    const next = checked ? [...current, roleId] : current.filter((id) => id !== roleId);
+    setError('');
+    try {
+      await usersApi.update(user.id, { roleIds: next });
+      load();
+    } catch (err) {
+      setError(extractError(err));
+    }
+  };
+
   return (
     <Card title={t('admin.users.title')} actions={<Button onClick={() => setShowForm((s) => !s)}>{showForm ? t('common.cancel') : t('admin.users.new')}</Button>}>
       {showForm && (
@@ -71,12 +89,26 @@ export default function UsersPage() {
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}
+      {!showForm && <ErrorText>{error}</ErrorText>}
       <Table columns={[t('admin.users.table.name'), t('admin.users.table.email'), t('admin.users.table.roles'), t('admin.users.table.projects'), t('admin.users.table.active')]}>
         {users.map((u) => (
           <tr key={u.id} className="border-b border-gray-100 align-top">
             <td className="py-2 pr-3">{u.name}</td>
             <td className="py-2 pr-3">{u.email}</td>
-            <td className="py-2 pr-3">{u.roles.map((r) => <Badge key={r.id}>{r.name}</Badge>)}</td>
+            <td className="py-2 pr-3">
+              <div className="flex flex-col gap-1">
+                {roles.map((r) => (
+                  <label key={r.id} className="text-xs flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      checked={u.roles.some((ur) => ur.id === r.id)}
+                      onChange={(e) => updateUserRoles(u, r.id, e.target.checked)}
+                    />
+                    {r.name}
+                  </label>
+                ))}
+              </div>
+            </td>
             <td className="py-2 pr-3">
               <div className="flex flex-col gap-1">
                 {projects.map((p) => (

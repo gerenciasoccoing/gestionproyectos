@@ -15,15 +15,19 @@ const list = asyncHandler(async (req, res) => {
 const create = asyncHandler(async (req, res) => {
   const { name, email, password, roleIds = [] } = req.body;
   if (!name || !email || !password) throw new ApiError(400, 'name, email y password son obligatorios');
+  // Bug real en producción (admin@soccoing.com.co): sin este chequeo se podía guardar un usuario
+  // sin ningún rol, lo que lo deja con un Set de permisos vacío (ver auth.js) y rompe la app entera
+  // para esa persona apenas inicia sesión. Un usuario siempre debe quedar con al menos un rol.
+  if (!roleIds.length) throw new ApiError(400, 'Debes asignar al menos un rol al usuario');
 
   await assertWithinLimit(User, 'maxUsers');
 
+  const roles = await Role.findAll({ where: { id: roleIds } });
+  if (roles.length !== roleIds.length) throw new ApiError(400, 'Uno o más roles seleccionados no existen');
+
   const passwordHash = await bcrypt.hash(password, 10);
   const user = await User.create({ name, email, passwordHash });
-  if (roleIds.length) {
-    const roles = await Role.findAll({ where: { id: roleIds } });
-    await user.setRoles(roles);
-  }
+  await user.setRoles(roles);
   const full = await User.findByPk(user.id, { include: [Role, Project] });
   res.status(201).json(serializeUser(full));
 });
@@ -40,7 +44,12 @@ const update = asyncHandler(async (req, res) => {
   await user.save();
 
   if (roleIds !== undefined) {
+    // Mismo requisito que en create(): un usuario nunca debe quedar sin ningún rol (ver comentario
+    // ahí sobre el bug de admin@soccoing.com.co). Editar roles es justamente cómo se reasignan acá
+    // (ver UsersPage.jsx), así que sin este chequeo el mismo bug podía reaparecer por esta vía.
+    if (!roleIds.length) throw new ApiError(400, 'Debes asignar al menos un rol al usuario');
     const roles = await Role.findAll({ where: { id: roleIds } });
+    if (roles.length !== roleIds.length) throw new ApiError(400, 'Uno o más roles seleccionados no existen');
     await user.setRoles(roles);
   }
 

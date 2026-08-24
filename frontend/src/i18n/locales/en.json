@@ -1170,6 +1170,7 @@
       "email": "Email",
       "password": "Password",
       "roles": "Roles",
+      "roleRequired": "You must assign at least one role to the user.",
       "save": "Save",
       "table": {
         "name": "Name",
