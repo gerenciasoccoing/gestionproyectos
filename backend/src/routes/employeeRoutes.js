@@ -18,6 +18,7 @@ router.get('/', requirePermission('personal', 'view'), employeeController.list);
 router.get('/:id', requirePermission('personal', 'view'), employeeController.get);
 router.post('/', requirePermission('personal', 'create'), uploadContract.single('file'), employeeController.create);
 router.put('/:id', requirePermission('personal', 'edit'), uploadContract.single('file'), employeeController.update);
+router.delete('/:id', requirePermission('personal', 'delete'), employeeController.remove);
 
 router.post('/:id/social-security', requirePermission('personal', 'edit'), uploadSocialSecurity.single('file'), employeeController.addSocialSecurityDocument);
 router.post('/:id/payments', requirePermission('personal', 'edit'), uploadPayment.single('file'), employeeController.addPaymentReceipt);

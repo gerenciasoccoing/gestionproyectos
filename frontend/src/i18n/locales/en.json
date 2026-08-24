@@ -456,6 +456,8 @@
     "detail": {
       "back": "← Back to personnel",
       "basicData": "Basic data",
+      "delete": "Delete worker",
+      "deleteConfirm": "Delete {{name}}? This cannot be undone and will also remove their affiliation documents, payment receipts, and generated contracts/amendments.",
       "position": "Position",
       "entry": "Entry",
       "exit": "Exit",

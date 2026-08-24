@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useOutletContext, useParams, Link } from 'react-router-dom';
+import { useOutletContext, useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { employeesApi, employeeContractsApi, cashBoxesApi } from '../../api';
 import { Card, Button, Input, Select, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
@@ -10,10 +10,23 @@ export default function EmployeeDetailPage() {
   const { t } = useTranslation();
   const { projectId } = useOutletContext();
   const { employeeId } = useParams();
+  const navigate = useNavigate();
   const [employee, setEmployee] = useState(null);
+  const [deleteError, setDeleteError] = useState('');
 
   const load = () => employeesApi.get(projectId, employeeId).then(setEmployee);
   useEffect(() => { load(); }, [projectId, employeeId]);
+
+  const remove = async () => {
+    if (!window.confirm(t('personnel.detail.deleteConfirm', { name: employee.name }))) return;
+    setDeleteError('');
+    try {
+      await employeesApi.remove(projectId, employee.id);
+      navigate('../personnel');
+    } catch (err) {
+      setDeleteError(extractError(err));
+    }
+  };
 
   if (!employee) return <div className="text-gray-500">{t('common.loading')}</div>;
 
@@ -23,7 +36,11 @@ export default function EmployeeDetailPage() {
       <div className="flex items-center gap-3 mt-2 mb-4">
         <h2 className="text-lg font-bold">{employee.name}</h2>
         <Badge color={employee.status === 'activo' ? 'green' : 'gray'}>{t(`personnel.list.status.${employee.status}`, employee.status)}</Badge>
+        <Can module="personal" action="delete">
+          <Button variant="danger" className="ml-auto" onClick={remove}>{t('personnel.detail.delete')}</Button>
+        </Can>
       </div>
+      <ErrorText>{deleteError}</ErrorText>
 
       <BasicDataSection projectId={projectId} employee={employee} onChange={load} />
       <ContractsSection projectId={projectId} employee={employee} onChange={load} />
@@ -54,6 +71,7 @@ function BasicDataSection({ projectId, employee, onChange }) {
 
   const startEdit = () => {
     setForm({
+      name: employee.name || '', entryDate: employee.entryDate || '',
       position: employee.position || '', salaryValue: employee.salaryValue || '', dedicationHours: employee.dedicationHours || '',
       documentType: employee.documentType || '', documentNumber: employee.documentNumber || '',
       address: employee.address || '', city: employee.city || '', phone: employee.phone || '',
@@ -120,6 +138,8 @@ function BasicDataSection({ projectId, employee, onChange }) {
         </div>
       ) : (
         <form onSubmit={save} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <Input label={t('personnel.list.name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          <Input label={t('personnel.list.entryDate')} type="date" value={form.entryDate} onChange={(e) => setForm({ ...form, entryDate: e.target.value })} required />
           <Input label={t('personnel.detail.position')} value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} />
           <Input label={t('personnel.detail.salary')} type="number" min="0" step="0.01" value={form.salaryValue} onChange={(e) => setForm({ ...form, salaryValue: e.target.value })} />
           <Input label={t('personnel.detail.dedication')} type="number" min="0" step="0.01" value={form.dedicationHours} onChange={(e) => setForm({ ...form, dedicationHours: e.target.value })} />

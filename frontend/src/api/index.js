@@ -134,6 +134,7 @@ export const employeesApi = {
   get: (pid, id) => client.get(`/projects/${pid}/employees/${id}`).then((r) => r.data),
   create: (pid, formData) => client.post(`/projects/${pid}/employees`, formData).then((r) => r.data),
   update: (pid, id, formData) => client.put(`/projects/${pid}/employees/${id}`, formData).then((r) => r.data),
+  remove: (pid, id) => client.delete(`/projects/${pid}/employees/${id}`),
   addSocialSecurity: (pid, id, formData) => client.post(`/projects/${pid}/employees/${id}/social-security`, formData).then((r) => r.data),
   addPayment: (pid, id, formData) => client.post(`/projects/${pid}/employees/${id}/payments`, formData).then((r) => r.data),
   severancePreview: (pid, id, data) => client.post(`/projects/${pid}/employees/${id}/severance/preview`, data).then((r) => r.data),

@@ -456,6 +456,8 @@
     "detail": {
       "back": "← Volver a personal",
       "basicData": "Datos básicos",
+      "delete": "Eliminar trabajador",
+      "deleteConfirm": "¿Eliminar a {{name}}? Esta acción no se puede deshacer y borrará también sus documentos de afiliación, comprobantes de pago y contratos/otrosíes generados.",
       "position": "Cargo",
       "entry": "Ingreso",
       "exit": "Salida",

@@ -49,6 +49,17 @@ export default function PersonnelListPage() {
     }
   };
 
+  const remove = async (emp) => {
+    if (!window.confirm(t('personnel.detail.deleteConfirm', { name: emp.name }))) return;
+    setError('');
+    try {
+      await employeesApi.remove(projectId, emp.id);
+      load();
+    } catch (err) {
+      setError(extractError(err));
+    }
+  };
+
   return (
     <Card title={showHistory ? t('personnel.list.titleHistory') : t('personnel.list.titleActive')} actions={
       <div className="flex flex-wrap gap-2">
@@ -62,6 +73,7 @@ export default function PersonnelListPage() {
         )}
       </div>
     }>
+      {!showForm && <ErrorText>{error}</ErrorText>}
       {showForm && (
         <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
           <Input label={t('personnel.list.name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
@@ -125,8 +137,11 @@ export default function PersonnelListPage() {
             <td className="py-2 pr-3">{formatDate(emp.exitDate) || '-'}</td>
             <td className="py-2 pr-3">{money(emp.salaryValue)}</td>
             <td className="py-2 pr-3"><Badge color={emp.status === 'activo' ? 'green' : 'gray'}>{t(`personnel.list.status.${emp.status}`, emp.status)}</Badge></td>
-            <td className="py-2 pr-3 text-right">
+            <td className="py-2 pr-3 text-right whitespace-nowrap">
               <Link to={`../personnel/${emp.id}`} className="text-blue-600 hover:underline text-sm">{t('personnel.list.viewDetail')}</Link>
+              <Can module="personal" action="delete">
+                <button type="button" className="text-red-600 hover:underline text-sm ml-3" onClick={() => remove(emp)}>{t('personnel.detail.delete')}</button>
+              </Can>
             </td>
           </tr>
         ))}
