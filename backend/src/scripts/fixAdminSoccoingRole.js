@@ -29,7 +29,10 @@ async function run() {
     console.log(`Usuario: ${user.name} (${user.id})`);
     console.log(`Roles actuales: ${user.Roles.length ? user.Roles.map((r) => r.name).join(', ') : '(ninguno)'}`);
 
-    const role = await Role.findOne({ where: { name: TARGET_ROLE_NAME } });
+    // Búsqueda sin distinguir mayúsculas/minúsculas: el rol se crea a mano desde Administración >
+    // Roles, así que el nombre exacto ("Coordinador", "COORDINADOR", etc.) queda a criterio de
+    // quien lo creó.
+    const role = await Role.findOne({ where: { name: { [Op.iLike]: TARGET_ROLE_NAME } } });
     if (!role) throw new Error(`No existe el rol "${TARGET_ROLE_NAME}" en la empresa ${company.companyName}. Créalo primero desde Administración > Roles.`);
 
     if (user.Roles.some((r) => r.id === role.id)) {
