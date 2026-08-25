@@ -4,6 +4,7 @@ const { computeEVM, computeSCurve } = require('../services/evmService');
 const { getBudgetItemsWithProgress } = require('../services/budgetService');
 const { getPurchaseReport } = require('../services/purchaseOrderService');
 const { generateProjectReportPdf } = require('../services/pdfService');
+const { getLetterheadForProject } = require('../services/letterheadService');
 
 const evm = asyncHandler(async (req, res) => {
   const asOfDate = req.query.asOfDate ? new Date(req.query.asOfDate) : new Date();
@@ -59,9 +60,10 @@ async function gatherReportData(projectId) {
 
 const exportPdf = asyncHandler(async (req, res) => {
   const data = await gatherReportData(req.params.projectId);
+  const company = await getLetterheadForProject(req.params.projectId);
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="informe-${data.project.name.replace(/\s+/g, '_')}.pdf"`);
-  const doc = generateProjectReportPdf(data);
+  const doc = generateProjectReportPdf({ ...data, company });
   doc.pipe(res);
 });
 

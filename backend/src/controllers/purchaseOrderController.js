@@ -8,7 +8,7 @@ const {
   computeOrderTotals,
 } = require('../services/purchaseOrderService');
 const { generatePurchaseOrderPdf } = require('../services/pdfService');
-const { getSettingsForPdf } = require('./companySettingsController');
+const { getLetterheadForProject } = require('../services/letterheadService');
 const { assertCashBoxUsable, overdraftWarning } = require('../services/cashBoxService');
 
 // Estos controladores atienden DOS montajes de ruta: el anidado en proyecto
@@ -567,7 +567,7 @@ const exportPdf = asyncHandler(async (req, res) => {
     };
   });
 
-  const company = await getSettingsForPdf();
+  const company = await getLetterheadForProject(order.projectId);
   const lang = req.query.lang === 'en' ? 'en' : 'es';
   const totals = computeOrderTotals(itemsWithDelivery, order.retentionPercent);
   // "Elaboró" es quien generó la orden (order.createdBy), no necesariamente quien exporta el PDF

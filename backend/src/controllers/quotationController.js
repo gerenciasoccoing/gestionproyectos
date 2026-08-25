@@ -6,7 +6,7 @@ const { getQuotationWithBudget, convertQuotationToProject } = require('../servic
 const { buildApuDataByIdMap } = require('../services/apuExportService');
 const { generateQuotationPdf, generateBudgetWithApuAnnexPdf } = require('../services/pdfService');
 const { generateBudgetWithApuAnnexExcelBuffer } = require('../services/apuExcelExportService');
-const { getSettingsForPdf } = require('./companySettingsController');
+const { getLetterheadForProject } = require('../services/letterheadService');
 const { mapSeries } = require('../utils/mapSeries');
 
 // Extrae y valida el AIU discriminado (Administración/Imprevistos/Utilidad) del body.
@@ -150,7 +150,7 @@ const exportPdf = asyncHandler(async (req, res) => {
     return { ...item.toJSON(), directSubtotal, aiuAmount };
   });
 
-  const company = await getSettingsForPdf();
+  const company = await getLetterheadForProject(quotation.convertedProjectId);
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="cotizacion-${quotation.clientName.replace(/\s+/g, '_')}.pdf"`);
@@ -174,15 +174,18 @@ async function buildQuotationExportContext(quotationId, body) {
   const items = (budget.items || []).map((it) => it.toJSON());
   const apuDataById = await buildApuDataByIdMap(items, budget);
   const project = { name: quotation.projectNameProposed };
+  // convertedProjectId es null hasta que la cotización se convierta en proyecto: en ese caso
+  // getLetterheadForProject cae a la empresa principal, que es lo correcto (todavía no hay
+  // proyecto ni consorcio que aplicar).
+  const company = await getLetterheadForProject(quotation.convertedProjectId);
 
   const { elaboroNombre, revisoNombre } = body;
-  return { project, budget, items, apuDataById, elaboroNombre, revisoNombre };
+  return { project, budget, items, apuDataById, elaboroNombre, revisoNombre, company };
 }
 
 const exportBudgetPdf = asyncHandler(async (req, res) => {
   const ctx = await buildQuotationExportContext(req.params.id, req.body);
-  const company = await getSettingsForPdf();
-  const doc = generateBudgetWithApuAnnexPdf({ ...ctx, company });
+  const doc = generateBudgetWithApuAnnexPdf(ctx);
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="presupuesto-${ctx.project.name.replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf"`);
   doc.pipe(res);
@@ -190,8 +193,7 @@ const exportBudgetPdf = asyncHandler(async (req, res) => {
 
 const exportBudgetExcel = asyncHandler(async (req, res) => {
   const ctx = await buildQuotationExportContext(req.params.id, req.body);
-  const company = await getSettingsForPdf();
-  const buffer = await generateBudgetWithApuAnnexExcelBuffer({ ...ctx, company, exportDate: req.body.exportDate });
+  const buffer = await generateBudgetWithApuAnnexExcelBuffer({ ...ctx, exportDate: req.body.exportDate });
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="presupuesto-${ctx.project.name.replace(/[^a-zA-Z0-9-_]/g, '_')}.xlsx"`);
   res.send(buffer);

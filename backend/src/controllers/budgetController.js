@@ -7,7 +7,7 @@ const { scanBudgetItemsFile } = require('../services/budgetItemsScanService');
 const { buildApuDataByIdMap } = require('../services/apuExportService');
 const { generateBudgetWithApuAnnexPdf } = require('../services/pdfService');
 const { generateBudgetWithApuAnnexExcelBuffer } = require('../services/apuExcelExportService');
-const { getSettingsForPdf } = require('./companySettingsController');
+const { getLetterheadForProject } = require('../services/letterheadService');
 
 // Extrae y valida el AIU discriminado (Administración/Imprevistos/Utilidad) del body.
 // Los tres son opcionales de forma independiente; los que no vengan quedan en 0.
@@ -148,7 +148,7 @@ async function buildBudgetExportContext(projectId, body) {
 
 const exportPdf = asyncHandler(async (req, res) => {
   const ctx = await buildBudgetExportContext(req.params.projectId, req.body);
-  const company = await getSettingsForPdf();
+  const company = await getLetterheadForProject(req.params.projectId);
   const doc = generateBudgetWithApuAnnexPdf({ ...ctx, company });
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="presupuesto-${(ctx.project?.name || 'proyecto').replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf"`);
@@ -157,7 +157,7 @@ const exportPdf = asyncHandler(async (req, res) => {
 
 const exportExcel = asyncHandler(async (req, res) => {
   const ctx = await buildBudgetExportContext(req.params.projectId, req.body);
-  const company = await getSettingsForPdf();
+  const company = await getLetterheadForProject(req.params.projectId);
   const buffer = await generateBudgetWithApuAnnexExcelBuffer({ ...ctx, company, exportDate: req.body.exportDate });
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="presupuesto-${(ctx.project?.name || 'proyecto').replace(/[^a-zA-Z0-9-_]/g, '_')}.xlsx"`);

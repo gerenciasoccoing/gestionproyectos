@@ -12,9 +12,24 @@ function sectionTitle(doc, text) {
 }
 
 // Genera el informe consolidado de proyecto (EVM, hitos/actas, riesgos, avance por ítem, compras).
-function generateProjectReportPdf({ project, evm, milestones, minutes, risks, progressItems, purchases }) {
+function generateProjectReportPdf({ project, evm, milestones, minutes, risks, progressItems, purchases, company }) {
   const doc = new PDFDocument({ margin: 50 });
 
+  // Membrete (logo + datos de la empresa principal o del consorcio/unión temporal asignado al
+  // proyecto, ver letterheadService.js) — mismo patrón que cotizaciones/órdenes/contratos.
+  if (company && company.logoPath && require('fs').existsSync(company.logoPath)) {
+    try {
+      doc.image(company.logoPath, 50, 45, { width: 90 });
+    } catch (e) { /* si el logo no puede leerse, se omite sin romper la generación */ }
+  }
+  doc.fontSize(16).font('Helvetica-Bold').text(company ? company.companyName : 'Empresa', 160, 50);
+  doc.fontSize(9).font('Helvetica').fillColor('#555')
+    .text(company?.nit ? `NIT: ${company.nit}` : '', 160, 70)
+    .text(company?.address || '', 160, 84)
+    .text(company?.phone || '', 160, 98);
+  doc.fillColor('#000');
+
+  doc.moveDown(3);
   doc.fontSize(18).font('Helvetica-Bold').text('Informe de Proyecto', { align: 'center' });
   doc.moveDown(0.3);
   doc.fontSize(12).font('Helvetica').text(project.name, { align: 'center' });

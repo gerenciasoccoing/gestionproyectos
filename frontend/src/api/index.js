@@ -59,6 +59,16 @@ export const socialSecurityProvidersApi = {
   create: (type, name) => client.post('/social-security-providers', { type, name }).then((r) => r.data),
 };
 
+// Consorcios / Uniones Temporales: entidades contratantes alternas a la empresa principal,
+// asignables a un proyecto (ver Project.consortiumId) para que sus documentos usen este membrete.
+export const consortiumsApi = {
+  list: () => client.get('/consortiums').then((r) => r.data),
+  get: (id) => client.get(`/consortiums/${id}`).then((r) => r.data),
+  create: (formData) => client.post('/consortiums', formData).then((r) => r.data),
+  update: (id, formData) => client.put(`/consortiums/${id}`, formData).then((r) => r.data),
+  remove: (id) => client.delete(`/consortiums/${id}`),
+};
+
 export const companyApi = {
   get: () => client.get('/company-settings').then((r) => r.data),
   update: (formData) => client.put('/company-settings', formData).then((r) => r.data),

@@ -4,7 +4,7 @@ const { sequelize, Employee, Severance, Expense } = require('../models');
 const { calculateSeverance } = require('../services/severanceService');
 const { relativePath, saveGeneratedFile } = require('../middleware/upload');
 const { assertCashBoxUsable, overdraftWarning } = require('../services/cashBoxService');
-const { getSettingsForPdf } = require('./companySettingsController');
+const { getLetterheadForProject } = require('../services/letterheadService');
 const { generateLaborCalculationPdf } = require('../services/pdfService');
 
 function pdfDocToBuffer(doc) {
@@ -97,7 +97,7 @@ const confirmRetirement = asyncHandler(async (req, res) => {
     return { severance: created, warning: w };
   });
 
-  const company = await getSettingsForPdf();
+  const company = await getLetterheadForProject(req.params.projectId);
   const pdfBuffer = await pdfDocToBuffer(generateLaborCalculationPdf({
     title: 'Liquidación de prestaciones sociales',
     employee,

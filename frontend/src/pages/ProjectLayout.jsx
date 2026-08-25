@@ -3,7 +3,9 @@ import { NavLink, Outlet, useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { projectsApi } from '../api';
 import { Badge, Button, Input, ErrorText, extractError } from '../components/ui';
+import { fileUrl } from '../api/client';
 import Can from '../components/Can';
+import ConsortiumSelect from '../components/ConsortiumSelect';
 
 export default function ProjectLayout() {
   const { t } = useTranslation();
@@ -14,6 +16,9 @@ export default function ProjectLayout() {
   const [nameDraft, setNameDraft] = useState('');
   const [nameError, setNameError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [editingConsortium, setEditingConsortium] = useState(false);
+  const [consortiumDraft, setConsortiumDraft] = useState('');
+  const [consortiumError, setConsortiumError] = useState('');
 
   const TABS = [
     { to: 'contractual', label: t('projects.tabs.contractual') },
@@ -48,6 +53,26 @@ export default function ProjectLayout() {
     }
   };
 
+  const startEditConsortium = () => {
+    setConsortiumDraft(project.consortiumId || '');
+    setConsortiumError('');
+    setEditingConsortium(true);
+  };
+
+  const saveConsortium = async () => {
+    setConsortiumError('');
+    setSaving(true);
+    try {
+      const updated = await projectsApi.update(projectId, { consortiumId: consortiumDraft || null });
+      setProject(updated);
+      setEditingConsortium(false);
+    } catch (err) {
+      setConsortiumError(extractError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (error) return <div className="text-red-600">{error}</div>;
   if (!project) return <div className="text-gray-500">{t('projects.loadingProject')}</div>;
 
@@ -75,6 +100,27 @@ export default function ProjectLayout() {
         )}
         {editingName && <ErrorText>{nameError}</ErrorText>}
         <p className="text-sm text-gray-500">{t('projects.client')}: {project.client || '-'}</p>
+
+        <div className="flex items-center flex-wrap gap-2 mt-1">
+          {!editingConsortium ? (
+            <>
+              {project.consortium?.logoPath && <img src={fileUrl(project.consortium.logoPath)} alt={project.consortium.name} className="h-6" />}
+              <p className="text-sm text-gray-500">
+                {t('projects.consortium.label')}: {project.consortium ? project.consortium.name : t('projects.consortium.mainCompany')}
+              </p>
+              <Can module="proyectos" action="edit">
+                <Button variant="secondary" onClick={startEditConsortium}>{t('common.edit')}</Button>
+              </Can>
+            </>
+          ) : (
+            <div className="flex items-end gap-2">
+              <ConsortiumSelect value={consortiumDraft} onChange={setConsortiumDraft} />
+              <Button onClick={saveConsortium} disabled={saving}>{t('common.save')}</Button>
+              <Button variant="secondary" onClick={() => setEditingConsortium(false)}>{t('common.cancel')}</Button>
+            </div>
+          )}
+        </div>
+        {editingConsortium && <ErrorText>{consortiumError}</ErrorText>}
       </div>
 
       <nav className="flex gap-1 border-b border-gray-300 mb-4 overflow-x-auto whitespace-nowrap -mx-3 px-3 sm:mx-0 sm:px-0">

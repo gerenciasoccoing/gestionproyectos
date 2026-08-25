@@ -1,6 +1,6 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { Project, User, ProjectUser } = require('../models');
+const { Project, User, ProjectUser, Consortium } = require('../models');
 const { deleteProjectCascade } = require('../services/projectDeletionService');
 const { assertWithinLimit } = require('../utils/planLimits');
 const { mapSeries } = require('../utils/mapSeries');
@@ -9,7 +9,7 @@ const list = asyncHandler(async (req, res) => {
   const where = req.user.isAdmin ? {} : { id: req.user.projectIds };
   const projects = await Project.findAll({
     where,
-    include: [{ model: User, attributes: ['id', 'name', 'email'] }],
+    include: [{ model: User, attributes: ['id', 'name', 'email'] }, { model: Consortium, as: 'consortium', attributes: ['id', 'name'] }],
     order: [['createdAt', 'DESC']],
   });
   res.json(projects);
@@ -17,20 +17,21 @@ const list = asyncHandler(async (req, res) => {
 
 const get = asyncHandler(async (req, res) => {
   const project = await Project.findByPk(req.params.id, {
-    include: [{ model: User, attributes: ['id', 'name', 'email'] }],
+    include: [{ model: User, attributes: ['id', 'name', 'email'] }, { model: Consortium, as: 'consortium' }],
   });
   if (!project) throw new ApiError(404, 'Proyecto no encontrado');
   res.json(project);
 });
 
 const create = asyncHandler(async (req, res) => {
-  const { name, client, clientId, description, userIds = [] } = req.body;
+  const { name, client, clientId, description, userIds = [], consortiumId } = req.body;
   if (!name) throw new ApiError(400, 'El nombre del proyecto es obligatorio');
 
   await assertWithinLimit(Project, 'maxActiveProjects', { status: 'activo' });
 
   const project = await Project.create({
     name, client, clientId: clientId || null, description, origin: 'manual', createdBy: req.user.id,
+    consortiumId: consortiumId || null,
   });
 
   const assignees = new Set([req.user.id, ...userIds]);
@@ -43,7 +44,7 @@ const create = asyncHandler(async (req, res) => {
 const update = asyncHandler(async (req, res) => {
   const project = await Project.findByPk(req.params.id);
   if (!project) throw new ApiError(404, 'Proyecto no encontrado');
-  const { name, client, clientId, description, status } = req.body;
+  const { name, client, clientId, description, status, consortiumId } = req.body;
   if (name !== undefined) {
     if (!name.trim()) throw new ApiError(400, 'El nombre del proyecto es obligatorio');
     project.name = name;
@@ -52,6 +53,7 @@ const update = asyncHandler(async (req, res) => {
   if (clientId !== undefined) project.clientId = clientId || null;
   if (description !== undefined) project.description = description;
   if (status !== undefined) project.status = status;
+  if (consortiumId !== undefined) project.consortiumId = consortiumId || null;
   await project.save();
   res.json(project);
 });

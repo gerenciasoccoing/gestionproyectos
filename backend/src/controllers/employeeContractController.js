@@ -4,7 +4,7 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { Employee, EmployeeContractDocument, Project } = require('../models');
-const { getSettingsForPdf } = require('./companySettingsController');
+const { getLetterheadForProject } = require('../services/letterheadService');
 const { saveGeneratedFile } = require('../middleware/upload');
 const { generateContractPdf } = require('../services/pdfService');
 const { generateContractDocxBuffer } = require('../services/contractDocService');
@@ -66,7 +66,7 @@ const generate = asyncHandler(async (req, res) => {
   }
 
   const project = await Project.findByPk(req.params.projectId);
-  const company = await getSettingsForPdf();
+  const company = await getLetterheadForProject(req.params.projectId);
   const sequenceNumber = await EmployeeContractDocument.count({ where: { employeeId: employee.id } });
 
   const doc = await EmployeeContractDocument.create({
@@ -107,7 +107,7 @@ const generateOtrosi = asyncHandler(async (req, res) => {
   }
 
   const project = await Project.findByPk(req.params.projectId);
-  const company = await getSettingsForPdf();
+  const company = await getLetterheadForProject(req.params.projectId);
   const sequenceNumber = await EmployeeContractDocument.count({ where: { employeeId: employee.id } });
 
   const doc = await EmployeeContractDocument.create({

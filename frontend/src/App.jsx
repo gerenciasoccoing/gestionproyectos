@@ -47,6 +47,7 @@ import UsersPage from './pages/admin/UsersPage';
 import RolesPage from './pages/admin/RolesPage';
 import LaborParametersPage from './pages/admin/LaborParametersPage';
 import CompanySettingsPage from './pages/admin/CompanySettingsPage';
+import ConsortiumsPage from './pages/admin/ConsortiumsPage';
 
 export default function App() {
   return (
@@ -86,6 +87,7 @@ export default function App() {
           <Route path="roles" element={<RolesPage />} />
           <Route path="labor-parameters" element={<LaborParametersPage />} />
           <Route path="company" element={<CompanySettingsPage />} />
+          <Route path="consortiums" element={<ConsortiumsPage />} />
         </Route>
 
         <Route path="projects/:projectId" element={<ProjectLayout />}>

@@ -124,6 +124,13 @@
       "personnel": "Personal",
       "expenses": "Gastos",
       "reports": "Informes"
+    },
+    "consortium": {
+      "label": "Entidad contratante",
+      "mainCompany": "Empresa principal",
+      "addNew": "+ Crear nuevo consorcio",
+      "newTitle": "Nuevo consorcio / unión temporal",
+      "logoLaterNote": "El logo se puede agregar luego desde Administración > Consorcios."
     }
   },
   "contractual": {
@@ -1235,7 +1242,8 @@
       "users": "Usuarios",
       "roles": "Roles y Permisos",
       "laborParameters": "Parámetros Laborales",
-      "company": "Datos de la Empresa"
+      "company": "Datos de la Empresa",
+      "consortiums": "Consorcios / Uniones Temporales"
     },
     "users": {
       "title": "Usuarios",
@@ -1320,6 +1328,25 @@
       "logo": "Logo",
       "save": "Guardar",
       "saved": "Guardado correctamente."
+    },
+    "consortiums": {
+      "title": "Consorcios / Uniones Temporales",
+      "help": "Entidades contratantes alternas a la empresa principal. Asígnalas a un proyecto para que sus órdenes, contratos/nómina/liquidación, cotizaciones/presupuestos e informes usen este membrete en vez del de la empresa principal.",
+      "add": "+ Agregar consorcio",
+      "name": "Nombre",
+      "nit": "NIT",
+      "address": "Dirección",
+      "phone": "Teléfono",
+      "legalRepName": "Representante legal",
+      "logo": "Logo",
+      "confirmDelete": "¿Eliminar \"{{name}}\"? Si tiene proyectos asociados, primero deberás reasignarlos.",
+      "empty": "Sin consorcios registrados.",
+      "table": {
+        "logo": "Logo",
+        "name": "Nombre",
+        "nit": "NIT",
+        "legalRepName": "Representante legal"
+      }
     }
   },
   "auth": {

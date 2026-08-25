@@ -124,6 +124,13 @@
       "personnel": "Personnel",
       "expenses": "Expenses",
       "reports": "Reports"
+    },
+    "consortium": {
+      "label": "Contracting entity",
+      "mainCompany": "Main company",
+      "addNew": "+ Create new consortium",
+      "newTitle": "New consortium / joint venture",
+      "logoLaterNote": "The logo can be added later from Administration > Consortiums."
     }
   },
   "contractual": {
@@ -1235,7 +1242,8 @@
       "users": "Users",
       "roles": "Roles and Permissions",
       "laborParameters": "Labor Parameters",
-      "company": "Company Data"
+      "company": "Company Data",
+      "consortiums": "Consortiums / Joint Ventures"
     },
     "users": {
       "title": "Users",
@@ -1320,6 +1328,25 @@
       "logo": "Logo",
       "save": "Save",
       "saved": "Saved successfully."
+    },
+    "consortiums": {
+      "title": "Consortiums / Joint Ventures",
+      "help": "Contracting entities alternate to the main company. Assign them to a project so its purchase orders, personnel contracts/payroll/severance, quotations/budgets, and reports use this letterhead instead of the main company's.",
+      "add": "+ Add consortium",
+      "name": "Name",
+      "nit": "Tax ID (NIT)",
+      "address": "Address",
+      "phone": "Phone",
+      "legalRepName": "Legal representative",
+      "logo": "Logo",
+      "confirmDelete": "Delete \"{{name}}\"? If it has associated projects, you'll need to reassign them first.",
+      "empty": "No consortiums registered.",
+      "table": {
+        "logo": "Logo",
+        "name": "Name",
+        "nit": "Tax ID",
+        "legalRepName": "Legal representative"
+      }
     }
   },
   "auth": {

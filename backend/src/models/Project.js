@@ -17,11 +17,16 @@ module.exports = (sequelize) => {
     origin: { type: DataTypes.ENUM('manual', 'cotizacion'), defaultValue: 'manual' },
     quotationId: { type: DataTypes.UUID, allowNull: true },
     createdBy: { type: DataTypes.UUID, allowNull: true },
+    // Entidad contratante del proyecto: null = empresa principal (comportamiento por defecto, sin
+    // cambios); si se asigna un consorcio/unión temporal, todos los documentos generados dentro de
+    // este proyecto usan su membrete — ver services/letterheadService.js#getLetterheadForProject.
+    consortiumId: { type: DataTypes.UUID, allowNull: true },
   });
 
   Project.associate = (models) => {
     Project.belongsToMany(models.User, { through: models.ProjectUser, foreignKey: 'projectId' });
     Project.belongsTo(models.Quotation, { foreignKey: 'quotationId', as: 'quotation' });
+    Project.belongsTo(models.Consortium, { foreignKey: 'consortiumId', as: 'consortium' });
     Project.belongsTo(models.ThirdParty, { foreignKey: 'clientId', as: 'clientParty' });
     Project.hasMany(models.Contract, { foreignKey: 'projectId', as: 'contracts' });
     Project.hasMany(models.Policy, { foreignKey: 'projectId', as: 'policies' });

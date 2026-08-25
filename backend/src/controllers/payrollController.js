@@ -6,7 +6,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { Employee, PaymentReceipt } = require('../models');
 const { calculatePayroll } = require('../services/payrollService');
-const { getSettingsForPdf } = require('./companySettingsController');
+const { getLetterheadForProject } = require('../services/letterheadService');
 const { saveGeneratedFile } = require('../middleware/upload');
 const { generateLaborCalculationPdf } = require('../services/pdfService');
 
@@ -73,7 +73,7 @@ const confirm = asyncHandler(async (req, res) => {
     breakdown: result.breakdown,
   });
 
-  const company = await getSettingsForPdf();
+  const company = await getLetterheadForProject(req.params.projectId);
   const pdfBuffer = await pdfDocToBuffer(generateLaborCalculationPdf({
     title: 'Comprobante de pago de nómina',
     employee,

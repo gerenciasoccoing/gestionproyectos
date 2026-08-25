@@ -5,13 +5,14 @@ import { projectsApi, thirdPartiesApi } from '../api';
 import { Card, Button, Input, SearchSelect, Table, Badge, ErrorText, extractError } from '../components/ui';
 import Can from '../components/Can';
 import MotivationalBanner from '../components/MotivationalBanner';
+import ConsortiumSelect from '../components/ConsortiumSelect';
 
 export default function ProjectsListPage() {
   const { t } = useTranslation();
   const [projects, setProjects] = useState([]);
   const [clients, setClients] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', client: '', clientId: '', description: '' });
+  const [form, setForm] = useState({ name: '', client: '', clientId: '', description: '', consortiumId: '' });
   const [error, setError] = useState('');
 
   const load = () => projectsApi.list().then(setProjects);
@@ -29,8 +30,8 @@ export default function ProjectsListPage() {
     e.preventDefault();
     setError('');
     try {
-      await projectsApi.create({ ...form, clientId: form.clientId || undefined });
-      setForm({ name: '', client: '', clientId: '', description: '' });
+      await projectsApi.create({ ...form, clientId: form.clientId || undefined, consortiumId: form.consortiumId || undefined });
+      setForm({ name: '', client: '', clientId: '', description: '', consortiumId: '' });
       setShowForm(false);
       load();
     } catch (err) {
@@ -68,6 +69,7 @@ export default function ProjectsListPage() {
             />
             <Input label={t('projects.client')} value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value, clientId: '' })} />
             <Input label={t('projects.description')} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            <ConsortiumSelect value={form.consortiumId} onChange={(v) => setForm({ ...form, consortiumId: v })} />
             <Button type="submit">{t('common.save')}</Button>
           </form>
           <ErrorText>{error}</ErrorText>

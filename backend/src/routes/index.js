@@ -8,6 +8,7 @@ router.use('/price-items', require('./priceItemRoutes'));
 router.use('/apus', require('./apuRoutes'));
 router.use('/quotations', require('./quotationRoutes'));
 router.use('/company-settings', require('./companySettingsRoutes'));
+router.use('/consortiums', require('./consortiumRoutes'));
 router.use('/third-parties', require('./thirdPartyRoutes'));
 router.use('/inventory-items', require('./inventoryItemRoutes'));
 router.use('/inventory-checkouts', require('./inventoryCheckoutRoutes'));

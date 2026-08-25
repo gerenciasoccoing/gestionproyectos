@@ -12,6 +12,7 @@ const modelDefiners = [
   require('./RolePermission'),
   require('./UserRole'),
   require('./ProjectUser'),
+  require('./Consortium'),
   require('./Project'),
   require('./Contract'),
   require('./Policy'),
