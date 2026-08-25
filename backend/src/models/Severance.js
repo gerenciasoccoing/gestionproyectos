@@ -22,6 +22,7 @@ module.exports = (sequelize) => {
     total: { type: DataTypes.DECIMAL(18, 2), allowNull: false },
     breakdown: { type: DataTypes.JSONB, allowNull: false }, // detalle auditable por concepto (fórmula + valores)
     pazYSalvoFilePath: { type: DataTypes.STRING, allowNull: true },
+    pdfFilePath: { type: DataTypes.STRING, allowNull: true },
     expenseId: { type: DataTypes.UUID, allowNull: true },
   });
 

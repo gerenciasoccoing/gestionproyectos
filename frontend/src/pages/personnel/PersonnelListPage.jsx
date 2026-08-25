@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { employeesApi, employeeContractsApi } from '../../api';
+import { employeesApi, employeeContractsApi, laborParamsApi } from '../../api';
 import { Card, Button, Input, Select, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import Can from '../../components/Can';
+import ProviderSelect from '../../components/ProviderSelect';
+import ContractValueHelper from '../../components/ContractValueHelper';
 
 const EMPTY_FORM = {
   name: '', position: '', entryDate: '', dedicationHours: '', salaryValue: '',
@@ -27,10 +29,22 @@ export default function PersonnelListPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [file, setFile] = useState(null);
   const [error, setError] = useState('');
+  const [laborParams, setLaborParams] = useState(null);
 
   const load = () => employeesApi.list(projectId, showHistory ? 'retirado' : 'activo').then(setEmployees);
   useEffect(() => { load(); }, [projectId, showHistory]);
   useEffect(() => { employeeContractsApi.contractTypes().then(setContractTypes); }, []);
+  useEffect(() => { laborParamsApi.current().then(setLaborParams).catch(() => {}); }, []);
+
+  const toggleForm = () => {
+    setShowForm((s) => {
+      const next = !s;
+      if (next && laborParams && !form.salaryValue) {
+        setForm((f) => ({ ...f, salaryValue: laborParams.smlv }));
+      }
+      return next;
+    });
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -68,7 +82,7 @@ export default function PersonnelListPage() {
         </Button>
         {!showHistory && (
           <Can module="personal" action="create">
-            <Button onClick={() => setShowForm((s) => !s)}>{showForm ? t('common.cancel') : t('personnel.list.add')}</Button>
+            <Button onClick={toggleForm}>{showForm ? t('common.cancel') : t('personnel.list.add')}</Button>
           </Can>
         )}
       </div>
@@ -80,8 +94,16 @@ export default function PersonnelListPage() {
           <Input label={t('personnel.list.position')} value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} required />
           <Input label={t('personnel.list.entryDate')} type="date" value={form.entryDate} onChange={(e) => setForm({ ...form, entryDate: e.target.value })} required />
           <Input label={t('personnel.list.dedicationHours')} type="number" min="0" step="0.01" value={form.dedicationHours} onChange={(e) => setForm({ ...form, dedicationHours: e.target.value })} />
-          <Input label={t('personnel.list.salary')} type="number" min="0" step="0.01" value={form.salaryValue} onChange={(e) => setForm({ ...form, salaryValue: e.target.value })} required />
+          <Input label={t('personnel.list.salaryBase')} type="number" min="0" step="0.01" value={form.salaryValue} onChange={(e) => setForm({ ...form, salaryValue: e.target.value })} required />
           <Input label={t('personnel.list.contractFile')} type="file" onChange={(e) => setFile(e.target.files[0])} />
+          <ContractValueHelper
+            laborParams={laborParams}
+            projectId={projectId}
+            salaryValue={form.salaryValue}
+            entryDate={form.entryDate}
+            contractEndDate={form.contractEndDate}
+            showRange={NEEDS_END_DATE.has(form.contractType)}
+          />
 
           <Select label={t('personnel.contract.type')} value={form.contractType} onChange={(e) => setForm({ ...form, contractType: e.target.value })} className="lg:col-span-1">
             <option value="">{t('personnel.contract.selectType')}</option>
@@ -105,15 +127,15 @@ export default function PersonnelListPage() {
 
           {IS_LABORAL(form.contractType) || form.contractType === 'aprendizaje' ? (
             <>
-              <Input label={t('personnel.detail.eps')} value={form.epsName} onChange={(e) => setForm({ ...form, epsName: e.target.value })} />
+              <ProviderSelect type="eps" label={t('personnel.detail.eps')} value={form.epsName} onChange={(v) => setForm({ ...form, epsName: v })} />
               {form.contractType !== 'aprendizaje' && (
-                <Input label={t('personnel.detail.pensionFund')} value={form.pensionFundName} onChange={(e) => setForm({ ...form, pensionFundName: e.target.value })} />
+                <ProviderSelect type="pension" label={t('personnel.detail.pensionFund')} value={form.pensionFundName} onChange={(v) => setForm({ ...form, pensionFundName: v })} />
               )}
-              <Input label={t('personnel.detail.arl')} value={form.arlName} onChange={(e) => setForm({ ...form, arlName: e.target.value })} />
+              <ProviderSelect type="arl" label={t('personnel.detail.arl')} value={form.arlName} onChange={(v) => setForm({ ...form, arlName: v })} />
             </>
           ) : null}
           {form.contractType === 'subcontratista_natural' && (
-            <Input label={t('personnel.detail.arl')} value={form.arlName} onChange={(e) => setForm({ ...form, arlName: e.target.value })} />
+            <ProviderSelect type="arl" label={t('personnel.detail.arl')} value={form.arlName} onChange={(v) => setForm({ ...form, arlName: v })} />
           )}
 
           {IS_SUBCONTRATISTA_JURIDICA(form.contractType) && (

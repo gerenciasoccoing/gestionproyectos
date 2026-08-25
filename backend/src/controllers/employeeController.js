@@ -2,6 +2,31 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { Employee, SocialSecurityDocument, PaymentReceipt, Severance, EmployeeContractDocument } = require('../models');
 const { relativePath } = require('../middleware/upload');
+const { days360, getEffectiveLaborParameters, computeAuxTransporte } = require('../services/laborCalculations');
+
+// Valor del contrato proporcional al rango de días (entryDate -> contractEndDate), con la MISMA
+// convención de días (año comercial de 360, ver laborCalculations.js#days360) que ya usan
+// liquidación y nómina — a propósito no es un valor que se guarda: siempre se puede recalcular a
+// partir de salaryValue/entryDate/contractEndDate, así que mostrarlo en vivo en el formulario es
+// suficiente y evita que quede desactualizado si esos campos cambian después.
+const previewContractValue = asyncHandler(async (req, res) => {
+  const { salaryValue, entryDate, contractEndDate } = req.body;
+  if (salaryValue === undefined || !entryDate || !contractEndDate) {
+    throw new ApiError(400, 'salaryValue, entryDate y contractEndDate son obligatorios');
+  }
+  if (new Date(contractEndDate) < new Date(entryDate)) {
+    throw new ApiError(400, 'La fecha de terminación no puede ser anterior a la de inicio');
+  }
+  const days = days360(entryDate, contractEndDate);
+  const dailySalary = Number(salaryValue) / 30;
+  const total = dailySalary * days;
+
+  const params = await getEffectiveLaborParameters(entryDate);
+  const { applies: auxTransporteApplies, amount: auxTransporteMonthly } = computeAuxTransporte(salaryValue, params);
+  const auxTransporteTotal = auxTransporteApplies ? (auxTransporteMonthly / 30) * days : 0;
+
+  res.json({ days, dailySalary, total, auxTransporteApplies, auxTransporteMonthly, auxTransporteTotal, grandTotal: total + auxTransporteTotal });
+});
 
 const list = asyncHandler(async (req, res) => {
   const { status } = req.query; // ?status=retirado para ver histórico
@@ -154,4 +179,4 @@ const addPaymentReceipt = asyncHandler(async (req, res) => {
   res.status(201).json(receipt);
 });
 
-module.exports = { list, get, create, update, remove, uploadCedula, addSocialSecurityDocument, addPaymentReceipt };
+module.exports = { list, get, create, update, remove, uploadCedula, addSocialSecurityDocument, addPaymentReceipt, previewContractValue };

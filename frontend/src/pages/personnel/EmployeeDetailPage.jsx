@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useOutletContext, useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { employeesApi, employeeContractsApi, cashBoxesApi } from '../../api';
+import {
+  employeesApi, employeeContractsApi, cashBoxesApi, laborParamsApi, payrollApi,
+} from '../../api';
 import { Card, Button, Input, Select, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
+import ProviderSelect from '../../components/ProviderSelect';
+import ContractValueHelper from '../../components/ContractValueHelper';
 
 export default function EmployeeDetailPage() {
   const { t } = useTranslation();
@@ -65,9 +69,11 @@ function BasicDataSection({ projectId, employee, onChange }) {
   const [form, setForm] = useState(null);
   const [cedulaFile, setCedulaFile] = useState(null);
   const [contractTypes, setContractTypes] = useState([]);
+  const [laborParams, setLaborParams] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => { employeeContractsApi.contractTypes().then(setContractTypes); }, []);
+  useEffect(() => { laborParamsApi.current().then(setLaborParams).catch(() => {}); }, []);
 
   const startEdit = () => {
     setForm({
@@ -141,8 +147,16 @@ function BasicDataSection({ projectId, employee, onChange }) {
           <Input label={t('personnel.list.name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           <Input label={t('personnel.list.entryDate')} type="date" value={form.entryDate} onChange={(e) => setForm({ ...form, entryDate: e.target.value })} required />
           <Input label={t('personnel.detail.position')} value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} />
-          <Input label={t('personnel.detail.salary')} type="number" min="0" step="0.01" value={form.salaryValue} onChange={(e) => setForm({ ...form, salaryValue: e.target.value })} />
+          <Input label={t('personnel.list.salaryBase')} type="number" min="0" step="0.01" value={form.salaryValue} onChange={(e) => setForm({ ...form, salaryValue: e.target.value })} />
           <Input label={t('personnel.detail.dedication')} type="number" min="0" step="0.01" value={form.dedicationHours} onChange={(e) => setForm({ ...form, dedicationHours: e.target.value })} />
+          <ContractValueHelper
+            laborParams={laborParams}
+            projectId={projectId}
+            salaryValue={form.salaryValue}
+            entryDate={form.entryDate}
+            contractEndDate={form.contractEndDate}
+            showRange={NEEDS_END_DATE.has(form.contractType)}
+          />
 
           <Select label={t('personnel.contract.type')} value={form.contractType} onChange={(e) => setForm({ ...form, contractType: e.target.value })}>
             <option value="">{t('personnel.contract.selectType')}</option>
@@ -168,15 +182,15 @@ function BasicDataSection({ projectId, employee, onChange }) {
 
           {(IS_LABORAL(form.contractType) || form.contractType === 'aprendizaje') && (
             <>
-              <Input label={t('personnel.detail.eps')} value={form.epsName} onChange={(e) => setForm({ ...form, epsName: e.target.value })} />
+              <ProviderSelect type="eps" label={t('personnel.detail.eps')} value={form.epsName} onChange={(v) => setForm({ ...form, epsName: v })} />
               {form.contractType !== 'aprendizaje' && (
-                <Input label={t('personnel.detail.pensionFund')} value={form.pensionFundName} onChange={(e) => setForm({ ...form, pensionFundName: e.target.value })} />
+                <ProviderSelect type="pension" label={t('personnel.detail.pensionFund')} value={form.pensionFundName} onChange={(v) => setForm({ ...form, pensionFundName: v })} />
               )}
-              <Input label={t('personnel.detail.arl')} value={form.arlName} onChange={(e) => setForm({ ...form, arlName: e.target.value })} />
+              <ProviderSelect type="arl" label={t('personnel.detail.arl')} value={form.arlName} onChange={(v) => setForm({ ...form, arlName: v })} />
             </>
           )}
           {form.contractType === 'subcontratista_natural' && (
-            <Input label={t('personnel.detail.arl')} value={form.arlName} onChange={(e) => setForm({ ...form, arlName: e.target.value })} />
+            <ProviderSelect type="arl" label={t('personnel.detail.arl')} value={form.arlName} onChange={(v) => setForm({ ...form, arlName: v })} />
           )}
 
           {IS_SUBCONTRATISTA_JURIDICA(form.contractType) && (
@@ -341,6 +355,65 @@ function SocialSecuritySection({ projectId, employee, onChange }) {
   );
 }
 
+function PayrollCalculator({ projectId, employee, onChange }) {
+  const { t } = useTranslation();
+  const [form, setForm] = useState({ periodStart: '', periodEnd: '', paymentDate: '' });
+  const [preview, setPreview] = useState(null);
+  const [error, setError] = useState('');
+  const [confirming, setConfirming] = useState(false);
+
+  const doPreview = async (e) => {
+    e.preventDefault();
+    setError('');
+    setPreview(null);
+    try {
+      const result = await payrollApi.preview(projectId, employee.id, form);
+      setPreview(result);
+    } catch (err) {
+      setError(extractError(err));
+    }
+  };
+
+  const confirm = async () => {
+    setConfirming(true);
+    setError('');
+    try {
+      await payrollApi.confirm(projectId, employee.id, form);
+      setPreview(null);
+      setForm({ periodStart: '', periodEnd: '', paymentDate: '' });
+      onChange();
+    } catch (err) {
+      setError(extractError(err));
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  return (
+    <div className="mb-4 pb-4 border-b">
+      <h4 className="font-medium text-sm text-gray-700 mb-2">{t('personnel.detail.payments.payroll.title')}</h4>
+      <form onSubmit={doPreview} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3 items-end">
+        <Input label={t('personnel.detail.payments.payroll.periodStart')} type="date" value={form.periodStart} onChange={(e) => setForm({ ...form, periodStart: e.target.value })} required />
+        <Input label={t('personnel.detail.payments.payroll.periodEnd')} type="date" value={form.periodEnd} onChange={(e) => setForm({ ...form, periodEnd: e.target.value })} required />
+        <Input label={t('personnel.detail.payments.payroll.paymentDate')} type="date" value={form.paymentDate} onChange={(e) => setForm({ ...form, paymentDate: e.target.value })} required />
+        <Button type="submit">{t('personnel.detail.payments.payroll.calculate')}</Button>
+      </form>
+      <ErrorText>{error}</ErrorText>
+      {preview && (
+        <div className="mt-2">
+          <BreakdownTable breakdown={preview.breakdown} />
+          <div className="flex items-center justify-between mt-2">
+            <p className="font-bold">{t('common.total')}: {money(preview.total)}</p>
+            <Button onClick={confirm} disabled={confirming}>
+              {confirming ? t('personnel.detail.payments.payroll.processing') : t('personnel.detail.payments.payroll.confirmButton')}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PaymentsSection({ projectId, employee, onChange }) {
   const { t } = useTranslation();
   const [form, setForm] = useState({ date: '', periodLabel: '', amount: '' });
@@ -367,6 +440,8 @@ function PaymentsSection({ projectId, employee, onChange }) {
   return (
     <Card title={t('personnel.detail.payments.title')}>
       <Can module="personal" action="edit">
+        <PayrollCalculator projectId={projectId} employee={employee} onChange={onChange} />
+        <h4 className="font-medium text-sm text-gray-700 mb-2">{t('personnel.detail.payments.manualTitle')}</h4>
         <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3 items-end">
           <Input label={t('personnel.detail.payments.date')} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
           <Input label={t('personnel.detail.payments.period')} placeholder={t('personnel.detail.payments.periodPlaceholder')} value={form.periodLabel} onChange={(e) => setForm({ ...form, periodLabel: e.target.value })} required />
@@ -376,17 +451,18 @@ function PaymentsSection({ projectId, employee, onChange }) {
         </form>
         <ErrorText>{error}</ErrorText>
       </Can>
-      <Table columns={[t('personnel.detail.payments.table.date'), t('personnel.detail.payments.table.period'), t('personnel.detail.payments.table.amount'), t('personnel.detail.payments.table.file')]}>
+      <Table columns={[t('personnel.detail.payments.table.date'), t('personnel.detail.payments.table.period'), t('personnel.detail.payments.table.amount'), t('personnel.detail.payments.table.file'), t('personnel.detail.payments.table.pdf')]}>
         {employee.paymentReceipts?.map((p) => (
           <tr key={p.id} className="border-b border-gray-100">
             <td className="py-1 pr-3">{formatDate(p.date)}</td>
             <td className="py-1 pr-3">{p.periodLabel}</td>
             <td className="py-1 pr-3">{money(p.amount)}</td>
-            <td className="py-1 pr-3"><a className="text-blue-600 hover:underline" href={fileUrl(p.filePath)} target="_blank" rel="noreferrer">{t('common.view')}</a></td>
+            <td className="py-1 pr-3">{p.filePath ? <a className="text-blue-600 hover:underline" href={fileUrl(p.filePath)} target="_blank" rel="noreferrer">{t('common.view')}</a> : '-'}</td>
+            <td className="py-1 pr-3">{p.pdfFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(p.pdfFilePath)} target="_blank" rel="noreferrer">PDF</a> : '-'}</td>
           </tr>
         ))}
         {(!employee.paymentReceipts || employee.paymentReceipts.length === 0) && (
-          <tr><td colSpan={4} className="py-2 text-center text-gray-400">{t('personnel.detail.payments.empty')}</td></tr>
+          <tr><td colSpan={5} className="py-2 text-center text-gray-400">{t('personnel.detail.payments.empty')}</td></tr>
         )}
       </Table>
     </Card>
@@ -511,6 +587,11 @@ function SeveranceSummary({ employee, projectId, onChange }) {
     <Card title={t('personnel.detail.severance.summaryTitle')}>
       <BreakdownTable breakdown={severance.breakdown} />
       <p className="text-right font-bold text-lg mt-2">{t('common.total')}: {money(severance.total)}</p>
+      {severance.pdfFilePath && (
+        <p className="mt-2">
+          <a className="text-blue-600 hover:underline text-sm" href={fileUrl(severance.pdfFilePath)} target="_blank" rel="noreferrer">{t('personnel.detail.severance.viewPdf')}</a>
+        </p>
+      )}
       <div className="mt-3 border-t pt-3 flex items-center gap-3">
         {severance.pazYSalvoFilePath ? (
           <a className="text-blue-600 hover:underline text-sm" href={fileUrl(severance.pazYSalvoFilePath)} target="_blank" rel="noreferrer">{t('personnel.detail.severance.viewSigned')}</a>

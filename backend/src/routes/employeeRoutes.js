@@ -5,6 +5,7 @@ const { makeUploader } = require('../middleware/upload');
 const employeeController = require('../controllers/employeeController');
 const severanceController = require('../controllers/severanceController');
 const employeeContractController = require('../controllers/employeeContractController');
+const payrollController = require('../controllers/payrollController');
 
 const uploadContract = makeUploader('employee-contracts', 'document');
 const uploadSocialSecurity = makeUploader('social-security', 'document');
@@ -19,9 +20,12 @@ router.get('/:id', requirePermission('personal', 'view'), employeeController.get
 router.post('/', requirePermission('personal', 'create'), uploadContract.single('file'), employeeController.create);
 router.put('/:id', requirePermission('personal', 'edit'), uploadContract.single('file'), employeeController.update);
 router.delete('/:id', requirePermission('personal', 'delete'), employeeController.remove);
+router.post('/preview-contract-value', requirePermission('personal', 'view'), employeeController.previewContractValue);
 
 router.post('/:id/social-security', requirePermission('personal', 'edit'), uploadSocialSecurity.single('file'), employeeController.addSocialSecurityDocument);
 router.post('/:id/payments', requirePermission('personal', 'edit'), uploadPayment.single('file'), employeeController.addPaymentReceipt);
+router.post('/:id/payroll/preview', requirePermission('personal', 'edit'), payrollController.preview);
+router.post('/:id/payroll/confirm', requirePermission('personal', 'edit'), payrollController.confirm);
 router.post('/:id/cedula', requirePermission('personal', 'edit'), uploadCedula.single('file'), employeeController.uploadCedula);
 
 router.post('/:id/severance/preview', requirePermission('personal', 'edit'), severanceController.preview);

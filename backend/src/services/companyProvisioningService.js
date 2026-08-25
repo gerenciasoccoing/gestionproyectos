@@ -1,7 +1,8 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const ApiError = require('../utils/ApiError');
-const { Company, User, Role, Permission, LaborParameters, CashBox } = require('../models');
+const { Company, User, Role, Permission, LaborParameters, CashBox, SocialSecurityProvider } = require('../models');
+const { DEFAULT_SOCIAL_SECURITY_PROVIDERS } = require('../config/socialSecurityProviders');
 // Chequeo de correo duplicado ANTES de tener companyId de contexto (ver provisionCompany): con la
 // Capa 2 (RLS) activa, la conexión restringida no ve NINGUNA fila sin ese contexto — un
 // User.findOne de la conexión normal acá siempre devolvería null, sin importar si el correo ya
@@ -62,6 +63,13 @@ async function seedDefaultsForCompany(company, { adminName, adminEmail, adminPas
       where: { name: 'Caja general' },
       defaults: { initialBalance: 0, status: 'activa' },
     });
+
+    for (const [type, names] of Object.entries(DEFAULT_SOCIAL_SECURITY_PROVIDERS)) {
+      for (const name of names) {
+        // eslint-disable-next-line no-await-in-loop
+        await SocialSecurityProvider.findOrCreate({ where: { type, name } });
+      }
+    }
 
     return admin;
   });

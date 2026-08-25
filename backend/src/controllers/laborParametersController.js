@@ -1,9 +1,20 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { LaborParameters } = require('../models');
+const { getEffectiveLaborParameters } = require('../services/laborCalculations');
 
 const list = asyncHandler(async (req, res) => {
   const params = await LaborParameters.findAll({ order: [['effectiveDate', 'DESC']] });
+  res.json(params);
+});
+
+// Los parámetros vigentes HOY (SMLV + auxilio de transporte, sobre todo) — usado para precargar el
+// salario por defecto y mostrar el auxilio de transporte al dar de alta o editar un trabajador
+// (ver PersonnelListPage.jsx / EmployeeDetailPage.jsx). Gated por 'personal' en vez de 'admin' a
+// propósito: cualquiera que pueda crear/editar personal necesita poder leer esto, no solo quien
+// administra los parámetros.
+const current = asyncHandler(async (req, res) => {
+  const params = await getEffectiveLaborParameters(new Date().toISOString().slice(0, 10));
   res.json(params);
 });
 
@@ -33,4 +44,4 @@ const create = asyncHandler(async (req, res) => {
   res.status(201).json(params);
 });
 
-module.exports = { list, create };
+module.exports = { list, current, create };

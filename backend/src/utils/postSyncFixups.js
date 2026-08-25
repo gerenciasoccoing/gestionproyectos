@@ -6,11 +6,12 @@ const path = require('path');
 const {
   sequelize, Company, CashBox,
   Contract, Employee, Expense, InventoryItem, Minute, PaymentReceipt, Policy,
-  ProgressPhoto, Severance, SocialSecurityDocument, ThirdParty,
+  ProgressPhoto, Severance, SocialSecurityDocument, SocialSecurityProvider, ThirdParty,
 } = require('../models/adminModels');
 const { TENANT_SCOPING_EXCLUDED } = require('../models/defineModels');
 const { runInTransactionContext } = require('../utils/tenantContext');
 const { UPLOAD_ROOT } = require('../middleware/upload');
+const { DEFAULT_SOCIAL_SECURITY_PROVIDERS } = require('../config/socialSecurityProviders');
 
 // Mismo criterio que applyTenantScoping.js: algunos modelos excluidos del aislamiento (ej.
 // SupportAccessLog) igual tienen una columna companyId como dato simple (a qué empresa se accedió),
@@ -289,8 +290,34 @@ async function applyPostSyncFixups() {
   await sequelize.query('ALTER TABLE "PurchaseOrderItems" ALTER COLUMN "name" TYPE TEXT;');
   await sequelize.query('ALTER TABLE "ExpenseItems" ALTER COLUMN "description" TYPE TEXT;');
 
+  // PaymentReceipt.filePath pasó de obligatorio a opcional: ahora un registro también puede venir
+  // de calcular la nómina (payrollService.js), que no parte de un archivo subido a mano. Mismo
+  // problema conocido: sync({alter:true}) no relaja un NOT NULL existente por sí solo.
+  await sequelize.query('ALTER TABLE "PaymentReceipts" ALTER COLUMN "filePath" DROP NOT NULL;');
+
+  await seedSocialSecurityProvidersForExistingCompanies();
+
   await ensureAppDbRole();
   await applyRowLevelSecurity();
+}
+
+// SocialSecurityProvider (catálogo de EPS/pensión/ARL) se siembra con sus valores por defecto al
+// crear una empresa nueva (companyProvisioningService.js), pero las empresas que ya existían antes
+// de esta funcionalidad nunca pasaron por ahí — sin esto se quedarían con el selector vacío. Corre
+// en cada arranque; findOrCreate por empresa hace que sea un no-op seguro una vez sembrado.
+async function seedSocialSecurityProvidersForExistingCompanies() {
+  const companies = await Company.findAll();
+  for (const company of companies) {
+    // eslint-disable-next-line no-await-in-loop
+    await runInTransactionContext(company.id, null, async () => {
+      for (const [type, names] of Object.entries(DEFAULT_SOCIAL_SECURITY_PROVIDERS)) {
+        for (const name of names) {
+          // eslint-disable-next-line no-await-in-loop
+          await SocialSecurityProvider.findOrCreate({ where: { type, name } });
+        }
+      }
+    });
+  }
 }
 
 // Migración de "caja por ítem" a "caja por orden" (corrección del bug de diseño reportado: antes

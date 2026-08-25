@@ -17,6 +17,7 @@ router.use('/cash-boxes', require('./cashBoxRoutes'));
 router.use('/expenses', require('./globalExpenseRoutes'));
 router.use('/platform-admin', require('./platformAdminRoutes'));
 router.use('/employee-contract-types', require('./employeeContractTypeRoutes'));
+router.use('/social-security-providers', require('./socialSecurityProviderRoutes'));
 router.use('/register-company', require('./companyRegistrationRoutes'));
 
 router.use('/projects', require('./projectRoutes'));

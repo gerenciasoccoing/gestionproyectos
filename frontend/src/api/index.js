@@ -47,6 +47,16 @@ export const rolesApi = {
 export const laborParamsApi = {
   list: () => client.get('/labor-parameters').then((r) => r.data),
   create: (data) => client.post('/labor-parameters', data).then((r) => r.data),
+  // Parámetros vigentes hoy (SMLV, auxilio de transporte, etc.) — usados para prellenar el
+  // salario base y mostrar el auxilio de transporte al crear/editar un trabajador.
+  current: () => client.get('/labor-parameters/current').then((r) => r.data),
+};
+
+// Catálogo de EPS/fondos de pensión/ARL (ver socialSecurityProviderController.js): precargado con
+// las entidades colombianas más comunes, con opción de crear una nueva si no está en la lista.
+export const socialSecurityProvidersApi = {
+  list: (type) => client.get('/social-security-providers', { params: { type } }).then((r) => r.data),
+  create: (type, name) => client.post('/social-security-providers', { type, name }).then((r) => r.data),
 };
 
 export const companyApi = {
@@ -141,6 +151,16 @@ export const employeesApi = {
   severanceConfirm: (pid, id, data) => client.post(`/projects/${pid}/employees/${id}/severance`, data).then((r) => r.data),
   uploadPazYSalvo: (pid, id, formData) => client.post(`/projects/${pid}/employees/${id}/severance/paz-y-salvo`, formData).then((r) => r.data),
   uploadCedula: (pid, id, formData) => client.post(`/projects/${pid}/employees/${id}/cedula`, formData).then((r) => r.data),
+  // Cálculo en vivo (sin persistir) del valor del contrato para un rango de fechas — ver
+  // employeeController.js#previewContractValue.
+  previewContractValue: (pid, data) => client.post(`/projects/${pid}/employees/preview-contract-value`, data).then((r) => r.data),
+};
+
+// Cálculo y registro de pago de nómina por período — ver payrollController.js. preview() no
+// persiste nada; confirm() persiste el PaymentReceipt calculado y genera su PDF de soporte.
+export const payrollApi = {
+  preview: (pid, id, data) => client.post(`/projects/${pid}/employees/${id}/payroll/preview`, data).then((r) => r.data),
+  confirm: (pid, id, data) => client.post(`/projects/${pid}/employees/${id}/payroll/confirm`, data).then((r) => r.data),
 };
 
 export const employeeContractsApi = {

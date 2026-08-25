@@ -437,6 +437,7 @@
       "entryDate": "Entry date",
       "dedicationHours": "Dedication (hours)",
       "salary": "Monthly salary",
+      "salaryBase": "Base monthly salary",
       "contractFile": "Employment contract (file)",
       "table": {
         "name": "Name",
@@ -479,6 +480,21 @@
       "pensionFund": "Pension fund",
       "arl": "Occupational risk insurer (ARL)",
       "cedula": "ID document",
+      "providerSelect": {
+        "addNew": "+ Add new...",
+        "namePlaceholder": "Entity name"
+      },
+      "salaryHelp": {
+        "baseSalaryNote": "The salary entered is the base amount, before adding the transportation subsidy.",
+        "smlv": "Current minimum wage (SMLV)",
+        "auxTransporte": "Current transportation subsidy",
+        "auxTransporteNote": "applies for salaries up to 2x minimum wage; calculated separately",
+        "rangeDays": "Days in range: {{count}}",
+        "rangeBase": "Salary value for the range",
+        "rangeAux": "Transportation subsidy for the range",
+        "rangeTotal": "Total contract value",
+        "notApplicable": "not applicable"
+      },
       "socialSecurity": {
         "title": "Social Security (Health, ARL, Pension)",
         "type": "Type",
@@ -500,6 +516,7 @@
       },
       "payments": {
         "title": "Payment Receipts (Payroll)",
+        "manualTitle": "Upload manual receipt",
         "date": "Date",
         "period": "Period",
         "periodPlaceholder": "E.g.: July 2026",
@@ -511,9 +528,19 @@
           "date": "Date",
           "period": "Period",
           "amount": "Amount",
-          "file": "File"
+          "file": "File",
+          "pdf": "PDF"
         },
-        "empty": "No receipts."
+        "empty": "No receipts.",
+        "payroll": {
+          "title": "Calculate payroll payment for a period",
+          "periodStart": "Period start",
+          "periodEnd": "Period end",
+          "paymentDate": "Payment date",
+          "calculate": "Calculate",
+          "processing": "Processing...",
+          "confirmButton": "Confirm and generate PDF"
+        }
       },
       "breakdown": {
         "concept": "Concept",
@@ -536,6 +563,7 @@
         "processing": "Processing...",
         "confirmButton": "Confirm exit and generate settlement",
         "summaryTitle": "Severance Settlement (history)",
+        "viewPdf": "View settlement PDF report",
         "viewSigned": "View signed clearance",
         "uploadSigned": "Upload signed clearance"
       }

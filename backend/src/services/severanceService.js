@@ -1,22 +1,4 @@
-const { LaborParameters } = require('../models');
-
-// Convención colombiana de "año comercial" (360 días, meses de 30 días) usada por ley
-// para liquidar prestaciones sociales. días = (Δaños*360 + Δmeses*30 + Δdías) + 1 (inclusivo).
-function days360(start, end) {
-  const s = normalizeDay(start);
-  const e = normalizeDay(end);
-  const diff = (e.year - s.year) * 360 + (e.month - s.month) * 30 + (e.day - s.day);
-  return Math.max(diff + 1, 0);
-}
-
-function normalizeDay(date) {
-  const d = new Date(date);
-  return {
-    year: d.getUTCFullYear(),
-    month: d.getUTCMonth() + 1,
-    day: Math.min(d.getUTCDate(), 30),
-  };
-}
+const { days360, getEffectiveLaborParameters, computeAuxTransporte } = require('./laborCalculations');
 
 // Determina el inicio del semestre vigente a la fecha de retiro (para prima proporcional),
 // sin retroceder antes de la fecha de ingreso.
@@ -28,15 +10,6 @@ function semesterStart(entryDate, exitDate) {
   const start = exit.getUTCMonth() < 6 ? half1 : half2;
   const entry = new Date(entryDate);
   return entry > start ? entry : start;
-}
-
-async function getEffectiveLaborParameters(atDate) {
-  const params = await LaborParameters.findOne({
-    where: {},
-    order: [['effectiveDate', 'DESC']],
-  });
-  if (!params) throw new Error('No hay parámetros laborales configurados (LaborParameters)');
-  return params;
 }
 
 // Reglas de indemnización simplificadas y parametrizables (CST Art. 64, contrato a término indefinido).
@@ -65,8 +38,7 @@ function calculateIndemnizacion(cause, daysWorked, dailySalary, rules) {
 async function calculateSeverance({ salaryValue, entryDate, exitDate, cause }) {
   const params = await getEffectiveLaborParameters(exitDate);
 
-  const auxTransporteApplies = Number(salaryValue) <= Number(params.smlv) * Number(params.topeAuxTransporteSalarios);
-  const auxTransporte = auxTransporteApplies ? Number(params.auxTransporte) : 0;
+  const { applies: auxTransporteApplies, amount: auxTransporte } = computeAuxTransporte(salaryValue, params);
 
   const baseCesantiasYPrima = Number(salaryValue) + auxTransporte; // aux. transporte SÍ integra la base de cesantías y prima
   const baseVacaciones = Number(salaryValue); // vacaciones se liquidan sobre salario básico, sin aux. transporte

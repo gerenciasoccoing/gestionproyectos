@@ -6,6 +6,7 @@ const laborParametersController = require('../controllers/laborParametersControl
 router.use(authenticate);
 
 router.get('/', requirePermission('admin', 'view'), laborParametersController.list);
+router.get('/current', requirePermission('personal', 'view'), laborParametersController.current);
 router.post('/', requirePermission('admin', 'create'), laborParametersController.create);
 
 module.exports = router;

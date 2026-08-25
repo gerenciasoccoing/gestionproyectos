@@ -731,6 +731,57 @@ function generateContractPdf(content, company) {
   return doc;
 }
 
+// Reporte de un cálculo laboral desglosado por conceptos (nómina o liquidación) — ambos
+// servicios (payrollService.js#calculatePayroll, severanceService.js#calculateSeverance) devuelven
+// el mismo `breakdown.conceptos: [{concepto, formula, valor}]` + `breakdown.total`, así que un solo
+// generador cubre los dos reportes sin duplicar el layout.
+function generateLaborCalculationPdf({ title, employee, company, breakdown, meta }) {
+  const doc = new PDFDocument({ margin: 50 });
+
+  if (company && company.logoPath && require('fs').existsSync(company.logoPath)) {
+    try {
+      doc.image(company.logoPath, 50, 45, { width: 90 });
+    } catch (e) { /* si el logo no puede leerse, se omite sin romper la generación */ }
+  }
+  doc.fontSize(16).font('Helvetica-Bold').text(company ? company.companyName : 'Empresa', 160, 50);
+  doc.fontSize(9).font('Helvetica').fillColor('#555')
+    .text(company?.nit ? `NIT: ${company.nit}` : '', 160, 70)
+    .text(company?.address || '', 160, 84)
+    .text(company?.phone || '', 160, 98);
+  doc.fillColor('#000');
+
+  doc.moveDown(3);
+  doc.fontSize(15).font('Helvetica-Bold').text(title, { align: 'center' });
+  doc.moveDown(1);
+
+  doc.fontSize(10).font('Helvetica-Bold').text('Trabajador: ', { continued: true }).font('Helvetica').text(employee?.name || '-');
+  if (employee?.documentNumber) {
+    doc.font('Helvetica-Bold').text('Documento: ', { continued: true }).font('Helvetica').text(String(employee.documentNumber));
+  }
+  (meta || []).forEach(({ label, value }) => {
+    doc.font('Helvetica-Bold').text(`${label}: `, { continued: true }).font('Helvetica').text(String(value));
+  });
+  doc.moveDown(1);
+
+  sectionTitle(doc, 'Detalle del cálculo');
+  breakdown.conceptos.forEach((c) => {
+    if (doc.y > 700) doc.addPage();
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#000').text(c.concepto, { continued: true });
+    doc.font('Helvetica').text(`   ${money(c.valor)}`, { align: 'right' });
+    doc.font('Helvetica-Oblique').fontSize(8).fillColor('#555').text(c.formula);
+    doc.fillColor('#000').fontSize(10);
+    doc.moveDown(0.5);
+  });
+
+  doc.moveDown(0.5);
+  doc.strokeColor('#1f2937').moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+  doc.moveDown(0.5);
+  doc.font('Helvetica-Bold').fontSize(13).text(`TOTAL: ${money(breakdown.total)}`, { align: 'right' });
+
+  doc.end();
+  return doc;
+}
+
 module.exports = {
-  generateProjectReportPdf, generateQuotationPdf, generateApuPdf, generateBudgetWithApuAnnexPdf, generatePurchaseOrderPdf, generateContractPdf, money,
+  generateProjectReportPdf, generateQuotationPdf, generateApuPdf, generateBudgetWithApuAnnexPdf, generatePurchaseOrderPdf, generateContractPdf, generateLaborCalculationPdf, money,
 };

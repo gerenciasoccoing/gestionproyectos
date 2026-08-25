@@ -2,8 +2,19 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { sequelize, Employee, Severance, Expense } = require('../models');
 const { calculateSeverance } = require('../services/severanceService');
-const { relativePath } = require('../middleware/upload');
+const { relativePath, saveGeneratedFile } = require('../middleware/upload');
 const { assertCashBoxUsable, overdraftWarning } = require('../services/cashBoxService');
+const { getSettingsForPdf } = require('./companySettingsController');
+const { generateLaborCalculationPdf } = require('../services/pdfService');
+
+function pdfDocToBuffer(doc) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+  });
+}
 
 async function loadActiveEmployee(req) {
   const employee = await Employee.findOne({ where: { id: req.params.id, projectId: req.params.projectId } });
@@ -85,6 +96,21 @@ const confirmRetirement = asyncHandler(async (req, res) => {
     const w = await overdraftWarning(cashBoxId, { transaction: t });
     return { severance: created, warning: w };
   });
+
+  const company = await getSettingsForPdf();
+  const pdfBuffer = await pdfDocToBuffer(generateLaborCalculationPdf({
+    title: 'Liquidación de prestaciones sociales',
+    employee,
+    company,
+    breakdown: result.breakdown,
+    meta: [
+      { label: 'Fecha de retiro', value: exitDate },
+      { label: 'Causal', value: cause },
+      { label: 'Días trabajados', value: result.daysWorked },
+    ],
+  }));
+  severance.pdfFilePath = saveGeneratedFile(severance.companyId, 'severance-reports', `liquidacion-${severance.id}.pdf`, pdfBuffer);
+  await severance.save();
 
   res.status(201).json({ ...severance.toJSON(), warning });
 });

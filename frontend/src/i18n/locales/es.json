@@ -437,6 +437,7 @@
       "entryDate": "Fecha de ingreso",
       "dedicationHours": "Dedicación (horas)",
       "salary": "Salario mensual",
+      "salaryBase": "Salario mensual básico",
       "contractFile": "Contrato laboral (archivo)",
       "table": {
         "name": "Nombre",
@@ -479,6 +480,21 @@
       "pensionFund": "Fondo de pensión",
       "arl": "ARL",
       "cedula": "Cédula (documento)",
+      "providerSelect": {
+        "addNew": "+ Agregar nueva...",
+        "namePlaceholder": "Nombre de la entidad"
+      },
+      "salaryHelp": {
+        "baseSalaryNote": "El salario capturado es el básico, antes de sumar el auxilio de transporte.",
+        "smlv": "SMLV vigente",
+        "auxTransporte": "Auxilio de transporte vigente",
+        "auxTransporteNote": "aplica si el salario es de hasta 2 SMLV; se calcula aparte",
+        "rangeDays": "Días del rango: {{count}}",
+        "rangeBase": "Valor del salario en el rango",
+        "rangeAux": "Auxilio de transporte en el rango",
+        "rangeTotal": "Valor total del contrato",
+        "notApplicable": "no aplica"
+      },
       "socialSecurity": {
         "title": "Seguridad Social (Salud, ARL, Pensión)",
         "type": "Tipo",
@@ -500,6 +516,7 @@
       },
       "payments": {
         "title": "Comprobantes de Pago (Nómina)",
+        "manualTitle": "Subir comprobante manual",
         "date": "Fecha",
         "period": "Periodo",
         "periodPlaceholder": "Ej: Julio 2026",
@@ -511,9 +528,19 @@
           "date": "Fecha",
           "period": "Periodo",
           "amount": "Monto",
-          "file": "Archivo"
+          "file": "Archivo",
+          "pdf": "PDF"
         },
-        "empty": "Sin comprobantes."
+        "empty": "Sin comprobantes.",
+        "payroll": {
+          "title": "Calcular pago de nómina por período",
+          "periodStart": "Inicio del período",
+          "periodEnd": "Fin del período",
+          "paymentDate": "Fecha de pago",
+          "calculate": "Calcular",
+          "processing": "Procesando...",
+          "confirmButton": "Confirmar y generar PDF"
+        }
       },
       "breakdown": {
         "concept": "Concepto",
@@ -536,6 +563,7 @@
         "processing": "Procesando...",
         "confirmButton": "Confirmar retiro y generar liquidación",
         "summaryTitle": "Liquidación de Prestaciones Sociales (histórico)",
+        "viewPdf": "Ver reporte PDF de liquidación",
         "viewSigned": "Ver paz y salvo firmado",
         "uploadSigned": "Subir paz y salvo firmado"
       }
