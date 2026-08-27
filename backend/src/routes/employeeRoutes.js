@@ -36,5 +36,6 @@ router.post('/:id/severance/paz-y-salvo', requirePermission('personal', 'edit'),
 router.get('/:id/contracts', requirePermission('personal', 'view'), employeeContractController.list);
 router.post('/:id/contracts', requirePermission('personal', 'edit'), preventDuplicateSubmit, employeeContractController.generate);
 router.post('/:id/contracts/:contractId/otrosi', requirePermission('personal', 'edit'), preventDuplicateSubmit, employeeContractController.generateOtrosi);
+router.delete('/:id/contracts/:contractId', requirePermission('personal', 'delete'), employeeContractController.removeDocument);
 
 module.exports = router;

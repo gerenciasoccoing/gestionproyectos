@@ -594,6 +594,7 @@
       "newValue": "Nuevo valor (opcional)",
       "generateOtrosi": "Generar otrosí",
       "otrosiLabel": "Otrosí No.",
+      "confirmDelete": "¿Eliminar este documento? Esta acción no se puede deshacer.",
       "empty": "Sin contratos generados todavía.",
       "table": {
         "type": "Tipo",

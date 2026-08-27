@@ -594,6 +594,7 @@
       "newValue": "New value (optional)",
       "generateOtrosi": "Generate amendment",
       "otrosiLabel": "Amendment No.",
+      "confirmDelete": "Delete this document? This action cannot be undone.",
       "empty": "No contracts generated yet.",
       "table": {
         "type": "Type",

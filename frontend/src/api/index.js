@@ -178,6 +178,7 @@ export const employeeContractsApi = {
   list: (pid, employeeId) => client.get(`/projects/${pid}/employees/${employeeId}/contracts`).then((r) => r.data),
   generate: (pid, employeeId) => client.post(`/projects/${pid}/employees/${employeeId}/contracts`).then((r) => r.data),
   generateOtrosi: (pid, employeeId, contractId, data) => client.post(`/projects/${pid}/employees/${employeeId}/contracts/${contractId}/otrosi`, data).then((r) => r.data),
+  remove: (pid, employeeId, contractId) => client.delete(`/projects/${pid}/employees/${employeeId}/contracts/${contractId}`).then((r) => r.data),
 };
 
 export const expensesApi = {

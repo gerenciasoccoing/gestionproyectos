@@ -139,4 +139,23 @@ const generateOtrosi = asyncHandler(async (req, res) => {
   res.status(201).json(doc);
 });
 
-module.exports = { listContractTypes, list, generate, generateOtrosi };
+// Elimina un documento puntual del historial (contrato u otrosí). No toca al trabajador ni a
+// ningún otro documento — si otro otrosí depende de este como su parentDocumentId, se rechaza en
+// vez de romper esa cadena o cascadear el borrado.
+const removeDocument = asyncHandler(async (req, res) => {
+  const employee = await loadEmployee(req);
+  const doc = await EmployeeContractDocument.findOne({ where: { id: req.params.contractId, employeeId: employee.id } });
+  if (!doc) throw new ApiError(404, 'Documento no encontrado para este trabajador.');
+
+  const dependentCount = await EmployeeContractDocument.count({ where: { parentDocumentId: doc.id } });
+  if (dependentCount > 0) {
+    throw new ApiError(400, 'Este documento tiene un otrosí asociado. Elimina primero el otrosí antes de eliminar este documento.');
+  }
+
+  await doc.destroy();
+  res.status(204).send();
+});
+
+module.exports = {
+  listContractTypes, list, generate, generateOtrosi, removeDocument, renderAndPersist,
+};

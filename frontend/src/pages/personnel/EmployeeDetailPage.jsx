@@ -222,6 +222,7 @@ function ContractsSection({ projectId, employee, onChange }) {
   const [missingFields, setMissingFields] = useState([]);
   const [otrosiForm, setOtrosiForm] = useState({ newContractObject: '', newEndDate: '', newSalaryValue: '' });
   const [showOtrosi, setShowOtrosi] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const load = () => employeeContractsApi.list(projectId, employee.id).then(setDocs);
   useEffect(() => { load(); }, [projectId, employee.id]);
@@ -260,6 +261,20 @@ function ContractsSection({ projectId, employee, onChange }) {
     }
   });
 
+  const removeDoc = async (doc) => {
+    if (!window.confirm(t('personnel.contract.confirmDelete'))) return;
+    setError('');
+    setDeletingId(doc.id);
+    try {
+      await employeeContractsApi.remove(projectId, employee.id, doc.id);
+      load();
+    } catch (err) {
+      setError(extractError(err));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <Card title={t('personnel.contract.title')} actions={
       <Can module="personal" action="edit">
@@ -283,7 +298,7 @@ function ContractsSection({ projectId, employee, onChange }) {
           <Button type="submit" loading={submittingOtrosi}>{t('personnel.contract.generateOtrosi')}</Button>
         </form>
       )}
-      <Table columns={[t('personnel.contract.table.type'), t('personnel.contract.table.number'), t('personnel.contract.table.from'), t('personnel.contract.table.to'), t('personnel.contract.table.value'), t('personnel.contract.table.pdf'), t('personnel.contract.table.docx')]}>
+      <Table columns={[t('personnel.contract.table.type'), t('personnel.contract.table.number'), t('personnel.contract.table.from'), t('personnel.contract.table.to'), t('personnel.contract.table.value'), t('personnel.contract.table.pdf'), t('personnel.contract.table.docx'), '']}>
         {docs.map((d) => (
           <tr key={d.id} className="border-b border-gray-100">
             <td className="py-1 pr-3">{d.kind === 'otrosi' ? `${t('personnel.contract.otrosiLabel')} ${d.sequenceNumber}` : typeLabel(d.contractType)}</td>
@@ -293,9 +308,14 @@ function ContractsSection({ projectId, employee, onChange }) {
             <td className="py-1 pr-3">{money(d.valueAtIssue)}</td>
             <td className="py-1 pr-3">{d.pdfFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(d.pdfFilePath)} target="_blank" rel="noreferrer">PDF</a> : '-'}</td>
             <td className="py-1 pr-3">{d.docxFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(d.docxFilePath)} target="_blank" rel="noreferrer">Word</a> : '-'}</td>
+            <td className="py-1 pr-3 text-right">
+              <Can module="personal" action="delete">
+                <Button variant="danger" loading={deletingId === d.id} onClick={() => removeDoc(d)}>{t('common.delete')}</Button>
+              </Can>
+            </td>
           </tr>
         ))}
-        {docs.length === 0 && <tr><td colSpan={7} className="py-2 text-center text-gray-400">{t('personnel.contract.empty')}</td></tr>}
+        {docs.length === 0 && <tr><td colSpan={8} className="py-2 text-center text-gray-400">{t('personnel.contract.empty')}</td></tr>}
       </Table>
     </Card>
   );
