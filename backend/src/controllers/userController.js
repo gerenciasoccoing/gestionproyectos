@@ -3,6 +3,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { User, Role, Project, ProjectUser } = require('../models');
 const { assertWithinLimit } = require('../utils/planLimits');
+const { invalidateAuthCache } = require('../middleware/auth');
 
 const list = asyncHandler(async (req, res) => {
   const users = await User.findAll({
@@ -54,6 +55,10 @@ const update = asyncHandler(async (req, res) => {
   }
 
   const full = await User.findByPk(user.id, { include: [Role, Project] });
+  // El caché de auth.js guarda permisos/roles resueltos por hasta 45s (ver AUTH_CACHE_TTL_MS):
+  // sin invalidar acá, un cambio de rol o de estado activo/inactivo tardaría hasta ese tiempo en
+  // reflejarse para el usuario editado.
+  invalidateAuthCache();
   res.json(serializeUser(full));
 });
 
@@ -61,6 +66,7 @@ const remove = asyncHandler(async (req, res) => {
   const user = await User.findByPk(req.params.id);
   if (!user) throw new ApiError(404, 'Usuario no encontrado');
   await user.destroy();
+  invalidateAuthCache();
   res.status(204).send();
 });
 
@@ -72,6 +78,7 @@ const assignProjects = asyncHandler(async (req, res) => {
   const projects = await Project.findAll({ where: { id: projectIds } });
   await user.setProjects(projects);
   const full = await User.findByPk(user.id, { include: [Role, Project] });
+  invalidateAuthCache();
   res.json(serializeUser(full));
 });
 

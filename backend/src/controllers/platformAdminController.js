@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { PlatformAdmin, Company, User, Project, Role, SupportAccessLog, CompanyRegistrationRequest, PasswordResetToken } = require('../models');
+const { invalidateAuthCache } = require('../middleware/auth');
 // Este controlador atiende con un token de operador de plataforma, que nunca trae companyId (ver
 // signToken) — con la Capa 2 (RLS) activa, cualquier consulta a un modelo tenant-scoped (User,
 // Project...) desde la conexión restringida sin ese contexto devuelve 0 filas sin importar
@@ -97,6 +98,7 @@ const setCompanyStatus = asyncHandler(async (req, res) => {
   if (!company) throw new ApiError(404, 'Empresa no encontrada');
 
   await company.update({ active });
+  invalidateAuthCache();
   res.json({ id: company.id, companyName: company.companyName, active: company.active });
 });
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { laborParamsApi } from '../../api';
 import { Card, Button, Input, Table, ErrorText, extractError, money, formatDate } from '../../components/ui';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 const initialForm = {
   effectiveDate: '', smlv: '', auxTransporte: '', cesantiasDivisor: 360,
@@ -19,7 +20,7 @@ export default function LaborParametersPage() {
   const load = () => laborParamsApi.list().then(setParams);
   useEffect(() => { load(); }, []);
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     try {
@@ -30,7 +31,7 @@ export default function LaborParametersPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   return (
     <Card title={t('admin.laborParameters.title')} actions={
@@ -50,7 +51,7 @@ export default function LaborParametersPage() {
           <Input label={t('admin.laborParameters.primaDivisor')} type="number" min="1" step="0.01" value={form.primaDivisor} onChange={(e) => setForm({ ...form, primaDivisor: e.target.value })} />
           <Input label={t('admin.laborParameters.vacacionesDivisor')} type="number" min="1" step="0.01" value={form.vacacionesDivisor} onChange={(e) => setForm({ ...form, vacacionesDivisor: e.target.value })} />
           <Input label={t('admin.laborParameters.notes')} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="col-span-full" />
-          <Button type="submit" className="col-span-full">{t('admin.laborParameters.saveVersion')}</Button>
+          <Button type="submit" className="col-span-full" loading={submitting}>{t('admin.laborParameters.saveVersion')}</Button>
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}

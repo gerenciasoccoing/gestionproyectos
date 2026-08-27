@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { cashBoxesApi } from '../../api';
 import { Card, Button, Input, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import Can from '../../components/Can';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 const emptyForm = { name: '', initialBalance: '' };
 const emptyMovement = { amount: '', date: '', concept: '' };
@@ -21,7 +22,7 @@ export default function CashBoxesPage() {
   const load = () => cashBoxesApi.list().then(setCashBoxes);
   useEffect(() => { load(); }, []);
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     try {
@@ -32,7 +33,7 @@ export default function CashBoxesPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const toggleStatus = async (cashBox) => {
     const nextStatus = cashBox.status === 'activa' ? 'cerrada' : 'activa';
@@ -54,7 +55,7 @@ export default function CashBoxesPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
               <Input label={t('cashBoxes.fields.name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
               <Input label={t('cashBoxes.fields.initialBalance')} type="number" min="0" step="0.01" value={form.initialBalance} onChange={(e) => setForm({ ...form, initialBalance: e.target.value })} required />
-              <Button type="submit">{t('common.save')}</Button>
+              <Button type="submit" loading={submitting}>{t('common.save')}</Button>
             </div>
             <ErrorText>{error}</ErrorText>
           </form>
@@ -97,7 +98,7 @@ function CashBoxMovements({ cashBoxId, onChange }) {
   const load = () => cashBoxesApi.get(cashBoxId).then(setCashBox);
   useEffect(() => { load(); }, [cashBoxId]);
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     try {
@@ -108,7 +109,7 @@ function CashBoxMovements({ cashBoxId, onChange }) {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   if (!cashBox) return null;
   const canEdit = cashBox.status === 'activa';
@@ -121,7 +122,7 @@ function CashBoxMovements({ cashBoxId, onChange }) {
             <Input label={t('cashBoxes.fields.amount')} type="number" min="0.01" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
             <Input label={t('cashBoxes.fields.date')} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
             <Input label={t('cashBoxes.fields.concept')} value={form.concept} onChange={(e) => setForm({ ...form, concept: e.target.value })} className="min-w-[220px]" required />
-            <Button type="submit">{t('cashBoxes.registerIncome')}</Button>
+            <Button type="submit" loading={submitting}>{t('cashBoxes.registerIncome')}</Button>
           </form>
         </Can>
       )}

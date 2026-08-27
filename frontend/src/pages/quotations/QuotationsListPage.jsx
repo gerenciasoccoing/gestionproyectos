@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { quotationsApi, thirdPartiesApi } from '../../api';
 import { Card, Button, Input, SearchSelect, TextArea, Table, Badge, ErrorText, extractError, formatDate } from '../../components/ui';
 import Can from '../../components/Can';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 export default function QuotationsListPage() {
   const { t } = useTranslation();
@@ -25,7 +26,7 @@ export default function QuotationsListPage() {
     setForm((f) => ({ ...f, clientId, clientName: c ? c.name : f.clientName }));
   };
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     try {
@@ -36,7 +37,7 @@ export default function QuotationsListPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const statusColor = { borrador: 'gray', enviada: 'yellow', convertida: 'green' };
 
@@ -64,7 +65,7 @@ export default function QuotationsListPage() {
           <Input label={t('quotations.list.admin')} type="number" min="0" step="0.01" value={form.adminPercent} onChange={(e) => setForm({ ...form, adminPercent: e.target.value })} />
           <Input label={t('quotations.list.unforeseen')} type="number" min="0" step="0.01" value={form.imprevistosPercent} onChange={(e) => setForm({ ...form, imprevistosPercent: e.target.value })} />
           <Input label={t('quotations.list.profit')} type="number" min="0" step="0.01" value={form.utilidadPercent} onChange={(e) => setForm({ ...form, utilidadPercent: e.target.value })} />
-          <Button type="submit" className="col-span-full">{t('quotations.list.create')}</Button>
+          <Button type="submit" className="col-span-full" loading={submitting}>{t('quotations.list.create')}</Button>
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}

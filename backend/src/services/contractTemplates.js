@@ -67,6 +67,96 @@ function partiesBlock({ employee, company }) {
   return { docLabel, companyName: company.companyName, companyNit: company.nit, managerName: company.managerName || '(sin gerente configurado — ver Administración > Datos de la Empresa)' };
 }
 
+function row(label, value) {
+  return { label, value: value === undefined || value === null || value === '' ? '' : String(value) };
+}
+
+// Tabla de datos clave al inicio del contrato (etiqueta | valor), consumida tanto por
+// generateContractPdf como por contractDocService.js — misma fuente para los dos formatos, así
+// nunca quedan desincronizados. Todo se lee de lo ya capturado en el trabajador/subcontratista, el
+// documento de contrato recién creado (doc) y la empresa/consorcio del proyecto (company); nunca
+// se le vuelve a pedir al usuario al generar el documento.
+function buildPersonalInfoTable({ employee, company, project, doc, salaryLabel = 'Salario', endDateFallback }) {
+  return [
+    row('Nombre del empleador', company.companyName),
+    row('NIT', company.nit),
+    row('Domicilio del empleador', company.address),
+    row('Nombre del trabajador', employee.name),
+    row('Dirección del trabajador', employee.address),
+    row('Nacionalidad', employee.nationality),
+    row('Oficio que desempeñará el trabajador', employee.position),
+    row(salaryLabel, money(doc.valueAtIssue)),
+    row('Período de pago', 'Mensual'),
+    row('Fecha de iniciación de labores', formatDateEs(doc.effectiveFrom)),
+    row('Fecha de finalización de las actividades', doc.effectiveTo ? formatDateEs(doc.effectiveTo) : endDateFallback),
+    row('Lugar donde se desempeñarán las labores', project.name),
+    row('Ciudad donde ha sido contratado el trabajador', employee.city),
+    // Términos fijo/indefinido no exigen un objeto de obra/labor (contractObject es opcional para
+    // ellos, ver REQUIRED_FIELDS_BY_TYPE): si no se capturó, se describe con el oficio en vez de
+    // dejar la fila vacía.
+    row('Obra o labor contratada', doc.objectAtIssue || employee.position),
+  ];
+}
+
+function buildContractorInfoTable({ employee, company, project, doc, docLabel }) {
+  return [
+    row('Nombre del contratante', company.companyName),
+    row('NIT', company.nit),
+    row('Domicilio del contratante', company.address),
+    row('Nombre del contratista o subcontratista', employee.name),
+    row('Dirección', employee.address),
+    row('Documento de identidad', employee.documentNumber ? `${docLabel} No. ${employee.documentNumber}` : ''),
+    row('Honorarios o valor del contrato', money(doc.valueAtIssue)),
+    row('Período de pago', 'Mensual'),
+    row('Fecha de inicio', formatDateEs(doc.effectiveFrom)),
+    row('Fecha de terminación', formatDateEs(doc.effectiveTo)),
+    row('Lugar donde se prestará el servicio', project.name),
+    row('Ciudad donde ha sido contratado', employee.city),
+    row('Objeto del contrato', doc.objectAtIssue),
+  ];
+}
+
+function buildJuridicaInfoTable({ employee, company, project, doc }) {
+  return [
+    row('Nombre del contratante', company.companyName),
+    row('NIT', company.nit),
+    row('Domicilio del contratante', company.address),
+    row('Razón social del subcontratista', employee.subcontractorLegalName),
+    row('NIT del subcontratista', employee.subcontractorNit),
+    row('Representante legal', employee.subcontractorLegalRep),
+    row('Dirección', employee.address),
+    row('Valor del contrato', money(doc.valueAtIssue)),
+    row('Período de pago', 'Mensual'),
+    row('Fecha de inicio', formatDateEs(doc.effectiveFrom)),
+    row('Fecha de terminación', formatDateEs(doc.effectiveTo)),
+    row('Lugar donde se prestará el servicio', project.name),
+    row('Ciudad donde ha sido contratado', employee.city),
+    row('Objeto del contrato', doc.objectAtIssue),
+  ];
+}
+
+// Otrosí: misma tabla del contrato ORIGINAL (parent), con las filas que cambian marcadas
+// (changed: true) y mostrando "valor anterior -> NUEVO: valor nuevo" para que el cambio salte a la
+// vista sin perder el dato original.
+function buildOtrosiInfoTable({ employee, company, project, parent, changes }) {
+  const base = buildPersonalInfoTable({
+    employee, company, project, doc: parent,
+    endDateFallback: 'Hasta la finalización de la obra o labor contratada',
+  });
+  return base.map((r) => {
+    if (r.label === 'Obra o labor contratada' && changes.newContractObject) {
+      return { label: r.label, value: `${r.value} -> NUEVO: ${changes.newContractObject}`, changed: true };
+    }
+    if (r.label === 'Fecha de finalización de las actividades' && changes.newEndDate) {
+      return { label: r.label, value: `${r.value} -> NUEVO: ${formatDateEs(changes.newEndDate)}`, changed: true };
+    }
+    if (r.label === 'Salario' && changes.newSalaryValue) {
+      return { label: r.label, value: `${r.value} -> NUEVO: ${money(changes.newSalaryValue)}`, changed: true };
+    }
+    return r;
+  });
+}
+
 const CONFIDENTIALITY_CLAUSE = (partyLabel) => `${partyLabel} se obliga a guardar reserva sobre la información técnica, comercial, financiera y de clientes de la contraparte a la que tenga acceso con ocasión de la ejecución de este contrato, tanto durante su vigencia como después de su terminación, absteniéndose de divulgarla o usarla en beneficio propio o de terceros.`;
 
 const DATA_PROTECTION_CLAUSE = (partyLabel) => `${partyLabel} autoriza el tratamiento de sus datos personales (incluyendo datos sensibles de salud cuando sea necesario) para la gestión de este contrato, nómina, seguridad social y cumplimiento de obligaciones legales, conforme a la Ley 1581 de 2012, pudiendo ejercer en cualquier momento sus derechos de acceso, corrección y supresión.`;
@@ -75,6 +165,7 @@ function buildObraLabor({ employee, company, project, doc }) {
   const p = partiesBlock({ employee, company });
   return {
     documentTitle: 'CONTRATO INDIVIDUAL DE TRABAJO POR OBRA O LABOR CONTRATADA',
+    infoTable: buildPersonalInfoTable({ employee, company, project, doc, endDateFallback: 'Hasta la finalización de la obra o labor contratada' }),
     intro: `Entre los suscritos, ${p.companyName}, sociedad identificada con NIT ${p.companyNit}, representada legalmente por ${p.managerName} (en adelante "EL EMPLEADOR"), y ${employee.name}, identificado(a) con ${p.docLabel} No. ${employee.documentNumber}, domiciliado(a) en ${employee.address}, ${employee.city} (en adelante "EL TRABAJADOR"), se celebra el presente Contrato Individual de Trabajo por Obra o Labor Contratada, regido por las siguientes cláusulas:`,
     clauses: [
       { heading: 'PRIMERA — Objeto.', body: `EL TRABAJADOR se obliga a prestar sus servicios personales como ${employee.position} para la ejecución de la obra o labor determinada: "${doc.objectAtIssue}", dentro del proyecto ${project.name}, bajo la continuada dependencia y subordinación de EL EMPLEADOR.` },
@@ -105,6 +196,7 @@ function buildOtrosi({ employee, company, project, doc, changes }) {
 
   return {
     documentTitle: `OTROSÍ No. ${doc.sequenceNumber} AL CONTRATO DE TRABAJO POR OBRA O LABOR`,
+    infoTable: buildOtrosiInfoTable({ employee, company, project, parent, changes }),
     intro: `Entre ${p.companyName}, NIT ${p.companyNit}, representada legalmente por ${p.managerName} (EL EMPLEADOR), y ${employee.name}, identificado(a) con ${p.docLabel} No. ${employee.documentNumber} (EL TRABAJADOR), quienes suscribieron el Contrato Individual de Trabajo por Obra o Labor Contratada para la obra/labor "${parent.objectAtIssue}", acuerdan modificarlo mediante el presente Otrosí, así:`,
     clauses: [
       { heading: 'PRIMERA — Antecedente.', body: 'El contrato original sigue plenamente vigente en todo lo no modificado por este otrosí.' },
@@ -129,6 +221,7 @@ function buildTerminoFijoOIndefinido({ employee, company, project, doc }, indefi
 
   return {
     documentTitle: indefinido ? 'CONTRATO INDIVIDUAL DE TRABAJO A TÉRMINO INDEFINIDO' : 'CONTRATO INDIVIDUAL DE TRABAJO A TÉRMINO FIJO',
+    infoTable: buildPersonalInfoTable({ employee, company, project, doc, endDateFallback: 'Indefinida' }),
     intro: `Entre ${p.companyName}, NIT ${p.companyNit}, representada legalmente por ${p.managerName} (EL EMPLEADOR), y ${employee.name}, identificado(a) con ${p.docLabel} No. ${employee.documentNumber}, domiciliado(a) en ${employee.address}, ${employee.city} (EL TRABAJADOR), se celebra el presente contrato de trabajo:`,
     clauses: [
       { heading: 'PRIMERA — Objeto.', body: `EL TRABAJADOR prestará sus servicios personales como ${employee.position}, bajo continuada dependencia y subordinación de EL EMPLEADOR, dentro del proyecto ${project.name}.` },
@@ -152,6 +245,7 @@ function buildAprendizaje({ employee, company, project, doc }) {
   const p = partiesBlock({ employee, company });
   return {
     documentTitle: 'CONTRATO DE APRENDIZAJE',
+    infoTable: buildPersonalInfoTable({ employee, company, project, doc, salaryLabel: 'Salario / Apoyo de sostenimiento', endDateFallback: 'No aplica' }),
     intro: `Entre ${p.companyName}, NIT ${p.companyNit}, representada legalmente por ${p.managerName} (en adelante "LA EMPRESA PATROCINADORA"), y ${employee.name}, identificado(a) con ${p.docLabel} No. ${employee.documentNumber} (en adelante "EL APRENDIZ"), se celebra el presente Contrato de Aprendizaje, de conformidad con la Ley 789 de 2002. Este contrato no genera relación laboral ni salario, sino apoyo de sostenimiento, por tratarse de una forma especial de vinculación con fines de formación.`,
     clauses: [
       { heading: 'PRIMERA — Objeto.', body: `EL APRENDIZ desarrollará su etapa práctica mediante actividades de tipo formativo en el proyecto ${project.name}, en el cargo/función de ${employee.position}.` },
@@ -175,6 +269,7 @@ function buildPrestacionServicios({ employee, company, project, doc }) {
   const p = partiesBlock({ employee, company });
   return {
     documentTitle: 'CONTRATO DE PRESTACIÓN DE SERVICIOS',
+    infoTable: buildContractorInfoTable({ employee, company, project, doc, docLabel: p.docLabel }),
     intro: `Entre ${p.companyName}, NIT ${p.companyNit}, representada legalmente por ${p.managerName} (en adelante "EL CONTRATANTE"), y ${employee.name}, identificado(a) con ${p.docLabel} No. ${employee.documentNumber}, domiciliado(a) en ${employee.address}, ${employee.city} (en adelante "EL CONTRATISTA"), se celebra el presente Contrato de Prestación de Servicios, de naturaleza civil. Este contrato NO constituye relación laboral ni genera subordinación, prestaciones sociales ni relación de dependencia.`,
     clauses: [
       { heading: 'PRIMERA — Objeto.', body: `EL CONTRATISTA se obliga, de manera independiente y autónoma, a prestar a EL CONTRATANTE el servicio de: "${doc.objectAtIssue}", relacionado con el proyecto ${project.name}, empleando sus propios medios, conocimiento técnico y sin sujeción a horario ni subordinación laboral alguna.` },
@@ -198,6 +293,7 @@ function buildSubcontratistaNatural({ employee, company, project, doc }) {
   const p = partiesBlock({ employee, company });
   return {
     documentTitle: 'CONTRATO DE SUBCONTRATACIÓN — PERSONA NATURAL',
+    infoTable: buildContractorInfoTable({ employee, company, project, doc, docLabel: p.docLabel }),
     intro: `Entre ${p.companyName}, NIT ${p.companyNit}, representada legalmente por ${p.managerName} (en adelante "EL CONTRATANTE"), y ${employee.name}, identificado(a) con ${p.docLabel} No. ${employee.documentNumber}, domiciliado(a) en ${employee.address}, ${employee.city} (en adelante "EL SUBCONTRATISTA"), se celebra el presente Contrato de Subcontratación.`,
     clauses: [
       { heading: 'PRIMERA — Objeto.', body: `EL SUBCONTRATISTA se obliga a ejecutar, de manera independiente y con sus propios medios, la siguiente labor dentro del proyecto ${project.name}: "${doc.objectAtIssue}".` },
@@ -222,6 +318,7 @@ function buildSubcontratistaJuridica({ employee, company, project, doc }) {
   const p = partiesBlock({ employee, company });
   return {
     documentTitle: 'CONTRATO DE SUBCONTRATACIÓN — PERSONA JURÍDICA',
+    infoTable: buildJuridicaInfoTable({ employee, company, project, doc }),
     intro: `Entre ${p.companyName}, NIT ${p.companyNit}, representada legalmente por ${p.managerName} (en adelante "EL CONTRATANTE"), y ${employee.subcontractorLegalName}, sociedad identificada con NIT ${employee.subcontractorNit}, representada legalmente por ${employee.subcontractorLegalRep}, identificado(a) con ${p.docLabel} No. ${employee.documentNumber} (en adelante "EL SUBCONTRATISTA"), se celebra el presente Contrato de Subcontratación.`,
     clauses: [
       { heading: 'PRIMERA — Objeto.', body: `EL SUBCONTRATISTA se obliga a ejecutar, con su propio personal, equipos y medios, la siguiente labor dentro del proyecto ${project.name}: "${doc.objectAtIssue}".` },

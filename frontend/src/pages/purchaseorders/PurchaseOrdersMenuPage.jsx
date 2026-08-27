@@ -4,6 +4,7 @@ import { supplierPurchaseOrdersApi, thirdPartiesApi, projectsApi, budgetApi, cas
 import { Card, Button, Input, Select, SearchSelect, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { purchaseOrderPdfUrl } from '../../api/client';
 import Can from '../../components/Can';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 const STATUS_COLORS = { abierta: 'yellow', parcial: 'blue', cerrada: 'green', cerrada_con_faltantes: 'red' };
 const CATEGORIES = ['mano_obra', 'materiales', 'equipos', 'viaticos', 'imprevistos'];
@@ -69,7 +70,7 @@ export default function PurchaseOrdersMenuPage() {
     setForm((f) => ({ ...f, supplierId, supplier: s ? s.name : f.supplier }));
   };
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     if (!form.cashBoxId) { setError(t('expenses.cashBoxRequired')); return; }
@@ -89,7 +90,7 @@ export default function PurchaseOrdersMenuPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const startEditOrder = (order) => {
     setEditingOrderId(order.id);
@@ -225,7 +226,7 @@ export default function PurchaseOrdersMenuPage() {
               </div>
             ))}
             <Button type="button" variant="secondary" onClick={addRow}>{t('execution.purchaseOrders.addRow')}</Button>
-            <Button type="submit" className="ml-2">{t('execution.purchaseOrders.createOrder')}</Button>
+            <Button type="submit" className="ml-2" loading={submitting}>{t('execution.purchaseOrders.createOrder')}</Button>
             <ErrorText>{error}</ErrorText>
           </form>
         )}

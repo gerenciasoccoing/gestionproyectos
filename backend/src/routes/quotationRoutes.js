@@ -1,22 +1,23 @@
 const router = require('express').Router();
 const { authenticate } = require('../middleware/auth');
 const { requirePermission } = require('../middleware/authorize');
+const { preventDuplicateSubmit } = require('../middleware/idempotency');
 const quotationController = require('../controllers/quotationController');
 
 router.use(authenticate);
 
 router.get('/', requirePermission('cotizaciones', 'view'), quotationController.list);
-router.post('/', requirePermission('cotizaciones', 'create'), quotationController.create);
+router.post('/', requirePermission('cotizaciones', 'create'), preventDuplicateSubmit, quotationController.create);
 router.get('/:id', requirePermission('cotizaciones', 'view'), quotationController.get);
 router.put('/:id', requirePermission('cotizaciones', 'edit'), quotationController.update);
 router.put('/:id/budget-aiu', requirePermission('cotizaciones', 'edit'), quotationController.updateAiu);
 router.delete('/:id', requirePermission('cotizaciones', 'delete'), quotationController.remove);
-router.post('/:id/items', requirePermission('cotizaciones', 'edit'), quotationController.addItem);
+router.post('/:id/items', requirePermission('cotizaciones', 'edit'), preventDuplicateSubmit, quotationController.addItem);
 router.put('/:id/items/:itemId', requirePermission('cotizaciones', 'edit'), quotationController.updateItem);
 router.delete('/:id/items/:itemId', requirePermission('cotizaciones', 'edit'), quotationController.removeItem);
 router.get('/:id/pdf', requirePermission('cotizaciones', 'view'), quotationController.exportPdf);
 router.post('/:id/export-pdf', requirePermission('cotizaciones', 'view'), quotationController.exportBudgetPdf);
 router.post('/:id/export-excel', requirePermission('cotizaciones', 'view'), quotationController.exportBudgetExcel);
-router.post('/:id/convert', requirePermission('cotizaciones', 'edit'), quotationController.convert);
+router.post('/:id/convert', requirePermission('cotizaciones', 'edit'), preventDuplicateSubmit, quotationController.convert);
 
 module.exports = router;

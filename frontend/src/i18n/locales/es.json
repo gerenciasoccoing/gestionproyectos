@@ -483,6 +483,7 @@
       "address": "Dirección",
       "city": "Ciudad",
       "phone": "Teléfono",
+      "nationality": "Nacionalidad",
       "eps": "EPS",
       "pensionFund": "Fondo de pensión",
       "arl": "ARL",

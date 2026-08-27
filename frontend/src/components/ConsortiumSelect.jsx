@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { consortiumsApi } from '../api';
 import { Select, Input, Button, extractError } from './ui';
 import { useAuth } from '../context/AuthContext';
+import useSubmitGuard from '../hooks/useSubmitGuard';
 
 const ADD_NEW = '__add_new__';
 const EMPTY_NEW = { name: '', nit: '', address: '', phone: '', legalRepName: '' };
@@ -35,7 +36,7 @@ export default function ConsortiumSelect({ value, onChange }) {
     }
   };
 
-  const submitNew = async () => {
+  const [submitNew, submitting] = useSubmitGuard(async () => {
     if (!form.name.trim()) return;
     setError('');
     try {
@@ -48,7 +49,7 @@ export default function ConsortiumSelect({ value, onChange }) {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   if (adding) {
     return (
@@ -63,7 +64,7 @@ export default function ConsortiumSelect({ value, onChange }) {
         </div>
         <p className="text-xs text-gray-400">{t('projects.consortium.logoLaterNote')}</p>
         <div className="flex gap-2">
-          <Button type="button" onClick={submitNew}>{t('common.save')}</Button>
+          <Button type="button" onClick={submitNew} loading={submitting}>{t('common.save')}</Button>
           <Button type="button" variant="secondary" onClick={() => setAdding(false)}>{t('common.cancel')}</Button>
         </div>
         {error && <span className="text-red-600 text-xs">{error}</span>}

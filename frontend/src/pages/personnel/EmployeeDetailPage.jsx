@@ -9,6 +9,7 @@ import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
 import ProviderSelect from '../../components/ProviderSelect';
 import ContractValueHelper from '../../components/ContractValueHelper';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 export default function EmployeeDetailPage() {
   const { t } = useTranslation();
@@ -80,7 +81,7 @@ function BasicDataSection({ projectId, employee, onChange }) {
       name: employee.name || '', entryDate: employee.entryDate || '',
       position: employee.position || '', salaryValue: employee.salaryValue || '', dedicationHours: employee.dedicationHours || '',
       documentType: employee.documentType || '', documentNumber: employee.documentNumber || '',
-      address: employee.address || '', city: employee.city || '', phone: employee.phone || '',
+      address: employee.address || '', city: employee.city || '', phone: employee.phone || '', nationality: employee.nationality || 'Colombiana',
       contractType: employee.contractType || '', contractObject: employee.contractObject || '', contractEndDate: employee.contractEndDate || '',
       epsName: employee.epsName || '', pensionFundName: employee.pensionFundName || '', arlName: employee.arlName || '',
       subcontractorLegalName: employee.subcontractorLegalName || '', subcontractorNit: employee.subcontractorNit || '', subcontractorLegalRep: employee.subcontractorLegalRep || '',
@@ -129,6 +130,7 @@ function BasicDataSection({ projectId, employee, onChange }) {
           <div><span className="text-gray-500">{t('personnel.detail.documentType')}:</span> {employee.documentType ? `${employee.documentType} ${employee.documentNumber || ''}` : '-'}</div>
           <div><span className="text-gray-500">{t('personnel.detail.address')}:</span> {employee.address || '-'}{employee.city ? `, ${employee.city}` : ''}</div>
           <div><span className="text-gray-500">{t('personnel.detail.phone')}:</span> {employee.phone || '-'}</div>
+          <div><span className="text-gray-500">{t('personnel.detail.nationality')}:</span> {employee.nationality || '-'}</div>
           <div><span className="text-gray-500">{t('personnel.detail.eps')}:</span> {employee.epsName || '-'}</div>
           <div><span className="text-gray-500">{t('personnel.detail.pensionFund')}:</span> {employee.pensionFundName || '-'}</div>
           <div><span className="text-gray-500">{t('personnel.detail.arl')}:</span> {employee.arlName || '-'}</div>
@@ -174,6 +176,7 @@ function BasicDataSection({ projectId, employee, onChange }) {
           <Input label={t('personnel.detail.address')} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
           <Input label={t('personnel.detail.city')} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
           <Input label={t('personnel.detail.phone')} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <Input label={t('personnel.detail.nationality')} value={form.nationality} onChange={(e) => setForm({ ...form, nationality: e.target.value })} />
 
           <Input label={t('personnel.contract.object')} value={form.contractObject} onChange={(e) => setForm({ ...form, contractObject: e.target.value })} className="lg:col-span-2" />
           {NEEDS_END_DATE.has(form.contractType) && (
@@ -217,7 +220,6 @@ function ContractsSection({ projectId, employee, onChange }) {
   const [contractTypes, setContractTypes] = useState([]);
   const [error, setError] = useState('');
   const [missingFields, setMissingFields] = useState([]);
-  const [generating, setGenerating] = useState(false);
   const [otrosiForm, setOtrosiForm] = useState({ newContractObject: '', newEndDate: '', newSalaryValue: '' });
   const [showOtrosi, setShowOtrosi] = useState(false);
 
@@ -227,20 +229,18 @@ function ContractsSection({ projectId, employee, onChange }) {
 
   const typeLabel = (value) => contractTypes.find((ct) => ct.value === value)?.label || value;
 
-  const generate = async () => {
-    setError(''); setMissingFields([]); setGenerating(true);
+  const [generate, generating] = useSubmitGuard(async () => {
+    setError(''); setMissingFields([]);
     try {
       await employeeContractsApi.generate(projectId, employee.id);
       load();
     } catch (err) {
       setError(extractError(err));
       setMissingFields(err?.response?.data?.details?.missingFields || []);
-    } finally {
-      setGenerating(false);
     }
-  };
+  });
 
-  const submitOtrosi = async (e) => {
+  const [submitOtrosi, submittingOtrosi] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     const last = docs[docs.length - 1];
@@ -258,7 +258,7 @@ function ContractsSection({ projectId, employee, onChange }) {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   return (
     <Card title={t('personnel.contract.title')} actions={
@@ -267,7 +267,7 @@ function ContractsSection({ projectId, employee, onChange }) {
           {employee.contractType === 'obra_labor' && docs.length > 0 && (
             <Button variant="secondary" onClick={() => setShowOtrosi((s) => !s)}>{showOtrosi ? t('common.cancel') : t('personnel.contract.newOtrosi')}</Button>
           )}
-          <Button onClick={generate} disabled={generating}>{generating ? t('personnel.contract.generating') : t('personnel.contract.generate')}</Button>
+          <Button onClick={generate} loading={generating}>{generating ? t('personnel.contract.generating') : t('personnel.contract.generate')}</Button>
         </div>
       </Can>
     }>
@@ -280,7 +280,7 @@ function ContractsSection({ projectId, employee, onChange }) {
           <Input label={t('personnel.contract.newObject')} value={otrosiForm.newContractObject} onChange={(e) => setOtrosiForm({ ...otrosiForm, newContractObject: e.target.value })} />
           <Input label={t('personnel.contract.newEndDate')} type="date" value={otrosiForm.newEndDate} onChange={(e) => setOtrosiForm({ ...otrosiForm, newEndDate: e.target.value })} />
           <Input label={t('personnel.contract.newValue')} type="number" min="0" step="0.01" value={otrosiForm.newSalaryValue} onChange={(e) => setOtrosiForm({ ...otrosiForm, newSalaryValue: e.target.value })} />
-          <Button type="submit">{t('personnel.contract.generateOtrosi')}</Button>
+          <Button type="submit" loading={submittingOtrosi}>{t('personnel.contract.generateOtrosi')}</Button>
         </form>
       )}
       <Table columns={[t('personnel.contract.table.type'), t('personnel.contract.table.number'), t('personnel.contract.table.from'), t('personnel.contract.table.to'), t('personnel.contract.table.value'), t('personnel.contract.table.pdf'), t('personnel.contract.table.docx')]}>
@@ -307,7 +307,7 @@ function SocialSecuritySection({ projectId, employee, onChange }) {
   const [file, setFile] = useState(null);
   const [error, setError] = useState('');
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     if (!file) { setError(t('personnel.detail.socialSecurity.missingFile')); return; }
@@ -322,7 +322,7 @@ function SocialSecuritySection({ projectId, employee, onChange }) {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   return (
     <Card title={t('personnel.detail.socialSecurity.title')}>
@@ -335,7 +335,7 @@ function SocialSecuritySection({ projectId, employee, onChange }) {
           </Select>
           <Input label={t('personnel.detail.socialSecurity.date')} type="date" value={form.uploadDate} onChange={(e) => setForm({ ...form, uploadDate: e.target.value })} />
           <Input label={t('personnel.detail.socialSecurity.file')} type="file" onChange={(e) => setFile(e.target.files[0])} required />
-          <Button type="submit">{t('personnel.detail.socialSecurity.attach')}</Button>
+          <Button type="submit" loading={submitting}>{t('personnel.detail.socialSecurity.attach')}</Button>
         </form>
         <ErrorText>{error}</ErrorText>
       </Can>
@@ -360,7 +360,6 @@ function PayrollCalculator({ projectId, employee, onChange }) {
   const [form, setForm] = useState({ periodStart: '', periodEnd: '', paymentDate: '' });
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
-  const [confirming, setConfirming] = useState(false);
 
   const doPreview = async (e) => {
     e.preventDefault();
@@ -374,8 +373,7 @@ function PayrollCalculator({ projectId, employee, onChange }) {
     }
   };
 
-  const confirm = async () => {
-    setConfirming(true);
+  const [confirm, confirming] = useSubmitGuard(async () => {
     setError('');
     try {
       await payrollApi.confirm(projectId, employee.id, form);
@@ -384,10 +382,8 @@ function PayrollCalculator({ projectId, employee, onChange }) {
       onChange();
     } catch (err) {
       setError(extractError(err));
-    } finally {
-      setConfirming(false);
     }
-  };
+  });
 
   return (
     <div className="mb-4 pb-4 border-b">
@@ -404,7 +400,7 @@ function PayrollCalculator({ projectId, employee, onChange }) {
           <BreakdownTable breakdown={preview.breakdown} />
           <div className="flex items-center justify-between mt-2">
             <p className="font-bold">{t('common.total')}: {money(preview.total)}</p>
-            <Button onClick={confirm} disabled={confirming}>
+            <Button onClick={confirm} loading={confirming}>
               {confirming ? t('personnel.detail.payments.payroll.processing') : t('personnel.detail.payments.payroll.confirmButton')}
             </Button>
           </div>
@@ -420,7 +416,7 @@ function PaymentsSection({ projectId, employee, onChange }) {
   const [file, setFile] = useState(null);
   const [error, setError] = useState('');
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     if (!file) { setError(t('personnel.detail.payments.missingFile')); return; }
@@ -435,7 +431,7 @@ function PaymentsSection({ projectId, employee, onChange }) {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   return (
     <Card title={t('personnel.detail.payments.title')}>
@@ -447,7 +443,7 @@ function PaymentsSection({ projectId, employee, onChange }) {
           <Input label={t('personnel.detail.payments.period')} placeholder={t('personnel.detail.payments.periodPlaceholder')} value={form.periodLabel} onChange={(e) => setForm({ ...form, periodLabel: e.target.value })} required />
           <Input label={t('personnel.detail.payments.amount')} type="number" min="0" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
           <Input label={t('personnel.detail.payments.receipt')} type="file" onChange={(e) => setFile(e.target.files[0])} required />
-          <Button type="submit" className="col-span-full">{t('personnel.detail.payments.attach')}</Button>
+          <Button type="submit" className="col-span-full" loading={submitting}>{t('personnel.detail.payments.attach')}</Button>
         </form>
         <ErrorText>{error}</ErrorText>
       </Can>
@@ -489,7 +485,6 @@ function SeveranceSection({ projectId, employee, onChange }) {
   const [form, setForm] = useState({ exitDate: '', cause: 'renuncia', cashBoxId: '' });
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
-  const [confirming, setConfirming] = useState(false);
   const [warning, setWarning] = useState('');
   const [cashBoxes, setCashBoxes] = useState([]);
 
@@ -507,10 +502,9 @@ function SeveranceSection({ projectId, employee, onChange }) {
     }
   };
 
-  const confirm = async () => {
+  const [confirm, confirming] = useSubmitGuard(async () => {
     if (!form.cashBoxId) { setError(t('personnel.detail.severance.cashBoxRequired')); return; }
     if (!window.confirm(t('personnel.detail.severance.confirmDialog'))) return;
-    setConfirming(true);
     setError('');
     setWarning('');
     try {
@@ -519,10 +513,8 @@ function SeveranceSection({ projectId, employee, onChange }) {
       onChange();
     } catch (err) {
       setError(extractError(err));
-    } finally {
-      setConfirming(false);
     }
-  };
+  });
 
   return (
     <Card title={t('personnel.detail.severance.title')}>
@@ -551,7 +543,7 @@ function SeveranceSection({ projectId, employee, onChange }) {
           <p className="text-right font-bold text-lg mt-2">{t('common.total')}: {money(preview.total)}</p>
           <Can module="personal" action="edit">
             <div className="text-right mt-2">
-              <Button variant="danger" onClick={confirm} disabled={confirming}>
+              <Button variant="danger" onClick={confirm} loading={confirming}>
                 {confirming ? t('personnel.detail.severance.processing') : t('personnel.detail.severance.confirmButton')}
               </Button>
             </div>

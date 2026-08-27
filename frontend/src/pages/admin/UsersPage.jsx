@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usersApi, rolesApi, projectsApi } from '../../api';
 import { Card, Button, Input, Table, ErrorText, extractError } from '../../components/ui';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 export default function UsersPage() {
   const { t } = useTranslation();
@@ -19,7 +20,7 @@ export default function UsersPage() {
     projectsApi.list().then(setProjects);
   }, []);
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     // El backend ya rechaza un alta sin roles (userController.js), pero se valida acá también para
@@ -33,7 +34,7 @@ export default function UsersPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const toggleRole = (roleId) => setForm((f) => ({
     ...f,
@@ -85,7 +86,7 @@ export default function UsersPage() {
               ))}
             </div>
           </div>
-          <Button type="submit" className="col-span-full">{t('admin.users.save')}</Button>
+          <Button type="submit" className="col-span-full" loading={submitting}>{t('admin.users.save')}</Button>
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}

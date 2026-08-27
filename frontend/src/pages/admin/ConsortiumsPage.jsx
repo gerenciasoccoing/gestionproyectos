@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { consortiumsApi } from '../../api';
 import { Card, Button, Input, Table, ErrorText, extractError } from '../../components/ui';
 import { fileUrl } from '../../api/client';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 const emptyForm = { name: '', nit: '', address: '', phone: '', legalRepName: '' };
 
@@ -38,7 +39,7 @@ export default function ConsortiumsPage() {
     setShowForm(true);
   };
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     try {
@@ -53,7 +54,7 @@ export default function ConsortiumsPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const remove = async (item) => {
     if (!window.confirm(t('admin.consortiums.confirmDelete', { name: item.name }))) return;
@@ -81,7 +82,7 @@ export default function ConsortiumsPage() {
           <Input label={t('admin.consortiums.address')} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
           <Input label={t('admin.consortiums.phone')} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           <Input label={t('admin.consortiums.logo')} type="file" accept="image/*" onChange={(e) => setLogo(e.target.files[0])} />
-          <Button type="submit" className="col-span-full w-fit">{editingId ? t('common.saveChanges') : t('common.save')}</Button>
+          <Button type="submit" className="col-span-full w-fit" loading={submitting}>{editingId ? t('common.saveChanges') : t('common.save')}</Button>
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}

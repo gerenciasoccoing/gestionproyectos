@@ -3,6 +3,7 @@ const path = require('path');
 const router = require('express').Router();
 const { authenticate } = require('../middleware/auth');
 const { requirePermission } = require('../middleware/authorize');
+const { preventDuplicateSubmit } = require('../middleware/idempotency');
 const priceItemController = require('../controllers/priceItemController');
 
 // Almacenamiento en memoria (no se persiste el archivo, solo se parsea y se descarta).
@@ -22,7 +23,7 @@ router.get('/import/template', requirePermission('cotizaciones', 'view'), priceI
 router.post('/import', requirePermission('cotizaciones', 'create'), importUpload.single('file'), priceItemController.importExcel);
 
 router.get('/', requirePermission('cotizaciones', 'view'), priceItemController.list);
-router.post('/', requirePermission('cotizaciones', 'create'), priceItemController.create);
+router.post('/', requirePermission('cotizaciones', 'create'), preventDuplicateSubmit, priceItemController.create);
 router.get('/:id', requirePermission('cotizaciones', 'view'), priceItemController.get);
 router.put('/:id', requirePermission('cotizaciones', 'edit'), priceItemController.update);
 router.put('/:id/value', requirePermission('cotizaciones', 'edit'), priceItemController.updateValue);

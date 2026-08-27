@@ -5,6 +5,7 @@ import { minutesApi } from '../../api';
 import { Card, Button, Input, Select, Table, ErrorText, extractError, Badge, formatDate } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 const TYPES = ['inicio', 'suspension', 'reinicio', 'terminacion', 'final', 'liquidacion'];
 
@@ -20,7 +21,7 @@ export default function MinutesPage() {
   const load = () => minutesApi.list(projectId).then(setMinutes);
   useEffect(() => { load(); }, [projectId]);
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     if (!file) { setError(t('execution.minutes.missingFile')); return; }
@@ -37,7 +38,7 @@ export default function MinutesPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const remove = async (id) => {
     if (!confirm(t('execution.minutes.confirmDelete'))) return;
@@ -58,7 +59,7 @@ export default function MinutesPage() {
           </Select>
           <Input label={t('execution.minutes.date')} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
           <Input label={t('execution.minutes.document')} type="file" accept=".pdf" onChange={(e) => setFile(e.target.files[0])} required />
-          <Button type="submit" className="col-span-full">{t('execution.minutes.save')}</Button>
+          <Button type="submit" className="col-span-full" loading={submitting}>{t('execution.minutes.save')}</Button>
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}

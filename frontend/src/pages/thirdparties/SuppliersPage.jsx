@@ -4,6 +4,7 @@ import { thirdPartiesApi, supplierPurchaseOrdersApi, projectsApi, budgetApi, cas
 import { Card, Button, Input, Select, SearchSelect, TextArea, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { fileUrl, purchaseOrderPdfUrl } from '../../api/client';
 import Can from '../../components/Can';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 const emptyForm = { name: '', nit: '', email: '', phone: '', address: '', contactName: '', notes: '' };
 const STATUS_COLORS = { abierta: 'yellow', parcial: 'blue', cerrada: 'green', cerrada_con_faltantes: 'red' };
@@ -54,7 +55,7 @@ export default function SuppliersPage() {
     setShowForm(true);
   };
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
 
@@ -81,7 +82,7 @@ export default function SuppliersPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const scanRutFile = async () => {
     if (!rutFile) return;
@@ -162,7 +163,7 @@ export default function SuppliersPage() {
                 onChange={(e) => setBankFile(e.target.files[0])}
                 className="col-span-full sm:col-span-1"
               />
-              <Button type="submit" className="col-span-full">{editingId ? t('thirdParties.saveChanges') : t('thirdParties.save')}</Button>
+              <Button type="submit" className="col-span-full" loading={submitting}>{editingId ? t('thirdParties.saveChanges') : t('thirdParties.save')}</Button>
               <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
             </div>
           </form>
@@ -247,7 +248,7 @@ function SupplierOrders({ supplier }) {
   const addRow = () => setForm((f) => ({ ...f, items: [...f.items, emptyOrderLine()] }));
   const removeRow = (idx) => setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     if (!form.cashBoxId) { setError(t('expenses.cashBoxRequired')); return; }
@@ -267,7 +268,7 @@ function SupplierOrders({ supplier }) {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const startEditOrder = (order) => {
     setEditingOrderId(order.id);
@@ -365,7 +366,7 @@ function SupplierOrders({ supplier }) {
             </div>
           ))}
           <Button type="button" variant="secondary" onClick={addRow}>{t('execution.purchaseOrders.addRow')}</Button>
-          <Button type="submit" className="ml-2">{t('execution.purchaseOrders.createOrder')}</Button>
+          <Button type="submit" className="ml-2" loading={submitting}>{t('execution.purchaseOrders.createOrder')}</Button>
           <ErrorText>{error}</ErrorText>
         </form>
       )}

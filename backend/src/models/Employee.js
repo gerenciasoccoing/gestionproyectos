@@ -50,6 +50,11 @@ module.exports = (sequelize) => {
     subcontractorLegalName: { type: DataTypes.STRING, allowNull: true },
     subcontractorNit: { type: DataTypes.STRING, allowNull: true },
     subcontractorLegalRep: { type: DataTypes.STRING, allowNull: true },
+    // Fila "Nacionalidad" de la tabla de datos clave al inicio de cada contrato (ver
+    // contractTemplates.js#buildInfoTable). Precargada al crear el trabajador, no se vuelve a
+    // pedir al generar el contrato. Trabajadores creados antes de este campo se backfillean en
+    // postSyncFixups.js.
+    nationality: { type: DataTypes.STRING, allowNull: true, defaultValue: 'Colombiana' },
   });
 
   Employee.associate = (models) => {

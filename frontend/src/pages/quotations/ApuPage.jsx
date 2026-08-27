@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { apuApi, priceItemsApi, companyApi } from '../../api';
 import { Card, Button, Input, Select, SearchSelect, Table, ErrorText, extractError, money } from '../../components/ui';
 import Can from '../../components/Can';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 function emptyRow(category, defaultPrestacionalPercent) {
   if (category === 'personal') {
@@ -229,7 +230,7 @@ export default function ApuPage() {
     return out;
   };
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     try {
@@ -242,7 +243,7 @@ export default function ApuPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const remove = async (id) => {
     if (!confirm(t('apu.catalog.confirmDelete'))) return;
@@ -381,7 +382,7 @@ export default function ApuPage() {
           </div>
 
           <div className="mt-3">
-            <Button type="submit">{editingId ? t('apu.catalog.saveChanges') : t('apu.catalog.save')}</Button>
+            <Button type="submit" loading={submitting}>{editingId ? t('apu.catalog.saveChanges') : t('apu.catalog.save')}</Button>
             <ErrorText>{error}</ErrorText>
           </div>
         </form>

@@ -4,6 +4,7 @@ import { thirdPartiesApi } from '../../api';
 import { Card, Button, Input, TextArea, Table, Badge, ErrorText, extractError, money } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 const emptyForm = { name: '', nit: '', email: '', phone: '', address: '', contactName: '', notes: '' };
 const STATUS_COLORS = { activo: 'green', suspendido: 'yellow', terminado: 'blue', liquidado: 'gray' };
@@ -49,7 +50,7 @@ export default function ClientsPage() {
     setShowForm(true);
   };
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
 
@@ -75,7 +76,7 @@ export default function ClientsPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const scanRutFile = async () => {
     if (!rutFile) return;
@@ -147,7 +148,7 @@ export default function ClientsPage() {
               <Input label={t('thirdParties.fields.address')} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
               <Input label={t('thirdParties.fields.contactName')} value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} />
               <TextArea label={t('thirdParties.fields.notes')} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="col-span-full" rows={2} />
-              <Button type="submit" className="col-span-full">{editingId ? t('thirdParties.saveChanges') : t('thirdParties.save')}</Button>
+              <Button type="submit" className="col-span-full" loading={submitting}>{editingId ? t('thirdParties.saveChanges') : t('thirdParties.save')}</Button>
               <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
             </div>
           </form>

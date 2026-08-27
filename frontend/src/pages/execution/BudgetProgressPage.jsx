@@ -5,6 +5,7 @@ import { budgetApi, progressApi, apuApi } from '../../api';
 import { Card, Button, Input, SearchSelect, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 export default function BudgetProgressPage() {
   const { t } = useTranslation();
@@ -74,7 +75,7 @@ export default function BudgetProgressPage() {
     }
   };
 
-  const submitItem = async (e) => {
+  const [submitItem, submittingItem] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     try {
@@ -88,7 +89,7 @@ export default function BudgetProgressPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   // La Descripción de un ítem basado en APU es siempre el nombre del APU (no se pide ni se
   // duplica a mano); solo se pide como texto libre cuando el ítem es manual (sin APU).
@@ -413,7 +414,7 @@ export default function BudgetProgressPage() {
             <Input label={t('execution.budget.items.unit')} value={itemForm.unit} onChange={(e) => setItemForm({ ...itemForm, unit: e.target.value })} required />
             <Input label={t('execution.budget.items.budgetedQty')} type="number" min="0" step="0.01" value={itemForm.quantity} onChange={(e) => setItemForm({ ...itemForm, quantity: e.target.value })} required />
             <Input label={t('execution.budget.items.unitValue')} type="number" min="0" step="0.01" value={itemForm.unitCost} onChange={(e) => setItemForm({ ...itemForm, unitCost: e.target.value })} disabled={!!itemForm.apuId} required />
-            <Button type="submit">{t('execution.budget.items.save')}</Button>
+            <Button type="submit" loading={submittingItem}>{t('execution.budget.items.save')}</Button>
             <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
           </form>
         )}
@@ -485,7 +486,7 @@ function ItemProgressPanel({ projectId, itemId, onChange }) {
   const load = () => progressApi.listEntries(projectId, itemId).then(setEntries);
   useEffect(() => { load(); }, [projectId, itemId]);
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError(''); setWarning('');
     try {
@@ -503,7 +504,7 @@ function ItemProgressPanel({ projectId, itemId, onChange }) {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const remove = async (entryId) => {
     if (!confirm(t('execution.budget.progress.confirmDelete'))) return;
@@ -520,7 +521,7 @@ function ItemProgressPanel({ projectId, itemId, onChange }) {
           <Input label={t('execution.budget.progress.executedQty')} type="number" min="0" step="0.01" value={form.quantityExecuted} onChange={(e) => setForm({ ...form, quantityExecuted: e.target.value })} required />
           <Input label={t('execution.budget.progress.notes')} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           <Input label={t('execution.budget.progress.photos')} type="file" accept="image/*" multiple onChange={(e) => setFiles(e.target.files)} />
-          <Button type="submit" className="col-span-full">{t('execution.budget.progress.register')}</Button>
+          <Button type="submit" className="col-span-full" loading={submitting}>{t('execution.budget.progress.register')}</Button>
           <div className="col-span-full">
             <ErrorText>{error}</ErrorText>
             {warning && <p className="text-sm text-yellow-600 mt-1">⚠ {warning}</p>}

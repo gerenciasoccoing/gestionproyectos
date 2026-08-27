@@ -54,7 +54,11 @@ export function Card({ title, actions, children, className = '' }) {
   );
 }
 
-export function Button({ children, variant = 'primary', className = '', ...props }) {
+// `loading`: deshabilita el botón y muestra un spinner inline mientras una petición está en
+// curso — pensado para usarse junto con useSubmitGuard.js (ver hooks/useSubmitGuard.js), así cada
+// formulario de creación solo necesita pasar `loading={submitting}` en vez de reinventar su
+// propio indicador de "guardando..." en cada sitio.
+export function Button({ children, variant = 'primary', className = '', loading = false, disabled, ...props }) {
   const variants = {
     primary: 'bg-blue-600 hover:bg-blue-700 text-white',
     secondary: 'bg-gray-200 hover:bg-gray-300 text-gray-800',
@@ -63,9 +67,16 @@ export function Button({ children, variant = 'primary', className = '', ...props
   };
   return (
     <button
-      className={`px-3 py-1.5 rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${className}`}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${className}`}
+      disabled={disabled || loading}
       {...props}
     >
+      {loading && (
+        <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      )}
       {children}
     </button>
   );

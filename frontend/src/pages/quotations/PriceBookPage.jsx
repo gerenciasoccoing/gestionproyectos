@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { priceItemsApi } from '../../api';
 import { Card, Button, Input, Select, Table, ErrorText, extractError, money } from '../../components/ui';
 import Can from '../../components/Can';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 const PAGE_SIZE = 50;
 
@@ -36,7 +37,7 @@ export default function PriceBookPage() {
 
   useEffect(() => { setPage(1); }, [search, typeFilter]);
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     try {
@@ -47,7 +48,7 @@ export default function PriceBookPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const updateValue = async (id) => {
     const value = editing[id];
@@ -85,7 +86,7 @@ export default function PriceBookPage() {
             <Input label={t('priceBook.name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
             <Input label={t('priceBook.unit')} value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} required />
             <Input label={t('priceBook.value')} type="number" min="0" step="0.01" value={form.currentValue} onChange={(e) => setForm({ ...form, currentValue: e.target.value })} required />
-            <Button type="submit" className="col-span-full">{t('common.save')}</Button>
+            <Button type="submit" className="col-span-full" loading={submitting}>{t('common.save')}</Button>
             <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
           </form>
         )}

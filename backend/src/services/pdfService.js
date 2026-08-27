@@ -695,10 +695,41 @@ function generatePurchaseOrderPdf({ order, items, company, lang = 'es', totals, 
   return doc;
 }
 
+// Tabla de datos clave (etiqueta | valor) al inicio del contrato — mismas filas y mismo orden que
+// dibuja contractDocService.js en Word, a partir de content.infoTable (ver
+// contractTemplates.js#buildPersonalInfoTable y afines). Las filas marcadas `changed` (otrosí) se
+// resaltan en negrita/color para que el cambio salte a la vista sin perder el valor original.
+function drawContractInfoTable(doc, infoTable) {
+  if (!infoTable || !infoTable.length) return;
+  const startX = 50;
+  const labelWidth = 220;
+  const valueWidth = 275;
+  const totalWidth = labelWidth + valueWidth;
+  doc.strokeColor('#cccccc');
+  infoTable.forEach((r) => {
+    doc.font('Helvetica-Bold').fontSize(9);
+    const labelHeight = doc.heightOfString(r.label, { width: labelWidth - 10 });
+    doc.font('Helvetica').fontSize(9);
+    const valueHeight = doc.heightOfString(r.value || '-', { width: valueWidth - 10 });
+    const rowHeight = Math.max(labelHeight, valueHeight) + 8;
+    if (doc.y + rowHeight > 760) doc.addPage();
+    const y = doc.y;
+    doc.rect(startX, y, totalWidth, rowHeight).stroke();
+    doc.moveTo(startX + labelWidth, y).lineTo(startX + labelWidth, y + rowHeight).stroke();
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#1f2937').text(r.label, startX + 5, y + 4, { width: labelWidth - 10 });
+    doc.font(r.changed ? 'Helvetica-Bold' : 'Helvetica').fontSize(9).fillColor(r.changed ? '#b45309' : '#000000')
+      .text(r.value || '-', startX + labelWidth + 5, y + 4, { width: valueWidth - 10 });
+    doc.y = y + rowHeight;
+  });
+  doc.strokeColor('#000000').fillColor('#000000').font('Helvetica');
+  doc.moveDown(1);
+}
+
 // Contrato/otrosí de personal: mismo membrete simple que cotizaciones/APU (logo + datos de la
-// empresa), cuerpo de párrafos justificados por cláusula, y firmas al final. `content` es la
-// estructura genérica que arma contractTemplates.js#buildContractContent — la misma que consume
-// contractDocService.js para el .docx, así que el texto legal vive en un solo lugar.
+// empresa), tabla de datos clave, cuerpo de párrafos justificados por cláusula, y firmas al final.
+// `content` es la estructura genérica que arma contractTemplates.js#buildContractContent — la
+// misma que consume contractDocService.js para el .docx, así que el texto legal vive en un solo
+// lugar.
 function generateContractPdf(content, company) {
   const doc = new PDFDocument({ margin: 50 });
 
@@ -717,6 +748,8 @@ function generateContractPdf(content, company) {
   doc.moveDown(3);
   doc.fontSize(15).font('Helvetica-Bold').text(content.documentTitle, { align: 'center' });
   doc.moveDown(1);
+
+  drawContractInfoTable(doc, content.infoTable);
 
   doc.fontSize(10).font('Helvetica').text(content.intro, { align: 'justify' });
   doc.moveDown(0.8);

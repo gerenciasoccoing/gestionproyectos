@@ -483,6 +483,7 @@
       "address": "Address",
       "city": "City",
       "phone": "Phone",
+      "nationality": "Nationality",
       "eps": "Health insurer (EPS)",
       "pensionFund": "Pension fund",
       "arl": "Occupational risk insurer (ARL)",

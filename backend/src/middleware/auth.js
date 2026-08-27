@@ -3,6 +3,33 @@ const ApiError = require('../utils/ApiError');
 const { sequelize, User, Role, Permission, Company, Project } = require('../models');
 const { runInTransactionContext } = require('../utils/tenantContext');
 
+// Caché corta en memoria de {empresa activa + usuario + roles + permisos + proyectos}, resuelto
+// hoy con un Company.findByPk + User.findByPk (con Role→Permission y Project anidados) en CADA
+// petición autenticada — el costo real detrás de la lentitud general de la app, no solo al
+// navegar. TTL corto (no Redis: un solo contenedor backend, no hay estado que compartir entre
+// instancias) para no volver obsoleto el permiso de nadie por mucho tiempo; además se invalida a
+// mano (invalidateAuthCache) en cualquier punto que cambie roles/permisos/estado activo — ver
+// userController.js, roleController.js, platformAdminController.js.
+const AUTH_CACHE_TTL_MS = 45_000;
+const authCache = new Map();
+
+function getCachedAuthData(companyId, userId) {
+  const entry = authCache.get(`${companyId}:${userId}`);
+  if (entry && entry.expiresAt > Date.now()) return entry.data;
+  return null;
+}
+
+function setCachedAuthData(companyId, userId, data) {
+  authCache.set(`${companyId}:${userId}`, { data, expiresAt: Date.now() + AUTH_CACHE_TTL_MS });
+}
+
+// Sin argumentos: limpia todo el caché. Son operaciones raras de administración (cambiar el rol
+// de un usuario, los permisos de un rol, o activar/desactivar una empresa) — invalidar todo es
+// más simple y seguro que rastrear con precisión a quién afecta cada cambio.
+function invalidateAuthCache() {
+  authCache.clear();
+}
+
 // Verifica el JWT y adjunta a req.user: { id, name, email, isAdmin, permissions: Set('modulo:accion'), projectIds }.
 // El companyId del token (puesto en el login, ver authController.signToken) ancla TODA la
 // petición a esa empresa: se abre acá el contexto de aislamiento multi-tenant en sus dos capas —
@@ -69,6 +96,12 @@ async function authenticate(req, res, next) {
     );
 
     await runInTransactionContext(payload.companyId, transaction, async () => {
+      const cached = getCachedAuthData(payload.companyId, payload.sub);
+      if (cached) {
+        req.user = { ...cached, companyId: payload.companyId };
+        return next();
+      }
+
       const company = await Company.findByPk(payload.companyId);
       if (!company || !company.active) throw new ApiError(403, 'Esta empresa no tiene acceso activo. Contacta al administrador de la plataforma.');
 
@@ -87,17 +120,19 @@ async function authenticate(req, res, next) {
         role.Permissions.forEach((p) => permissions.add(`${p.module}:${p.action}`));
       });
 
-      req.user = {
+      const authData = {
         id: user.id,
         name: user.name,
         email: user.email,
-        companyId: payload.companyId,
         isAdmin,
         permissions,
         roles: user.Roles.map((r) => r.name),
         projectIds: user.Projects.map((p) => p.id),
       };
-      next();
+      setCachedAuthData(payload.companyId, payload.sub, authData);
+
+      req.user = { ...authData, companyId: payload.companyId };
+      return next();
     });
   } catch (err) {
     await settle(false);
@@ -121,4 +156,4 @@ async function authenticate(req, res, next) {
   }
 }
 
-module.exports = { authenticate };
+module.exports = { authenticate, invalidateAuthCache };

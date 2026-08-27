@@ -6,10 +6,11 @@ import { Card, Button, Input, Select, Table, Badge, ErrorText, extractError, mon
 import Can from '../../components/Can';
 import ProviderSelect from '../../components/ProviderSelect';
 import ContractValueHelper from '../../components/ContractValueHelper';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 const EMPTY_FORM = {
   name: '', position: '', entryDate: '', dedicationHours: '', salaryValue: '',
-  documentType: '', documentNumber: '', address: '', city: '', phone: '',
+  documentType: '', documentNumber: '', address: '', city: '', phone: '', nationality: 'Colombiana',
   contractType: '', contractObject: '', contractEndDate: '',
   epsName: '', pensionFundName: '', arlName: '',
   subcontractorLegalName: '', subcontractorNit: '', subcontractorLegalRep: '',
@@ -46,7 +47,7 @@ export default function PersonnelListPage() {
     });
   };
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     try {
@@ -61,7 +62,7 @@ export default function PersonnelListPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const remove = async (emp) => {
     if (!window.confirm(t('personnel.detail.deleteConfirm', { name: emp.name }))) return;
@@ -120,6 +121,7 @@ export default function PersonnelListPage() {
           <Input label={t('personnel.detail.address')} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
           <Input label={t('personnel.detail.city')} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
           <Input label={t('personnel.detail.phone')} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <Input label={t('personnel.detail.nationality')} value={form.nationality} onChange={(e) => setForm({ ...form, nationality: e.target.value })} />
           <Input label={t('personnel.contract.object')} value={form.contractObject} onChange={(e) => setForm({ ...form, contractObject: e.target.value })} className="lg:col-span-2" />
           {NEEDS_END_DATE.has(form.contractType) && (
             <Input label={t('personnel.contract.endDate')} type="date" value={form.contractEndDate} onChange={(e) => setForm({ ...form, contractEndDate: e.target.value })} />
@@ -146,7 +148,7 @@ export default function PersonnelListPage() {
             </>
           )}
 
-          <Button type="submit" className="col-span-full">{t('common.save')}</Button>
+          <Button type="submit" className="col-span-full" loading={submitting}>{t('common.save')}</Button>
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}

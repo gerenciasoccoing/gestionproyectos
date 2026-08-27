@@ -61,7 +61,7 @@ const get = asyncHandler(async (req, res) => {
 // contractTemplates.js) — ninguno es obligatorio para crear/editar un trabajador; solo se exigen
 // al momento de generar un contrato según el tipo elegido (employeeContractController.js).
 const OPTIONAL_FIELDS = [
-  'documentNumber', 'address', 'city', 'phone', 'contractObject', 'contractEndDate',
+  'documentNumber', 'address', 'city', 'phone', 'contractObject', 'contractEndDate', 'nationality',
   'epsName', 'pensionFundName', 'arlName', 'subcontractorLegalName', 'subcontractorNit', 'subcontractorLegalRep',
 ];
 // ENUMs de Postgres: un '' del formulario no es un valor válido, hay que normalizarlo a null.

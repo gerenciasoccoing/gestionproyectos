@@ -6,6 +6,7 @@ import { Card, Button, Input, SearchSelect, Table, Badge, ErrorText, extractErro
 import Can from '../components/Can';
 import MotivationalBanner from '../components/MotivationalBanner';
 import ConsortiumSelect from '../components/ConsortiumSelect';
+import useSubmitGuard from '../hooks/useSubmitGuard';
 
 export default function ProjectsListPage() {
   const { t } = useTranslation();
@@ -26,7 +27,7 @@ export default function ProjectsListPage() {
     setForm((f) => ({ ...f, clientId, client: c ? c.name : f.client }));
   };
 
-  const handleCreate = async (e) => {
+  const [handleCreate, creating] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     try {
@@ -37,7 +38,7 @@ export default function ProjectsListPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const handleDelete = async (id) => {
     if (!confirm(t('projects.confirmDelete'))) return;
@@ -70,7 +71,7 @@ export default function ProjectsListPage() {
             <Input label={t('projects.client')} value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value, clientId: '' })} />
             <Input label={t('projects.description')} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             <ConsortiumSelect value={form.consortiumId} onChange={(v) => setForm({ ...form, consortiumId: v })} />
-            <Button type="submit">{t('common.save')}</Button>
+            <Button type="submit" loading={creating}>{t('common.save')}</Button>
           </form>
           <ErrorText>{error}</ErrorText>
         </Card>

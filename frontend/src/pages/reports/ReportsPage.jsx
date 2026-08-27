@@ -6,6 +6,7 @@ import { reportsApi, risksApi } from '../../api';
 import { Card, Button, Input, Select, TextArea, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 export default function ReportsPage() {
   const { t } = useTranslation();
@@ -126,7 +127,7 @@ function RisksSection({ projectId }) {
   const load = () => risksApi.list(projectId).then(setRisks);
   useEffect(() => { load(); }, [projectId]);
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     try {
@@ -137,7 +138,7 @@ function RisksSection({ projectId }) {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const updateStatus = async (id, status) => {
     await risksApi.update(projectId, id, { status });
@@ -169,7 +170,7 @@ function RisksSection({ projectId }) {
             <option value="media">{t('reports.risks.probabilityLevels.media')}</option>
             <option value="baja">{t('reports.risks.probabilityLevels.baja')}</option>
           </Select>
-          <Button type="submit">{t('common.save')}</Button>
+          <Button type="submit" loading={submitting}>{t('common.save')}</Button>
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}

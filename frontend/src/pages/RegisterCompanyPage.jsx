@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { companyRegistrationApi } from '../api';
 import { Button, Input, ErrorText, extractError } from '../components/ui';
 import Logo from '../components/Logo';
+import useSubmitGuard from '../hooks/useSubmitGuard';
 
 const emptyForm = { companyName: '', nit: '', contactName: '', contactEmail: '', phone: '' };
 
@@ -12,23 +13,19 @@ export default function RegisterCompanyPage() {
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
-  const handleSubmit = async (e) => {
+  const [handleSubmit, loading] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
     try {
       await companyRegistrationApi.create(form);
       setSent(true);
     } catch (err) {
       setError(extractError(err));
-    } finally {
-      setLoading(false);
     }
-  };
+  });
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 via-blue-50 to-slate-100 p-4">
@@ -53,7 +50,7 @@ export default function RegisterCompanyPage() {
                 <Input label={t('companyRegistration.contactEmail')} type="email" value={form.contactEmail} onChange={set('contactEmail')} required className="sm:col-span-2" />
               </div>
               <ErrorText>{error}</ErrorText>
-              <Button type="submit" className="w-full mt-6 py-2.5 rounded-lg" disabled={loading}>
+              <Button type="submit" className="w-full mt-6 py-2.5 rounded-lg" loading={loading}>
                 {loading ? t('companyRegistration.submitting') : t('companyRegistration.submit')}
               </Button>
             </form>

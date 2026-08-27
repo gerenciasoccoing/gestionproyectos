@@ -5,6 +5,7 @@ import { contractsApi, policiesApi } from '../../api';
 import { Card, Button, Input, Table, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 export default function ContractualPage() {
   const { projectId } = useOutletContext();
@@ -34,7 +35,7 @@ function ContractsSection({ projectId, contracts, onChange }) {
   const [scanNotice, setScanNotice] = useState('');
   const [error, setError] = useState('');
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     try {
@@ -50,7 +51,7 @@ function ContractsSection({ projectId, contracts, onChange }) {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const scanFile = async () => {
     if (!file) return;
@@ -101,7 +102,7 @@ function ContractsSection({ projectId, contracts, onChange }) {
           <Input label={t('contractual.contract.value')} type="number" min="0" step="0.01" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} required />
           <Input label={t('contractual.contract.signedDate')} type="date" value={form.signedDate} onChange={(e) => setForm({ ...form, signedDate: e.target.value })} required />
           <Input label={t('contractual.contract.endDate')} type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} required />
-          <Button type="submit" className="col-span-full">{t('contractual.contract.save')}</Button>
+          <Button type="submit" className="col-span-full" loading={submitting}>{t('contractual.contract.save')}</Button>
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}
@@ -133,7 +134,7 @@ function PoliciesSection({ projectId, policies, onChange }) {
   const [scanNotice, setScanNotice] = useState('');
   const [error, setError] = useState('');
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     try {
@@ -149,7 +150,7 @@ function PoliciesSection({ projectId, policies, onChange }) {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const scanFile = async () => {
     if (!file) return;
@@ -200,7 +201,7 @@ function PoliciesSection({ projectId, policies, onChange }) {
           <Input label={t('contractual.policies.value')} type="number" min="0" step="0.01" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} required />
           <Input label={t('contractual.policies.coverageStart')} type="date" value={form.coverageStart} onChange={(e) => setForm({ ...form, coverageStart: e.target.value })} required />
           <Input label={t('contractual.policies.coverageEnd')} type="date" value={form.coverageEnd} onChange={(e) => setForm({ ...form, coverageEnd: e.target.value })} required />
-          <Button type="submit" className="col-span-full">{t('contractual.policies.save')}</Button>
+          <Button type="submit" className="col-span-full" loading={submitting}>{t('contractual.policies.save')}</Button>
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}

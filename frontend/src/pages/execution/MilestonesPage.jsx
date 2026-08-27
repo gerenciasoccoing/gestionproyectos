@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { milestonesApi } from '../../api';
 import { Card, Button, Input, Select, Table, ErrorText, extractError, Badge, formatDate } from '../../components/ui';
 import Can from '../../components/Can';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 export default function MilestonesPage() {
   const { t } = useTranslation();
@@ -16,7 +17,7 @@ export default function MilestonesPage() {
   const load = () => milestonesApi.list(projectId).then(setMilestones);
   useEffect(() => { load(); }, [projectId]);
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     try {
@@ -27,7 +28,7 @@ export default function MilestonesPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const updateField = async (id, field, value) => {
     await milestonesApi.update(projectId, id, { [field]: value });
@@ -52,7 +53,7 @@ export default function MilestonesPage() {
         <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
           <Input label={t('execution.milestones.name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           <Input label={t('execution.milestones.plannedDate')} type="date" value={form.plannedDate} onChange={(e) => setForm({ ...form, plannedDate: e.target.value })} required />
-          <Button type="submit">{t('common.save')}</Button>
+          <Button type="submit" loading={submitting}>{t('common.save')}</Button>
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}

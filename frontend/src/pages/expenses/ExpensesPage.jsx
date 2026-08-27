@@ -5,6 +5,7 @@ import { expensesApi, generalExpensesApi, projectsApi, thirdPartiesApi, cashBoxe
 import { Card, Button, Input, Select, SearchSelect, TextArea, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 const CATEGORIES = ['mano_obra', 'materiales', 'equipos', 'viaticos', 'imprevistos'];
 const emptyForm = {
@@ -107,7 +108,7 @@ export default function ExpensesPage() {
     setForm((f) => ({ ...f, supplierId, vendorName: s ? s.name : f.vendorName, vendorNit: s?.nit || f.vendorNit, vendorPhone: s?.phone || f.vendorPhone, vendorEmail: s?.email || f.vendorEmail }));
   };
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     setWarning('');
@@ -131,7 +132,7 @@ export default function ExpensesPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const scanFile = async () => {
     if (!invoiceFile) return;
@@ -373,7 +374,7 @@ export default function ExpensesPage() {
             </div>
 
             <div className="flex items-center justify-between gap-3">
-              <Button type="submit">{t('expenses.save')}</Button>
+              <Button type="submit" loading={submitting}>{t('expenses.save')}</Button>
               <ErrorText>{error}</ErrorText>
             </div>
           </form>

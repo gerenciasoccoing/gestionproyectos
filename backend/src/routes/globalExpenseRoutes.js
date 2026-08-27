@@ -4,6 +4,7 @@ const router = require('express').Router();
 const { authenticate } = require('../middleware/auth');
 const { requirePermission, requireOptionalProjectAccess } = require('../middleware/authorize');
 const { makeUploader } = require('../middleware/upload');
+const { preventDuplicateSubmit } = require('../middleware/idempotency');
 const { Expense } = require('../models');
 const expenseController = require('../controllers/expenseController');
 
@@ -36,7 +37,7 @@ router.use(authenticate);
 const byIdParam = async (req) => Expense.findByPk(req.params.id);
 
 router.get('/', requirePermission('gastos', 'view'), expenseController.list);
-router.post('/', requirePermission('gastos', 'create'), uploadFiles, expenseController.create);
+router.post('/', requirePermission('gastos', 'create'), uploadFiles, preventDuplicateSubmit, expenseController.create);
 router.post('/scan', requirePermission('gastos', 'create'), scanUpload.single('file'), expenseController.scan);
 router.put('/:id', requirePermission('gastos', 'edit'), requireOptionalProjectAccess(byIdParam), uploadFiles, expenseController.update);
 router.delete('/:id', requirePermission('gastos', 'delete'), requireOptionalProjectAccess(byIdParam), expenseController.remove);

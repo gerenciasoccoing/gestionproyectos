@@ -2,6 +2,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { Role, Permission } = require('../models');
 const { MODULES, ACTIONS } = require('../config/permissions');
+const { invalidateAuthCache } = require('../middleware/auth');
 
 const listPermissionsCatalog = asyncHandler(async (req, res) => {
   res.json({ modules: MODULES, actions: ACTIONS });
@@ -21,6 +22,7 @@ const create = asyncHandler(async (req, res) => {
     await role.setPermissions(permissions);
   }
   const full = await Role.findByPk(role.id, { include: [Permission] });
+  invalidateAuthCache();
   res.status(201).json(serializeRole(full));
 });
 
@@ -37,6 +39,7 @@ const update = asyncHandler(async (req, res) => {
     await role.setPermissions(permissions);
   }
   const full = await Role.findByPk(role.id, { include: [Permission] });
+  invalidateAuthCache();
   res.json(serializeRole(full));
 });
 
@@ -45,6 +48,7 @@ const remove = asyncHandler(async (req, res) => {
   if (!role) throw new ApiError(404, 'Rol no encontrado');
   if (role.name === 'admin') throw new ApiError(400, 'No se puede eliminar el rol admin');
   await role.destroy();
+  invalidateAuthCache();
   res.status(204).send();
 });
 

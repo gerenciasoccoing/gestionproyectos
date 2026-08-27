@@ -4,6 +4,7 @@ const router = require('express').Router();
 const { authenticate } = require('../middleware/auth');
 const { requirePermission } = require('../middleware/authorize');
 const { makeUploader } = require('../middleware/upload');
+const { preventDuplicateSubmit } = require('../middleware/idempotency');
 const thirdPartyController = require('../controllers/thirdPartyController');
 
 const upload = makeUploader('third-parties', 'any');
@@ -31,7 +32,7 @@ router.use(authenticate);
 router.post('/scan-rut', requirePermission('terceros', 'create'), scanUpload.single('file'), thirdPartyController.scanRutFile);
 
 router.get('/', requirePermission('terceros', 'view'), thirdPartyController.list);
-router.post('/', requirePermission('terceros', 'create'), uploadFiles, thirdPartyController.create);
+router.post('/', requirePermission('terceros', 'create'), uploadFiles, preventDuplicateSubmit, thirdPartyController.create);
 router.get('/:id', requirePermission('terceros', 'view'), thirdPartyController.get);
 router.get('/:id/projects', requirePermission('terceros', 'view'), thirdPartyController.getClientProjects);
 router.put('/:id', requirePermission('terceros', 'edit'), uploadFiles, thirdPartyController.update);

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { rolesApi } from '../../api';
 import { Card, Button, Input, ErrorText, extractError } from '../../components/ui';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 export default function RolesPage() {
   const { t } = useTranslation();
@@ -14,7 +15,7 @@ export default function RolesPage() {
   const load = () => rolesApi.list().then(setRoles);
   useEffect(() => { load(); rolesApi.catalog().then(setCatalog); }, []);
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     try {
@@ -25,7 +26,7 @@ export default function RolesPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const togglePermission = async (role, moduleName, action) => {
     const key = `${moduleName}:${action}`;
@@ -59,7 +60,7 @@ export default function RolesPage() {
         <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
           <Input label={t('admin.roles.roleName')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           <Input label={t('admin.roles.description')} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          <Button type="submit">{t('admin.roles.save')}</Button>
+          <Button type="submit" loading={submitting}>{t('admin.roles.save')}</Button>
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}

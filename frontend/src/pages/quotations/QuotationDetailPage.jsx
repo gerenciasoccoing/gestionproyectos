@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { quotationsApi, apuApi } from '../../api';
 import { Card, Button, Input, SearchSelect, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import Can from '../../components/Can';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 export default function QuotationDetailPage() {
   const { t } = useTranslation();
@@ -68,7 +69,7 @@ export default function QuotationDetailPage() {
     setForm((f) => ({ ...f, apuId, description: apu ? apu.name : '', unit: apu ? apu.unit : f.unit }));
   };
 
-  const submitItem = async (e) => {
+  const [submitItem, submittingItem] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     try {
@@ -81,7 +82,7 @@ export default function QuotationDetailPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const downloadExport = async (format) => {
     setExportError('');
@@ -240,7 +241,7 @@ export default function QuotationDetailPage() {
             <Input label={t('quotations.detail.note')} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             <Input label={t('quotations.detail.unit')} value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} required />
             <Input label={t('quotations.detail.quantity')} type="number" min="0" step="0.01" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} required />
-            <Button type="submit" className="col-span-full">{t('quotations.detail.add')}</Button>
+            <Button type="submit" className="col-span-full" loading={submittingItem}>{t('quotations.detail.add')}</Button>
             <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
           </form>
         )}

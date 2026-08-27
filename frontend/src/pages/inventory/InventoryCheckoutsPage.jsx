@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { inventoryCheckoutsApi, inventoryItemsApi, projectsApi, thirdPartiesApi, employeesApi } from '../../api';
 import { Card, Button, Input, Select, SearchSelect, TextArea, Table, Badge, ErrorText, extractError, formatDate, formatDateTime } from '../../components/ui';
 import Can from '../../components/Can';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 const STATUS_COLORS = { activa: 'yellow', cerrada: 'green' };
 const CONDITIONS = ['bueno', 'dañado', 'incompleto'];
@@ -74,7 +75,7 @@ export default function InventoryCheckoutsPage() {
   const addLine = () => setForm((f) => ({ ...f, items: [...f.items, emptyLine()] }));
   const removeLine = (idx) => setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     try {
@@ -96,7 +97,7 @@ export default function InventoryCheckoutsPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const sendNotify = async () => {
     if (!notify) return;
@@ -175,7 +176,7 @@ export default function InventoryCheckoutsPage() {
               );
             })}
             <Button type="button" variant="secondary" onClick={addLine}>{t('inventory.checkouts.addItem')}</Button>
-            <Button type="submit" className="ml-2">{t('inventory.checkouts.save')}</Button>
+            <Button type="submit" className="ml-2" loading={submitting}>{t('inventory.checkouts.save')}</Button>
             <ErrorText>{error}</ErrorText>
           </form>
         )}

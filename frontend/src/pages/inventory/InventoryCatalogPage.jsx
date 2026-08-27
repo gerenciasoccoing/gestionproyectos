@@ -4,6 +4,7 @@ import { inventoryItemsApi } from '../../api';
 import { Card, Button, Input, Select, TextArea, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
+import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 const STATUS_COLORS = { disponible: 'green', en_prestamo: 'yellow', mantenimiento: 'blue', baja: 'red' };
 const STATUSES = ['disponible', 'en_prestamo', 'mantenimiento', 'baja'];
@@ -37,7 +38,7 @@ export default function InventoryCatalogPage() {
     setShowForm(true);
   };
 
-  const submit = async (e) => {
+  const [submit, submitting] = useSubmitGuard(async (e) => {
     e.preventDefault();
     setError('');
     try {
@@ -52,7 +53,7 @@ export default function InventoryCatalogPage() {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const remove = async (id) => {
     if (!confirm(t('inventory.catalog.confirmDelete'))) return;
@@ -91,7 +92,7 @@ export default function InventoryCatalogPage() {
               <Input label={t('inventory.catalog.fields.value')} type="number" min="0" step="0.01" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} />
               <Input label={t('inventory.catalog.fields.photo')} type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files[0])} />
               <TextArea label={t('inventory.catalog.fields.notes')} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="col-span-full" rows={2} />
-              <Button type="submit" className="col-span-full">{editingId ? t('common.saveChanges') : t('common.save')}</Button>
+              <Button type="submit" className="col-span-full" loading={submitting}>{editingId ? t('common.saveChanges') : t('common.save')}</Button>
               <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
             </div>
           </form>
