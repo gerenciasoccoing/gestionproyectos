@@ -701,10 +701,13 @@ function generatePurchaseOrderPdf({ order, items, company, lang = 'es', totals, 
 // resaltan en negrita/color para que el cambio salte a la vista sin perder el valor original.
 function drawContractInfoTable(doc, infoTable) {
   if (!infoTable || !infoTable.length) return;
-  const startX = 50;
+  const startX = doc.page.margins.left;
+  // Ancho de la etiqueta fijo (le alcanza a las etiquetas más largas de la tabla); el valor toma
+  // TODO el resto del ancho útil de la página, para que la tabla llegue hasta el margen derecho
+  // igual que el resto del documento, en vez de quedar angosta a la izquierda.
   const labelWidth = 220;
-  const valueWidth = 275;
-  const totalWidth = labelWidth + valueWidth;
+  const totalWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const valueWidth = totalWidth - labelWidth;
   doc.strokeColor('#cccccc');
   infoTable.forEach((r) => {
     doc.font('Helvetica-Bold').fontSize(9);
@@ -722,6 +725,10 @@ function drawContractInfoTable(doc, infoTable) {
     doc.y = y + rowHeight;
   });
   doc.strokeColor('#000000').fillColor('#000000').font('Helvetica');
+  // Cada fila termina posicionando el cursor x en la columna de valor (startX + labelWidth + 5);
+  // sin este reset, el párrafo que sigue (dibujado sin x explícito) hereda esa x residual y queda
+  // angosto y corrido a la derecha en vez de arrancar en el margen izquierdo a ancho completo.
+  doc.x = startX;
   doc.moveDown(1);
 }
 
