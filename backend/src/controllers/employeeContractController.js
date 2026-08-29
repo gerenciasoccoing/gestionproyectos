@@ -79,6 +79,7 @@ const generate = asyncHandler(async (req, res) => {
     valueAtIssue: employee.salaryValue,
     objectAtIssue: employee.contractObject,
     generatedBy: req.user.id,
+    contractPrefix: project?.contractNumber ? project.contractNumber.slice(0, 3) : null,
   });
 
   const content = buildContractContent({ employee, company, project, doc });
@@ -121,6 +122,7 @@ const generateOtrosi = asyncHandler(async (req, res) => {
     valueAtIssue: newSalaryValue !== undefined && newSalaryValue !== '' ? newSalaryValue : parent.valueAtIssue,
     objectAtIssue: newContractObject || parent.objectAtIssue,
     generatedBy: req.user.id,
+    contractPrefix: project?.contractNumber ? project.contractNumber.slice(0, 3) : null,
   });
 
   const changes = { newContractObject, newEndDate, newSalaryValue };

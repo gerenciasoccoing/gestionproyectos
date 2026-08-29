@@ -1,6 +1,6 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { Contract } = require('../models');
+const { Contract, Project } = require('../models');
 const { relativePath } = require('../middleware/upload');
 
 const list = asyncHandler(async (req, res) => {
@@ -9,7 +9,7 @@ const list = asyncHandler(async (req, res) => {
 });
 
 const create = asyncHandler(async (req, res) => {
-  const { object, value, signedDate, endDate } = req.body;
+  const { object, value, signedDate, endDate, contractNumber } = req.body;
   if (!object || value === undefined || !signedDate || !endDate) {
     throw new ApiError(400, 'object, value, signedDate y endDate son obligatorios');
   }
@@ -26,6 +26,20 @@ const create = asyncHandler(async (req, res) => {
     endDate,
     filePath: relativePath(req.file),
   });
+
+  // El No. de Contrato del proyecto se define UNA sola vez desde este formulario (leído
+  // automáticamente al escanear el PDF, o digitado a mano) — si el proyecto ya tenía uno
+  // asignado, no se sobreescribe acá; para corregirlo después se usa la edición explícita en la
+  // cabecera de la sección (projectController.update), un gesto intencional en vez de un efecto
+  // secundario de subir otro contrato.
+  if (contractNumber && contractNumber.trim()) {
+    const project = await Project.findByPk(req.params.projectId);
+    if (project && !project.contractNumber) {
+      project.contractNumber = contractNumber.trim();
+      await project.save();
+    }
+  }
+
   res.status(201).json(contract);
 });
 

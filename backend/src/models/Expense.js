@@ -42,6 +42,12 @@ module.exports = (sequelize) => {
     source: { type: DataTypes.ENUM('manual', 'purchase_receipt', 'liquidacion', 'purchase_order'), defaultValue: 'manual' },
     sourceId: { type: DataTypes.UUID, allowNull: true },
     createdBy: { type: DataTypes.UUID, allowNull: true },
+    // Consecutivo propio de Gastos (no existía antes de este campo: los gastos previos quedan sin
+    // número, no se les asigna nada retroactivo) + prefijo de 3 dígitos tomado de
+    // Project.contractNumber AL MOMENTO DE CREARSE (ver numberingService.js) — null si el
+    // proyecto no tenía número de contrato asignado en ese momento, o si el gasto no tiene proyecto.
+    expenseNumber: { type: DataTypes.INTEGER, allowNull: true },
+    contractPrefix: { type: DataTypes.STRING(3), allowNull: true },
   });
 
   Expense.associate = (models) => {

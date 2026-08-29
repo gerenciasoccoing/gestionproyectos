@@ -9,6 +9,7 @@ const { scanInvoice } = require('../services/invoiceScanService');
 const { assertCashBoxUsable, overdraftWarning } = require('../services/cashBoxService');
 const aiVisionService = require('../services/aiVisionService');
 const { getExtractor } = require('../config/aiDocumentExtractors');
+const { nextExpenseNumber, contractPrefixForProject } = require('../services/numberingService');
 
 // Estos controladores atienden DOS montajes de ruta: el anidado en proyecto
 // (/projects/:projectId/expenses, ver expenseRoutes.js — comportamiento sin cambios) y el global
@@ -124,6 +125,8 @@ const create = asyncHandler(async (req, res) => {
 
   const { expense, warning } = await sequelize.transaction(async (t) => {
     await assertCashBoxUsable(cashBoxId, { transaction: t });
+    const expenseNumber = await nextExpenseNumber(t);
+    const contractPrefix = await contractPrefixForProject(projectId, t);
     const created = await Expense.create({
       projectId,
       cashBoxId,
@@ -142,6 +145,8 @@ const create = asyncHandler(async (req, res) => {
       paymentReceiptFilePath: relativePath(paymentReceiptFile),
       source: 'manual',
       createdBy: req.user.id,
+      expenseNumber,
+      contractPrefix,
     }, { transaction: t });
     if (items.length) await ExpenseItem.bulkCreate(items.map((it) => ({ ...it, expenseId: created.id })), { transaction: t });
     if (taxes.length) await ExpenseTax.bulkCreate(taxes.map((tx) => ({ ...tx, expenseId: created.id })), { transaction: t });

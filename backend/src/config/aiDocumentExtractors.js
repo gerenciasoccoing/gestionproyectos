@@ -16,8 +16,8 @@ const EXTRACTORS = {
     maxTokens: 6000,
   },
   contract: {
-    instructions: 'Este documento es un contrato de obra o de servicios. Extrae el objeto del contrato (descripción de su alcance) y sus datos clave.',
-    schemaDescription: '{ "object": string|null, "value": number|null, "signedDate": "YYYY-MM-DD"|null, "endDate": "YYYY-MM-DD"|null }',
+    instructions: 'Este documento es un contrato de obra o de servicios. Extrae el objeto del contrato (descripción de su alcance), sus datos clave, y el número o consecutivo de contrato/adjudicación (busca etiquetas como "Contrato No.", "No. de Contrato", "Contrato N°" u similares, tal como aparece en el documento, sin inventar un formato).',
+    schemaDescription: '{ "object": string|null, "value": number|null, "signedDate": "YYYY-MM-DD"|null, "endDate": "YYYY-MM-DD"|null, "contractNumber": string|null }',
   },
   policy: {
     instructions: 'Este documento es una póliza de seguro asociada a un proyecto de construcción (ej. cumplimiento, responsabilidad civil, todo riesgo). Extrae su tipo y su vigencia.',

@@ -29,6 +29,10 @@ module.exports = (sequelize) => {
     generatedBy: { type: DataTypes.UUID, allowNull: true }, // userId de quien lo generó
     pdfFilePath: { type: DataTypes.STRING, allowNull: true },
     docxFilePath: { type: DataTypes.STRING, allowNull: true },
+    // Prefijo de 3 dígitos tomado de Project.contractNumber AL MOMENTO DE GENERARSE este documento
+    // (ver numberingService.js) — null si el proyecto no tenía número de contrato asignado en ese
+    // momento. No se recalcula si el número del proyecto cambia después.
+    contractPrefix: { type: DataTypes.STRING(3), allowNull: true },
   });
 
   EmployeeContractDocument.associate = (models) => {

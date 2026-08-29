@@ -20,7 +20,7 @@ function emptyOrderLine() { return { name: '', unit: '', quantityOrdered: '', un
 
 export default function PurchaseOrdersPage() {
   const { t, i18n } = useTranslation();
-  const { projectId } = useOutletContext();
+  const { projectId, project } = useOutletContext();
   const [orders, setOrders] = useState([]);
   const [budgetItems, setBudgetItems] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -141,6 +141,9 @@ export default function PurchaseOrdersPage() {
           </Can>
         </div>
       }>
+        {showForm && !project?.contractNumber && (
+          <p className="text-xs text-yellow-700 mb-3">{t('contractual.contractNumber.warning')}</p>
+        )}
         {showForm && (
           <form onSubmit={submit} className="mb-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-3">
@@ -183,11 +186,11 @@ export default function PurchaseOrdersPage() {
           </form>
         )}
 
-        <Table columns={[t('execution.purchaseOrders.table.supplier'), t('execution.purchaseOrders.table.date'), t('execution.purchaseOrders.table.status'), t('execution.purchaseOrders.table.items'), t('execution.purchaseOrders.table.expenses'), '']}>
+        <Table columns={[t('suppliers.orders.table.number'), t('execution.purchaseOrders.table.supplier'), t('execution.purchaseOrders.table.date'), t('execution.purchaseOrders.table.status'), t('execution.purchaseOrders.table.items'), t('execution.purchaseOrders.table.expenses'), '']}>
           {orders.map((o) => (
             editingOrderId === o.id ? (
               <tr key={o.id} className="border-b border-gray-100 bg-blue-50">
-                <td className="py-3 pr-3" colSpan={6}>
+                <td className="py-3 pr-3" colSpan={7}>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
                     <Input label={t('execution.purchaseOrders.date')} type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} />
                     <Select label={t('expenses.cashBox')} value={editForm.cashBoxId} onChange={(e) => setEditForm({ ...editForm, cashBoxId: e.target.value })}>
@@ -228,6 +231,7 @@ export default function PurchaseOrdersPage() {
               </tr>
             ) : (
               <tr key={o.id} className="border-b border-gray-100">
+                <td className="py-2 pr-3 text-gray-400 font-mono text-xs">{o.orderNumber ? `${o.contractPrefix ? `${o.contractPrefix}-` : ''}${o.orderNumber}` : '-'}</td>
                 <td className="py-2 pr-3">{o.supplier}</td>
                 <td className="py-2 pr-3">{formatDate(o.date)}</td>
                 <td className="py-2 pr-3"><Badge color={STATUS_COLORS[o.status]}>{t(`execution.purchaseOrders.status.${o.status}`, o.status)}</Badge></td>
@@ -252,7 +256,7 @@ export default function PurchaseOrdersPage() {
               </tr>
             )
           ))}
-          {orders.length === 0 && <tr><td colSpan={6} className="py-3 text-center text-gray-400">{t('execution.purchaseOrders.empty')}</td></tr>}
+          {orders.length === 0 && <tr><td colSpan={7} className="py-3 text-center text-gray-400">{t('execution.purchaseOrders.empty')}</td></tr>}
         </Table>
       </Card>
 

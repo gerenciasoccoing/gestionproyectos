@@ -13,7 +13,7 @@ import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 export default function EmployeeDetailPage() {
   const { t } = useTranslation();
-  const { projectId } = useOutletContext();
+  const { projectId, project } = useOutletContext();
   const { employeeId } = useParams();
   const navigate = useNavigate();
   const [employee, setEmployee] = useState(null);
@@ -48,7 +48,7 @@ export default function EmployeeDetailPage() {
       <ErrorText>{deleteError}</ErrorText>
 
       <BasicDataSection projectId={projectId} employee={employee} onChange={load} />
-      <ContractsSection projectId={projectId} employee={employee} onChange={load} />
+      <ContractsSection projectId={projectId} project={project} employee={employee} onChange={load} />
       <SocialSecuritySection projectId={projectId} employee={employee} onChange={load} />
       <PaymentsSection projectId={projectId} employee={employee} onChange={load} />
       {employee.status === 'activo' ? (
@@ -214,7 +214,7 @@ function BasicDataSection({ projectId, employee, onChange }) {
   );
 }
 
-function ContractsSection({ projectId, employee, onChange }) {
+function ContractsSection({ projectId, project, employee, onChange }) {
   const { t } = useTranslation();
   const [docs, setDocs] = useState([]);
   const [contractTypes, setContractTypes] = useState([]);
@@ -290,6 +290,9 @@ function ContractsSection({ projectId, employee, onChange }) {
       {missingFields.length > 0 && (
         <p className="text-sm text-yellow-700 mb-2">{t('personnel.contract.missingFields')}: {missingFields.join(', ')}</p>
       )}
+      {!project?.contractNumber && (
+        <p className="text-xs text-yellow-700 mb-2">{t('contractual.contractNumber.warning')}</p>
+      )}
       {showOtrosi && (
         <form onSubmit={submitOtrosi} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3 items-end border-b pb-3">
           <Input label={t('personnel.contract.newObject')} value={otrosiForm.newContractObject} onChange={(e) => setOtrosiForm({ ...otrosiForm, newContractObject: e.target.value })} />
@@ -302,7 +305,7 @@ function ContractsSection({ projectId, employee, onChange }) {
         {docs.map((d) => (
           <tr key={d.id} className="border-b border-gray-100">
             <td className="py-1 pr-3">{d.kind === 'otrosi' ? `${t('personnel.contract.otrosiLabel')} ${d.sequenceNumber}` : typeLabel(d.contractType)}</td>
-            <td className="py-1 pr-3">{d.sequenceNumber}</td>
+            <td className="py-1 pr-3">{d.contractPrefix ? `${d.contractPrefix}-${d.sequenceNumber}` : d.sequenceNumber}</td>
             <td className="py-1 pr-3">{formatDate(d.effectiveFrom) || '-'}</td>
             <td className="py-1 pr-3">{formatDate(d.effectiveTo) || '-'}</td>
             <td className="py-1 pr-3">{money(d.valueAtIssue)}</td>

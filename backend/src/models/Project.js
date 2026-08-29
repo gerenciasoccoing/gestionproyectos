@@ -21,6 +21,12 @@ module.exports = (sequelize) => {
     // cambios); si se asigna un consorcio/unión temporal, todos los documentos generados dentro de
     // este proyecto usan su membrete — ver services/letterheadService.js#getLetterheadForProject.
     consortiumId: { type: DataTypes.UUID, allowNull: true },
+    // No. de contrato (adjudicación/licitación) que identifica a este proyecto frente al cliente.
+    // Se lee automáticamente al escanear un contrato en la sección Contractual, o se edita a mano.
+    // Sus primeros 3 dígitos se usan como prefijo visual en gastos/órdenes de compra/contratos
+    // laborales creados DESDE ESTE MOMENTO (ver numberingService.js) — cambiarlo después no
+    // recalcula el prefijo de lo ya creado, para no alterar referencias existentes.
+    contractNumber: { type: DataTypes.STRING, allowNull: true },
   });
 
   Project.associate = (models) => {

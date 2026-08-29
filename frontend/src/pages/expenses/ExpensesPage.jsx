@@ -32,6 +32,7 @@ export default function ExpensesPage() {
   const { t } = useTranslation();
   const outletCtx = useOutletContext();
   const projectId = outletCtx?.projectId;
+  const project = outletCtx?.project;
   const isGeneral = !projectId;
 
   const api = isGeneral
@@ -275,6 +276,9 @@ export default function ExpensesPage() {
           <Button onClick={() => { setShowForm((s) => !s); if (showForm) resetForm(); }}>{showForm ? t('common.cancel') : t('expenses.add')}</Button>
         </Can>
       }>
+        {showForm && !isGeneral && !project?.contractNumber && (
+          <p className="text-xs text-yellow-700 mb-3">{t('contractual.contractNumber.warning')}</p>
+        )}
         {showForm && (
           <form onSubmit={submit} className="mb-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3 items-end">
@@ -381,13 +385,14 @@ export default function ExpensesPage() {
         )}
         {warning && <p className="text-sm text-yellow-600 mb-3">⚠ {warning}</p>}
         <Table columns={[
-          t('expenses.list.date'), t('expenses.list.category'), t('expenses.list.vendor'),
+          t('expenses.list.number'), t('expenses.list.date'), t('expenses.list.category'), t('expenses.list.vendor'),
           ...(isGeneral ? [t('expenses.list.project'), t('expenses.list.cashBox')] : []),
           t('expenses.list.items'), t('expenses.list.value'), t('expenses.list.origin'), t('expenses.list.invoice'), t('expenses.list.receipt'), '',
         ]}>
           {expenses.map((e) => (
             <Fragment key={e.id}>
               <tr className="border-b border-gray-100">
+                <td className="py-1 pr-3 text-gray-400 font-mono text-xs">{e.expenseNumber ? `${e.contractPrefix ? `${e.contractPrefix}-` : ''}${e.expenseNumber}` : '-'}</td>
                 <td className="py-1 pr-3">{formatDate(e.date)}</td>
                 <td className="py-1 pr-3">{LABELS[e.category]}</td>
                 <td className="py-1 pr-3">{e.vendorName || '-'}</td>
@@ -418,7 +423,7 @@ export default function ExpensesPage() {
               </tr>
               {expandedId === e.id && (
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  <td colSpan={isGeneral ? 11 : 9} className="py-3 px-3">
+                  <td colSpan={isGeneral ? 12 : 10} className="py-3 px-3">
                     <div className="text-xs text-gray-500 mb-2 flex flex-wrap gap-x-4 gap-y-1">
                       {e.vendorNit && <span>{t('expenses.nit')}: {e.vendorNit}</span>}
                       {e.vendorPhone && <span>{t('expenses.phone')}: {e.vendorPhone}</span>}
@@ -453,7 +458,7 @@ export default function ExpensesPage() {
               )}
             </Fragment>
           ))}
-          {expenses.length === 0 && <tr><td colSpan={isGeneral ? 11 : 9} className="py-3 text-center text-gray-400">{t('expenses.empty')}</td></tr>}
+          {expenses.length === 0 && <tr><td colSpan={isGeneral ? 12 : 10} className="py-3 text-center text-gray-400">{t('expenses.empty')}</td></tr>}
         </Table>
       </Card>
     </div>

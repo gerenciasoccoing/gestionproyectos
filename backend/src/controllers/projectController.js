@@ -44,7 +44,7 @@ const create = asyncHandler(async (req, res) => {
 const update = asyncHandler(async (req, res) => {
   const project = await Project.findByPk(req.params.id);
   if (!project) throw new ApiError(404, 'Proyecto no encontrado');
-  const { name, client, clientId, description, status, consortiumId } = req.body;
+  const { name, client, clientId, description, status, consortiumId, contractNumber } = req.body;
   if (name !== undefined) {
     if (!name.trim()) throw new ApiError(400, 'El nombre del proyecto es obligatorio');
     project.name = name;
@@ -54,6 +54,9 @@ const update = asyncHandler(async (req, res) => {
   if (description !== undefined) project.description = description;
   if (status !== undefined) project.status = status;
   if (consortiumId !== undefined) project.consortiumId = consortiumId || null;
+  // Edición explícita del No. de Contrato (a diferencia del auto-llenado de contractController.js,
+  // este SÍ sobreescribe): es el gesto intencional para corregirlo en cualquier momento.
+  if (contractNumber !== undefined) project.contractNumber = contractNumber ? contractNumber.trim() : null;
   await project.save();
   res.json(project);
 });

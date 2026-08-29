@@ -36,6 +36,11 @@ module.exports = (sequelize) => {
     // Retención en la fuente de la orden completa: porcentaje aplicado sobre el subtotal (antes de
     // IVA), se resta del total general. 0 = sin retención.
     retentionPercent: { type: DataTypes.DECIMAL(5, 2), allowNull: false, defaultValue: 0, validate: { min: 0, max: 100 } },
+    // Prefijo de 3 dígitos tomado de Project.contractNumber AL MOMENTO DE CREARSE la orden (ver
+    // numberingService.js) — null si el proyecto no tenía número de contrato asignado en ese
+    // momento, o si la orden no tiene proyecto. No se recalcula si el número del proyecto cambia
+    // después.
+    contractPrefix: { type: DataTypes.STRING(3), allowNull: true },
   });
 
   PurchaseOrder.associate = (models) => {

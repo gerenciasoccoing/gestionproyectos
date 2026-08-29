@@ -6,6 +6,7 @@ const { relativePath, saveGeneratedFile } = require('../middleware/upload');
 const { assertCashBoxUsable, overdraftWarning } = require('../services/cashBoxService');
 const { getLetterheadForProject } = require('../services/letterheadService');
 const { generateLaborCalculationPdf } = require('../services/pdfService');
+const { nextExpenseNumber, contractPrefixForProject } = require('../services/numberingService');
 
 function pdfDocToBuffer(doc) {
   return new Promise((resolve, reject) => {
@@ -59,6 +60,8 @@ const confirmRetirement = asyncHandler(async (req, res) => {
 
   const { severance, warning } = await sequelize.transaction(async (t) => {
     await assertCashBoxUsable(cashBoxId, { transaction: t });
+    const expenseNumber = await nextExpenseNumber(t);
+    const contractPrefix = await contractPrefixForProject(req.params.projectId, t);
     const expense = await Expense.create({
       projectId: req.params.projectId,
       cashBoxId,
@@ -68,6 +71,8 @@ const confirmRetirement = asyncHandler(async (req, res) => {
       description: `Liquidación de prestaciones sociales - ${employee.name}`,
       source: 'liquidacion',
       createdBy: req.user.id,
+      expenseNumber,
+      contractPrefix,
     }, { transaction: t });
 
     const created = await Severance.create({

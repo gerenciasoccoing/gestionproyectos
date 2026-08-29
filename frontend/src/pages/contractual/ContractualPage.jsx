@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { contractsApi, policiesApi } from '../../api';
+import { contractsApi, policiesApi, projectsApi } from '../../api';
 import { Card, Button, Input, Table, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
@@ -9,10 +9,12 @@ import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 export default function ContractualPage() {
   const { projectId } = useOutletContext();
+  const [project, setProject] = useState(null);
   const [contracts, setContracts] = useState([]);
   const [policies, setPolicies] = useState([]);
 
   const load = () => {
+    projectsApi.get(projectId).then(setProject);
     contractsApi.list(projectId).then(setContracts);
     policiesApi.list(projectId).then(setPolicies);
   };
@@ -20,16 +22,66 @@ export default function ContractualPage() {
 
   return (
     <div>
-      <ContractsSection projectId={projectId} contracts={contracts} onChange={load} />
+      <ContractNumberSection projectId={projectId} project={project} onChange={load} />
+      <ContractsSection projectId={projectId} project={project} contracts={contracts} onChange={load} />
       <PoliciesSection projectId={projectId} policies={policies} onChange={load} />
     </div>
   );
 }
 
-function ContractsSection({ projectId, contracts, onChange }) {
+// No. de Contrato del proyecto: campo único a nivel de proyecto (no por fila de la tabla de abajo,
+// que puede tener varias). Sus primeros 3 dígitos se usan como prefijo en gastos/órdenes de
+// compra/contratos laborales creados desde este momento (ver numberingService.js en el backend).
+// También se puede pre-llenar automáticamente al escanear un contrato en ContractsSection.
+function ContractNumberSection({ projectId, project, onChange }) {
+  const { t } = useTranslation();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [error, setError] = useState('');
+
+  const [save, saving] = useSubmitGuard(async () => {
+    setError('');
+    try {
+      await projectsApi.update(projectId, { contractNumber: draft.trim() || null });
+      setEditing(false);
+      onChange();
+    } catch (err) {
+      setError(extractError(err));
+    }
+  });
+
+  if (!project) return null;
+
+  return (
+    <Card title={t('contractual.contractNumber.title')}>
+      {editing ? (
+        <div className="flex flex-wrap items-end gap-2">
+          <Input label={t('contractual.contractNumber.label')} value={draft} onChange={(e) => setDraft(e.target.value)} className="max-w-xs" autoFocus />
+          <Button onClick={save} loading={saving}>{t('common.save')}</Button>
+          <Button variant="secondary" onClick={() => setEditing(false)}>{t('common.cancel')}</Button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-sm text-gray-700">
+            {project.contractNumber || <span className="text-gray-400">{t('contractual.contractNumber.empty')}</span>}
+          </span>
+          <Can module="proyectos" action="edit">
+            <Button variant="secondary" onClick={() => { setDraft(project.contractNumber || ''); setEditing(true); }}>{t('common.edit')}</Button>
+          </Can>
+        </div>
+      )}
+      {!project.contractNumber && !editing && (
+        <p className="text-xs text-yellow-700 mt-2">{t('contractual.contractNumber.warning')}</p>
+      )}
+      <ErrorText>{error}</ErrorText>
+    </Card>
+  );
+}
+
+function ContractsSection({ projectId, project, contracts, onChange }) {
   const { t } = useTranslation();
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ object: '', value: '', signedDate: '', endDate: '' });
+  const [form, setForm] = useState({ object: '', value: '', signedDate: '', endDate: '', contractNumber: '' });
   const [file, setFile] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [scanNotice, setScanNotice] = useState('');
@@ -43,7 +95,7 @@ function ContractsSection({ projectId, contracts, onChange }) {
       Object.entries(form).forEach(([k, v]) => fd.append(k, v));
       if (file) fd.append('file', file);
       await contractsApi.create(projectId, fd);
-      setForm({ object: '', value: '', signedDate: '', endDate: '' });
+      setForm({ object: '', value: '', signedDate: '', endDate: '', contractNumber: '' });
       setFile(null);
       setScanNotice('');
       setShowForm(false);
@@ -67,6 +119,7 @@ function ContractsSection({ projectId, contracts, onChange }) {
         value: result.value ?? f.value,
         signedDate: result.signedDate || f.signedDate,
         endDate: result.endDate || f.endDate,
+        contractNumber: result.contractNumber || f.contractNumber,
       }));
       setScanNotice(t('contractual.scanDone'));
     } catch (err) {
@@ -99,6 +152,9 @@ function ContractsSection({ projectId, contracts, onChange }) {
           {scanNotice && <p className="text-sm text-green-700 col-span-full">{scanNotice}</p>}
           <p className="text-xs text-gray-400 col-span-full">{t('contractual.scanNote')}</p>
           <Input label={t('contractual.contract.object')} value={form.object} onChange={(e) => setForm({ ...form, object: e.target.value })} required className="col-span-full" />
+          {!project?.contractNumber && (
+            <Input label={t('contractual.contractNumber.label')} value={form.contractNumber} onChange={(e) => setForm({ ...form, contractNumber: e.target.value })} placeholder={t('contractual.contractNumber.placeholder')} />
+          )}
           <Input label={t('contractual.contract.value')} type="number" min="0" step="0.01" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} required />
           <Input label={t('contractual.contract.signedDate')} type="date" value={form.signedDate} onChange={(e) => setForm({ ...form, signedDate: e.target.value })} required />
           <Input label={t('contractual.contract.endDate')} type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} required />

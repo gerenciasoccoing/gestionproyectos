@@ -284,7 +284,7 @@ export default function PurchaseOrdersMenuPage() {
               </tr>
             ) : (
               <tr key={o.id} className="border-b border-gray-100">
-                <td className="py-1 pr-3">{o.orderNumber || '-'}</td>
+                <td className="py-1 pr-3">{o.orderNumber ? `${o.contractPrefix ? `${o.contractPrefix}-` : ''}${o.orderNumber}` : '-'}</td>
                 <td className="py-1 pr-3">{o.Project?.name || <span className="text-gray-400">{t('purchaseOrdersMenu.noProject')}</span>}</td>
                 <td className="py-1 pr-3">{o.supplier}</td>
                 <td className="py-1 pr-3">{formatDate(o.date)}</td>

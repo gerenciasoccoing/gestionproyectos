@@ -175,7 +175,14 @@
     "readAuto": "Read automatically",
     "reading": "Reading...",
     "scanDone": "Data read. Review it before saving.",
-    "scanNote": "Automatic reading is a suggestion: always review and correct the data before saving."
+    "scanNote": "Automatic reading is a suggestion: always review and correct the data before saving.",
+    "contractNumber": {
+      "title": "Contract No.",
+      "label": "Contract No.",
+      "placeholder": "E.g. 045-2026",
+      "empty": "No contract number assigned.",
+      "warning": "No contract number assigned: expenses, purchase orders, and labor contracts created in this project won't carry a prefix until you set one."
+    }
   },
   "execution": {
     "budget": {
@@ -664,6 +671,7 @@
     "save": "Save expense",
     "confirmDelete": "Delete this expense?",
     "list": {
+      "number": "No.",
       "date": "Date",
       "category": "Category",
       "vendor": "Vendor",

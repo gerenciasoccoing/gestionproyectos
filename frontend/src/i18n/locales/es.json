@@ -175,7 +175,14 @@
     "readAuto": "Leer automáticamente",
     "reading": "Leyendo...",
     "scanDone": "Datos leídos. Revísalos antes de guardar.",
-    "scanNote": "La lectura automática es una sugerencia: siempre revisa y corrige los datos antes de guardar."
+    "scanNote": "La lectura automática es una sugerencia: siempre revisa y corrige los datos antes de guardar.",
+    "contractNumber": {
+      "title": "No. de Contrato",
+      "label": "No. de Contrato",
+      "placeholder": "Ej. 045-2026",
+      "empty": "Sin número de contrato asignado.",
+      "warning": "Sin número de contrato asignado: los gastos, órdenes de compra y contratos laborales que se creen en este proyecto no llevarán prefijo hasta que lo definas."
+    }
   },
   "execution": {
     "budget": {
@@ -664,6 +671,7 @@
     "save": "Guardar gasto",
     "confirmDelete": "¿Eliminar este gasto?",
     "list": {
+      "number": "No.",
       "date": "Fecha",
       "category": "Categoría",
       "vendor": "Proveedor",

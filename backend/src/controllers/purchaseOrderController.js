@@ -10,6 +10,7 @@ const {
 const { generatePurchaseOrderPdf } = require('../services/pdfService');
 const { getLetterheadForProject } = require('../services/letterheadService');
 const { assertCashBoxUsable, overdraftWarning } = require('../services/cashBoxService');
+const { nextExpenseNumber, contractPrefixForProject } = require('../services/numberingService');
 
 // Estos controladores atienden DOS montajes de ruta: el anidado en proyecto
 // (/projects/:projectId/purchase-orders, ver purchaseOrderRoutes.js — comportamiento sin cambios)
@@ -113,6 +114,7 @@ const create = asyncHandler(async (req, res) => {
 
   const order = await sequelize.transaction(async (t) => {
     const orderNumber = await nextOrderNumber(t);
+    const contractPrefix = await contractPrefixForProject(projectId, t);
     const created = await PurchaseOrder.create({
       projectId,
       orderNumber,
@@ -123,6 +125,7 @@ const create = asyncHandler(async (req, res) => {
       createdBy: req.user.id,
       cashBoxId,
       retentionPercent: retentionPercent !== undefined ? retentionPercent : 0,
+      contractPrefix,
     }, { transaction: t });
 
     await PurchaseOrderItem.bulkCreate(
@@ -399,6 +402,8 @@ const convertToExpense = asyncHandler(async (req, res) => {
 
   const { expense, warning } = await sequelize.transaction(async (t) => {
     await assertCashBoxUsable(cashBoxId, { transaction: t });
+    const expenseNumber = await nextExpenseNumber(t);
+    const contractPrefix = await contractPrefixForProject(order.projectId, t);
     const created = await Expense.create({
       projectId: order.projectId,
       cashBoxId,
@@ -411,6 +416,8 @@ const convertToExpense = asyncHandler(async (req, res) => {
       source: 'purchase_order',
       sourceId: order.id,
       createdBy: req.user.id,
+      expenseNumber,
+      contractPrefix,
     }, { transaction: t });
 
     await ExpenseItem.bulkCreate(
@@ -467,6 +474,8 @@ const addReceipt = asyncHandler(async (req, res) => {
 
   const { receipt, expense, cashBoxWarning } = await sequelize.transaction(async (t) => {
     await assertCashBoxUsable(cashBoxId, { transaction: t });
+    const expenseNumber = await nextExpenseNumber(t);
+    const contractPrefix = await contractPrefixForProject(order.projectId, t);
     const expenseCreated = await Expense.create({
       projectId: order.projectId,
       cashBoxId,
@@ -478,6 +487,8 @@ const addReceipt = asyncHandler(async (req, res) => {
       source: 'purchase_receipt',
       sourceId: null,
       createdBy: req.user.id,
+      expenseNumber,
+      contractPrefix,
     }, { transaction: t });
 
     const receiptCreated = await PurchaseReceipt.create({
