@@ -77,7 +77,7 @@ const create = asyncHandler(async (req, res) => {
   // La caja se elige UNA sola vez, a nivel de toda la orden (ver PurchaseOrder.cashBoxId): de ahí
   // sale el pago de cada recepción y del traslado a gastos, sin volver a preguntarla cada vez.
   await assertCashBoxUsable(cashBoxId);
-  if (retentionPercent !== undefined && (Number(retentionPercent) < 0 || Number(retentionPercent) > 100)) {
+  if (retentionPercent !== undefined && retentionPercent !== '' && (Number(retentionPercent) < 0 || Number(retentionPercent) > 100)) {
     throw new ApiError(400, 'retentionPercent debe estar entre 0 y 100');
   }
 
@@ -124,7 +124,7 @@ const create = asyncHandler(async (req, res) => {
       status: 'abierta',
       createdBy: req.user.id,
       cashBoxId,
-      retentionPercent: retentionPercent !== undefined ? retentionPercent : 0,
+      retentionPercent: retentionPercent !== undefined && retentionPercent !== '' ? Number(retentionPercent) : 0,
       contractPrefix,
     }, { transaction: t });
 
@@ -251,8 +251,12 @@ const updateOrder = asyncHandler(async (req, res) => {
   if (date !== undefined) order.date = date;
   if (projectId !== undefined) order.projectId = nextProjectId;
   if (retentionPercent !== undefined) {
-    if (Number(retentionPercent) < 0 || Number(retentionPercent) > 100) throw new ApiError(400, 'retentionPercent debe estar entre 0 y 100');
-    order.retentionPercent = retentionPercent;
+    // Un campo numérico vaciado en el formulario llega como '' (no undefined): se trata como "sin
+    // retención" (0) en vez de intentar guardar la cadena vacía en una columna numérica, que
+    // Postgres rechaza.
+    const nextRetention = retentionPercent === '' ? 0 : Number(retentionPercent);
+    if (nextRetention < 0 || nextRetention > 100) throw new ApiError(400, 'retentionPercent debe estar entre 0 y 100');
+    order.retentionPercent = nextRetention;
   }
 
   if (items !== undefined) {
