@@ -50,7 +50,8 @@
     "logoutShort": "Salir",
     "openMenu": "Abrir menú",
     "toggleSidebar": "Mostrar/ocultar menú",
-    "language": "Idioma"
+    "language": "Idioma",
+    "marketStudy": "Estudio de Mercado"
   },
   "purchaseOrdersMenu": {
     "title": "Órdenes de Compra",
@@ -123,7 +124,8 @@
       "execution": "Ejecución",
       "personnel": "Personal",
       "expenses": "Gastos",
-      "reports": "Informes"
+      "reports": "Informes",
+      "marketStudy": "Estudio de Mercado"
     },
     "consortium": {
       "label": "Entidad contratante",
@@ -358,7 +360,17 @@
       "confirmDelete": "¿Eliminar esta orden de compra? Esta acción no se puede deshacer.",
       "editOrder": "Editar orden",
       "itemHasDeliveries": "Ya tiene {{qty}} entregado(s): no se puede quitar",
-      "closedOrderNotEditable": "Esta orden está cerrada y no se puede editar (ni cabecera ni ítems)."
+      "closedOrderNotEditable": "Esta orden está cerrada y no se puede editar (ni cabecera ni ítems).",
+      "approve": "Aprobar",
+      "reject": "Rechazar",
+      "confirmReject": "¿Rechazar esta orden? Quedará fuera del flujo normal y no podrá generar gastos.",
+      "pendingApprovalNote": "Esta orden es un borrador generado desde un Estudio de Mercado de Cotizaciones y está pendiente de aprobación. Puedes editarla libremente; no podrá registrar entregas, cerrarse ni trasladarse a gastos hasta que se apruebe.",
+      "rejectedNote": "Esta orden fue rechazada y quedó fuera del flujo normal. No genera gastos.",
+      "approvalState": {
+        "pendiente_aprobacion": "Pendiente de aprobación",
+        "aprobada": "Aprobada",
+        "rechazada": "Rechazada"
+      }
     },
     "milestones": {
       "title": "Hitos",
@@ -1561,5 +1573,69 @@
     "expired": "Este enlace venció. Contacta al administrador para gestionarlo manualmente.",
     "notFound": "Enlace de confirmación no encontrado o inválido.",
     "confirmFailed": "No se pudo registrar la confirmación."
+  },
+  "marketStudy": {
+    "title": "Estudio de Mercado de Cotizaciones",
+    "subtitle": "Compara cotizaciones de distintos proveedores para un mismo requerimiento de compra y decide a quién comprar.",
+    "new": "+ Nuevo estudio",
+    "studyTitle": "Título del estudio",
+    "project": "Proyecto",
+    "noProjectPlaceholder": "Sin proyecto",
+    "budgetItem": "Ítem de presupuesto (opcional)",
+    "table": {
+      "title": "Título",
+      "project": "Proyecto",
+      "suppliers": "Cotizaciones",
+      "status": "Estado",
+      "created": "Creado",
+      "supplier": "Proveedor",
+      "items": "Ítems"
+    },
+    "status": {
+      "abierta": "Abierta",
+      "decidida": "Decidida"
+    },
+    "viewDetail": "Ver detalle",
+    "empty": "No hay estudios de mercado registrados.",
+    "decidedNote": "Este estudio ya fue decidido. Se generaron las siguientes órdenes de compra en borrador:",
+    "quotationsTitle": "Cotizaciones cargadas",
+    "noQuotations": "Todavía no se ha cargado ninguna cotización.",
+    "confirmDeleteQuotation": "¿Eliminar esta cotización? Esta acción no se puede deshacer.",
+    "deliveryTime": "Tiempo de entrega",
+    "validUntil": "Validez de la oferta",
+    "extractionStatus": "Lectura IA",
+    "extraction": {
+      "ok": "OK",
+      "revisar": "Revisar"
+    },
+    "addQuotation": "Agregar cotización",
+    "file": "Archivo (PDF, imagen o Excel)",
+    "reading": "Leyendo…",
+    "readAuto": "Leer automáticamente",
+    "scanDone": "Datos leídos. Revísalos y corrígelos antes de guardar.",
+    "scanNote": "La lectura automática es una sugerencia: revisa los datos antes de guardar, especialmente los ítems marcados para revisar.",
+    "registeredSupplier": "Proveedor registrado",
+    "newSupplierPlaceholder": "Proveedor nuevo (sin vincular)",
+    "supplierName": "Nombre del proveedor",
+    "supplierRequired": "El nombre del proveedor es obligatorio",
+    "itemsRequired": "Debe incluir al menos un ítem con nombre",
+    "paymentTerms": "Condiciones de pago",
+    "noLinkedSupplierNote": "Este proveedor no está vinculado a tu catálogo de Proveedores.",
+    "createSupplierLink": "Crear proveedor",
+    "items": "Ítems cotizados",
+    "itemName": "Ítem",
+    "groupKey": "Etiqueta de comparación",
+    "groupKeyHint": "Ítems con la misma etiqueta entre proveedores se comparan en la misma fila de la matriz. Corrígela si dos proveedores describieron el mismo ítem con palabras distintas.",
+    "comparisonTitle": "Matriz comparativa",
+    "item": "Ítem",
+    "supplierTotal": "Total por proveedor",
+    "needsReview": "Revisar",
+    "noOffer": "sin oferta",
+    "splitSuggested": "Sugerencia de la IA: el mejor precio está repartido entre varios proveedores (motivo: precio más bajo). Puedes dividir la compra manualmente o comprarle todo a un solo proveedor.",
+    "generateDraftTitle": "Generar orden(es) de compra en borrador",
+    "generateDraftHint": "Elige a qué proveedor(es) comprar y qué ítems de cada uno incluir. Se preseleccionó la sugerencia de mejor precio — puedes ajustarla libremente. Cada orden queda en borrador, pendiente de aprobación, y 100% editable antes de aprobarse.",
+    "selectAtLeastOneSupplier": "Selecciona al menos un proveedor para generar su borrador de orden",
+    "confirmGenerateDraft": "Generar borrador(es) de orden de compra",
+    "draftGenerated": "{{count}} borrador(es) de orden de compra generado(s). Puedes revisarlos y aprobarlos desde Órdenes de Compra."
   }
 }

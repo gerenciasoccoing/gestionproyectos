@@ -10,6 +10,9 @@ const ALLOWED_BY_KIND = {
   document: ['.pdf', '.doc', '.docx'],
   image: ['.jpg', '.jpeg', '.png', '.webp'],
   any: ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.webp'],
+  // Cotizaciones de proveedor (Estudio de Mercado): además de PDF/imagen, admite Excel (ver
+  // marketStudyScanService.js, que lo convierte a texto para la IA).
+  quotation: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.xlsx', '.xls'],
 };
 
 function ensureDir(dir) {

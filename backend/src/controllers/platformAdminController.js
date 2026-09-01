@@ -71,6 +71,7 @@ const listCompanies = asyncHandler(async (req, res) => {
     planTier: c.planTier,
     maxUsers: c.maxUsers,
     maxActiveProjects: c.maxActiveProjects,
+    enabledFeatures: c.enabledFeatures || [],
     userCount: countByCompany[c.id] || 0,
     activeProjectCount: activeProjectCountByCompany[c.id] || 0,
     createdAt: c.createdAt,
@@ -100,6 +101,29 @@ const setCompanyStatus = asyncHandler(async (req, res) => {
   await company.update({ active });
   invalidateAuthCache();
   res.json({ id: company.id, companyName: company.companyName, active: company.active });
+});
+
+// Catálogo de módulos "plus" activables por empresa (ver requireFeature). Lista de claves libre
+// a propósito, para que agregar un futuro plus sea agregar una clave nueva acá — nada más.
+const AVAILABLE_FEATURES = ['estudio_mercado'];
+
+// Activa/desactiva módulos "plus" para una empresa (ver Company.enabledFeatures). Reemplaza la
+// lista completa (igual que setCompanyStatus/updateCompanyPlan: el operador manda el estado
+// deseado, no un delta) — más simple de razonar desde el panel que un toggle por feature.
+const updateCompanyFeatures = asyncHandler(async (req, res) => {
+  const { enabledFeatures } = req.body;
+  if (!Array.isArray(enabledFeatures) || enabledFeatures.some((f) => typeof f !== 'string')) {
+    throw new ApiError(400, 'enabledFeatures debe ser un array de strings');
+  }
+  const unknown = enabledFeatures.filter((f) => !AVAILABLE_FEATURES.includes(f));
+  if (unknown.length) throw new ApiError(400, `Módulo(s) desconocido(s): ${unknown.join(', ')}`);
+
+  const company = await Company.findByPk(req.params.id, { hooks: false });
+  if (!company) throw new ApiError(404, 'Empresa no encontrada');
+
+  await company.update({ enabledFeatures: [...new Set(enabledFeatures)] });
+  invalidateAuthCache();
+  res.json({ id: company.id, companyName: company.companyName, enabledFeatures: company.enabledFeatures });
 });
 
 // Esqueleto de planes/límites (ver diseño multi-tenant): sin cobro ni enforcement duro todavía,
@@ -244,7 +268,7 @@ const rejectRegistrationRequest = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  login, listCompanies, createCompany, setCompanyStatus, updateCompanyPlan,
+  login, listCompanies, createCompany, setCompanyStatus, updateCompanyPlan, updateCompanyFeatures,
   impersonateCompany, listSupportAccessLog,
   listRegistrationRequests, approveRegistrationRequest, rejectRegistrationRequest,
 };

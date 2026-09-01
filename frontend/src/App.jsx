@@ -36,6 +36,9 @@ import ClientsPage from './pages/thirdparties/ClientsPage';
 
 import PurchaseOrdersMenuPage from './pages/purchaseorders/PurchaseOrdersMenuPage';
 
+import MarketStudiesPage from './pages/marketstudy/MarketStudiesPage';
+import MarketStudyDetailPage from './pages/marketstudy/MarketStudyDetailPage';
+
 import CashBoxesPage from './pages/cashboxes/CashBoxesPage';
 
 import InventoryLayout from './pages/inventory/InventoryLayout';
@@ -72,6 +75,8 @@ export default function App() {
         <Route path="third-parties" element={<Navigate to="/suppliers" replace />} />
 
         <Route path="purchase-orders" element={<ProtectedRoute module="ordenes_compra" action="view"><PurchaseOrdersMenuPage /></ProtectedRoute>} />
+        <Route path="market-studies" element={<ProtectedRoute feature="estudio_mercado" module="estudio_mercado" action="view"><MarketStudiesPage /></ProtectedRoute>} />
+        <Route path="market-studies/:studyId" element={<ProtectedRoute feature="estudio_mercado" module="estudio_mercado" action="view"><MarketStudyDetailPage /></ProtectedRoute>} />
         <Route path="expenses" element={<ProtectedRoute module="gastos" action="view"><ExpensesPage /></ProtectedRoute>} />
         <Route path="cash-boxes" element={<ProtectedRoute module="cajas" action="view"><CashBoxesPage /></ProtectedRoute>} />
 
@@ -107,6 +112,8 @@ export default function App() {
           <Route path="personnel/:employeeId" element={<EmployeeDetailPage />} />
 
           <Route path="expenses" element={<ExpensesPage />} />
+          <Route path="market-study" element={<ProtectedRoute feature="estudio_mercado" module="estudio_mercado" action="view"><MarketStudiesPage /></ProtectedRoute>} />
+          <Route path="market-study/:studyId" element={<ProtectedRoute feature="estudio_mercado" module="estudio_mercado" action="view"><MarketStudyDetailPage /></ProtectedRoute>} />
           <Route path="reports" element={<ReportsPage />} />
         </Route>
       </Route>

@@ -128,6 +128,9 @@ async function authenticate(req, res, next) {
         permissions,
         roles: user.Roles.map((r) => r.name),
         projectIds: user.Projects.map((p) => p.id),
+        // Módulos "plus" activados para la empresa (ver requireFeature) — de la empresa, no del
+        // usuario: ni siquiera un admin de la empresa puede saltárselo.
+        enabledFeatures: company.enabledFeatures || [],
       };
       setCachedAuthData(payload.companyId, payload.sub, authData);
 

@@ -5,10 +5,12 @@ import { projectsApi } from '../api';
 import { Badge, Button, Input, ErrorText, extractError } from '../components/ui';
 import { fileUrl } from '../api/client';
 import Can from '../components/Can';
+import { useAuth } from '../context/AuthContext';
 import ConsortiumSelect from '../components/ConsortiumSelect';
 
 export default function ProjectLayout() {
   const { t } = useTranslation();
+  const { hasFeature, can, isAdmin } = useAuth();
   const { projectId } = useParams();
   const [project, setProject] = useState(null);
   const [error, setError] = useState('');
@@ -25,6 +27,12 @@ export default function ProjectLayout() {
     { to: 'execution', label: t('projects.tabs.execution') },
     { to: 'personnel', label: t('projects.tabs.personnel') },
     { to: 'expenses', label: t('projects.tabs.expenses') },
+    // Módulo "plus" (ver Company.enabledFeatures): el tab ni aparece si la empresa no lo tiene
+    // activado, sin importar el permiso del usuario (isAdmin incluido) — mismo criterio que
+    // requireFeature en el backend.
+    ...(hasFeature('estudio_mercado') && (isAdmin || can('estudio_mercado', 'view'))
+      ? [{ to: 'market-study', label: t('projects.tabs.marketStudy') }]
+      : []),
     { to: 'reports', label: t('projects.tabs.reports') },
   ];
 

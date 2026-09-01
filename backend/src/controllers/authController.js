@@ -67,6 +67,7 @@ const login = asyncHandler(async (req, res) => {
       email: user.email,
       roles: user.Roles.map((r) => r.name),
       permissions,
+      enabledFeatures: company.enabledFeatures || [],
     },
   });
 });
@@ -144,6 +145,7 @@ const me = asyncHandler(async (req, res) => {
     permissions: [...req.user.permissions],
     isAdmin: req.user.isAdmin,
     projectIds: req.user.projectIds,
+    enabledFeatures: req.user.enabledFeatures,
   });
 });
 

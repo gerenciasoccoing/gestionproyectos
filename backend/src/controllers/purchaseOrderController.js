@@ -384,6 +384,9 @@ const convertToExpense = asyncHandler(async (req, res) => {
     include: [{ model: PurchaseOrderItem, as: 'items' }],
   });
   if (!order) throw new ApiError(404, 'Orden de compra no encontrada');
+  if (order.approvalState === 'pendiente_aprobacion') {
+    throw new ApiError(400, 'Esta orden es un borrador del Estudio de Mercado pendiente de aprobación. Apruébala antes de trasladarla a gastos.');
+  }
   if (!order.projectId) throw new ApiError(400, 'Esta orden no tiene un proyecto asignado. Asígnale un proyecto antes de trasladarla a gastos.');
   if (order.expenseId) throw new ApiError(400, 'Esta orden de compra ya fue trasladada a gastos');
   if (!order.items.length) throw new ApiError(400, 'La orden no tiene ítems para trasladar');
@@ -454,6 +457,9 @@ const addReceipt = asyncHandler(async (req, res) => {
   if (!order.projectId) throw new ApiError(400, 'Esta orden no tiene un proyecto asignado. Asígnale un proyecto antes de registrar entregas.');
   if (order.status === 'cerrada' || order.status === 'cerrada_con_faltantes') {
     throw new ApiError(400, 'No se pueden registrar recepciones en una orden cerrada');
+  }
+  if (order.approvalState === 'pendiente_aprobacion') {
+    throw new ApiError(400, 'Esta orden es un borrador del Estudio de Mercado pendiente de aprobación. Apruébala antes de registrar recepciones.');
   }
 
   const item = await PurchaseOrderItem.findOne({ where: { id: req.params.itemId, purchaseOrderId: order.id } });
@@ -528,6 +534,9 @@ const close = asyncHandler(async (req, res) => {
   if (order.status === 'cerrada' || order.status === 'cerrada_con_faltantes') {
     throw new ApiError(400, 'La orden ya está cerrada');
   }
+  if (order.approvalState === 'pendiente_aprobacion') {
+    throw new ApiError(400, 'Esta orden es un borrador del Estudio de Mercado pendiente de aprobación. Apruébala antes de cerrarla.');
+  }
 
   const fullyDelivered = await isOrderFullyDelivered(order.id);
   const { closureReason } = req.body;
@@ -544,6 +553,35 @@ const close = asyncHandler(async (req, res) => {
   await order.save();
   const items = await getOrderItemsWithDelivery(order.id);
   res.json({ ...order.toJSON(), items });
+});
+
+// Aprueba/rechaza un borrador generado desde el Estudio de Mercado de Cotizaciones (ver
+// approvalState en el modelo y marketStudyService.generateDraftOrders). Reusa el permiso
+// ordenes_compra:edit (aprobar/rechazar es, en la práctica, editar el estado de la orden) en vez
+// de crear una acción de permiso nueva. Aprobar no cambia nada más: la orden ya estaba 100%
+// editable y con status 'abierta' desde que se generó — solo deja de estar bloqueada para
+// convertToExpense/addReceipt/close. Rechazar la saca del flujo normal para siempre: nunca genera
+// gastos ni puede editarse más (queda como registro histórico dentro del estudio de mercado).
+const approve = asyncHandler(async (req, res) => {
+  const order = await PurchaseOrder.findOne({ where: scopeWhere(req) });
+  if (!order) throw new ApiError(404, 'Orden de compra no encontrada');
+  if (order.approvalState !== 'pendiente_aprobacion') {
+    throw new ApiError(400, 'Esta orden no está pendiente de aprobación');
+  }
+  order.approvalState = 'aprobada';
+  await order.save();
+  res.json(order);
+});
+
+const reject = asyncHandler(async (req, res) => {
+  const order = await PurchaseOrder.findOne({ where: scopeWhere(req) });
+  if (!order) throw new ApiError(404, 'Orden de compra no encontrada');
+  if (order.approvalState !== 'pendiente_aprobacion') {
+    throw new ApiError(400, 'Esta orden no está pendiente de aprobación');
+  }
+  order.approvalState = 'rechazada';
+  await order.save();
+  res.json(order);
 });
 
 // Reporte consolidado de compras: por proyecto y/o rango de fechas (basado en fecha de recepción).
@@ -598,4 +636,5 @@ const exportPdf = asyncHandler(async (req, res) => {
 
 module.exports = {
   list, listBySupplier, get, create, updateOrder, remove, updateItem, convertToExpense, addReceipt, close, report, exportPdf,
+  approve, reject,
 };

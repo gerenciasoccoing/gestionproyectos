@@ -24,5 +24,7 @@ router.put('/:id/items/:itemId', requirePermission('ordenes_compra', 'edit'), re
 router.post('/:id/convert-to-expense', requirePermission('ordenes_compra', 'edit'), requireOptionalProjectAccess(byIdParam), preventDuplicateSubmit, purchaseOrderController.convertToExpense);
 router.post('/:id/items/:itemId/receipts', requirePermission('ordenes_compra', 'edit'), requireOptionalProjectAccess(byIdParam), preventDuplicateSubmit, purchaseOrderController.addReceipt);
 router.post('/:id/close', requirePermission('ordenes_compra', 'edit'), requireOptionalProjectAccess(byIdParam), purchaseOrderController.close);
+router.post('/:id/approve', requirePermission('ordenes_compra', 'edit'), requireOptionalProjectAccess(byIdParam), purchaseOrderController.approve);
+router.post('/:id/reject', requirePermission('ordenes_compra', 'edit'), requireOptionalProjectAccess(byIdParam), purchaseOrderController.reject);
 
 module.exports = router;

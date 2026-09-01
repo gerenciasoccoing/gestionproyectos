@@ -36,6 +36,14 @@ const EXTRACTORS = {
     // aiVisionService.callClaude).
     maxTokens: 8000,
   },
+  // Cotización de un proveedor (Estudio de Mercado de Cotizaciones). Puede venir en formatos muy
+  // distintos entre proveedores; un campo que no se pueda leer con confianza debe quedar en null
+  // en vez de inventado (ver marketStudyScanService.js, que además marca needsReview por ítem).
+  supplierQuotation: {
+    instructions: 'Este documento es una cotización de un proveedor en respuesta a una solicitud de compra de materiales o servicios. Extrae el nombre del proveedor, cada ítem cotizado (con su cantidad, unidad, precio unitario y precio total), el tiempo de entrega ofrecido (tal como aparece escrito, sin forzarlo a un formato fijo), la validez de la oferta y las condiciones de pago.',
+    schemaDescription: '{ "supplierName": string|null, "deliveryTime": string|null, "validUntil": "YYYY-MM-DD"|null, "paymentTerms": string|null, "items": [ { "name": string, "unit": string|null, "quantity": number|null, "unitPrice": number|null, "totalPrice": number|null } ] }',
+    maxTokens: 6000,
+  },
 };
 
 function getExtractor(key) {

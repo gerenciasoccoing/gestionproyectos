@@ -60,6 +60,17 @@ export function SuppliersIcon(props) {
   );
 }
 
+// Estudio de Mercado de Cotizaciones: balanza, como comparación entre opciones.
+export function MarketStudyIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" {...common} {...props}>
+      <path d="M12 3v18M7 21h10" />
+      <path d="M4 7h6M14 7h6" />
+      <path d="M4 7l-2.5 5a2.5 2.5 0 0 0 5 0L4 7zM20 7l-2.5 5a2.5 2.5 0 0 0 5 0L20 7z" />
+    </svg>
+  );
+}
+
 export function InventoryIcon(props) {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" {...common} {...props}>

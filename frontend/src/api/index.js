@@ -21,6 +21,7 @@ export const platformAdminApi = {
   createCompany: (data) => platformAdminClient.post('/platform-admin/companies', data).then((r) => r.data),
   setCompanyStatus: (id, active) => platformAdminClient.patch(`/platform-admin/companies/${id}/status`, { active }).then((r) => r.data),
   updateCompanyPlan: (id, data) => platformAdminClient.patch(`/platform-admin/companies/${id}/plan`, data).then((r) => r.data),
+  updateCompanyFeatures: (id, enabledFeatures) => platformAdminClient.patch(`/platform-admin/companies/${id}/features`, { enabledFeatures }).then((r) => r.data),
   impersonateCompany: (id, reason) => platformAdminClient.post(`/platform-admin/companies/${id}/impersonate`, { reason }).then((r) => r.data),
   listSupportAccessLog: () => platformAdminClient.get('/platform-admin/support-access-log').then((r) => r.data),
   listRegistrationRequests: (status) => platformAdminClient.get('/platform-admin/registration-requests', { params: status ? { status } : {} }).then((r) => r.data),
@@ -143,6 +144,8 @@ export const purchaseOrdersApi = {
   addReceipt: (pid, id, itemId, data) => client.post(`/projects/${pid}/purchase-orders/${id}/items/${itemId}/receipts`, data).then((r) => r.data),
   close: (pid, id, closureReason) => client.post(`/projects/${pid}/purchase-orders/${id}/close`, { closureReason }).then((r) => r.data),
   report: (pid, params) => client.get(`/projects/${pid}/purchase-orders/report`, { params }).then((r) => r.data),
+  approve: (pid, id) => client.post(`/projects/${pid}/purchase-orders/${id}/approve`).then((r) => r.data),
+  reject: (pid, id) => client.post(`/projects/${pid}/purchase-orders/${id}/reject`).then((r) => r.data),
 };
 
 export const executionApi = {
@@ -237,6 +240,26 @@ export const supplierPurchaseOrdersApi = {
   convertToExpense: (id, data) => client.post(`/purchase-orders/${id}/convert-to-expense`, data).then((r) => r.data),
   addReceipt: (id, itemId, data) => client.post(`/purchase-orders/${id}/items/${itemId}/receipts`, data).then((r) => r.data),
   close: (id, closureReason) => client.post(`/purchase-orders/${id}/close`, { closureReason }).then((r) => r.data),
+  approve: (id) => client.post(`/purchase-orders/${id}/approve`).then((r) => r.data),
+  reject: (id) => client.post(`/purchase-orders/${id}/reject`).then((r) => r.data),
+};
+
+// Estudio de Mercado de Cotizaciones: módulo "plus" (ver Company.enabledFeatures / HasFeature),
+// disponible global (sin pid) y por proyecto (con pid) — mismo backend en ambos casos, ver
+// backend/routes/marketStudyRoutes.js y globalMarketStudyRoutes.js.
+function marketStudyBase(pid) { return pid ? `/projects/${pid}/market-studies` : '/market-studies'; }
+export const marketStudiesApi = {
+  list: (pid, params) => client.get(marketStudyBase(pid), { params }).then((r) => r.data),
+  get: (pid, id) => client.get(`${marketStudyBase(pid)}/${id}`).then((r) => r.data),
+  create: (pid, data) => client.post(marketStudyBase(pid), data).then((r) => r.data),
+  update: (pid, id, data) => client.put(`${marketStudyBase(pid)}/${id}`, data).then((r) => r.data),
+  remove: (pid, id) => client.delete(`${marketStudyBase(pid)}/${id}`),
+  scanQuotation: (pid, id, formData) => client.post(`${marketStudyBase(pid)}/${id}/scan`, formData).then((r) => r.data),
+  addQuotation: (pid, id, formData) => client.post(`${marketStudyBase(pid)}/${id}/quotations`, formData).then((r) => r.data),
+  updateQuotation: (pid, id, quotationId, data) => client.put(`${marketStudyBase(pid)}/${id}/quotations/${quotationId}`, data).then((r) => r.data),
+  removeQuotation: (pid, id, quotationId) => client.delete(`${marketStudyBase(pid)}/${id}/quotations/${quotationId}`),
+  comparison: (pid, id) => client.get(`${marketStudyBase(pid)}/${id}/comparison`).then((r) => r.data),
+  generateDraft: (pid, id, data) => client.post(`${marketStudyBase(pid)}/${id}/generate-draft`, data).then((r) => r.data),
 };
 
 export const inventoryItemsApi = {

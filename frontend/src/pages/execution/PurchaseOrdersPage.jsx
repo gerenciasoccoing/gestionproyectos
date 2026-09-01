@@ -234,7 +234,15 @@ export default function PurchaseOrdersPage() {
                 <td className="py-2 pr-3 text-gray-400 font-mono text-xs">{o.orderNumber ? `${o.contractPrefix ? `${o.contractPrefix}-` : ''}${o.orderNumber}` : '-'}</td>
                 <td className="py-2 pr-3">{o.supplier}</td>
                 <td className="py-2 pr-3">{formatDate(o.date)}</td>
-                <td className="py-2 pr-3"><Badge color={STATUS_COLORS[o.status]}>{t(`execution.purchaseOrders.status.${o.status}`, o.status)}</Badge></td>
+                <td className="py-2 pr-3 flex flex-wrap gap-1">
+                  <Badge color={STATUS_COLORS[o.status]}>{t(`execution.purchaseOrders.status.${o.status}`, o.status)}</Badge>
+                  {o.approvalState === 'pendiente_aprobacion' && (
+                    <Badge color="yellow">{t('execution.purchaseOrders.approvalState.pendiente_aprobacion')}</Badge>
+                  )}
+                  {o.approvalState === 'rechazada' && (
+                    <Badge color="red">{t('execution.purchaseOrders.approvalState.rechazada')}</Badge>
+                  )}
+                </td>
                 <td className="py-2 pr-3">{o.items?.length || 0}</td>
                 <td className="py-2 pr-3">{o.expenseId ? <Badge color="green">{t('execution.purchaseOrders.transferred')}</Badge> : <span className="text-gray-400 text-xs">-</span>}</td>
                 <td className="py-2 pr-3 text-right whitespace-nowrap">
@@ -363,13 +371,52 @@ function OrderDetail({ projectId, orderId, budgetItems, cashBoxes, onChange }) {
     }
   };
 
+  const approve = async () => {
+    setError('');
+    try {
+      await purchaseOrdersApi.approve(projectId, orderId);
+      load();
+      onChange();
+    } catch (err) {
+      setError(extractError(err));
+    }
+  };
+
+  const reject = async () => {
+    if (!confirm(t('execution.purchaseOrders.confirmReject'))) return;
+    setError('');
+    try {
+      await purchaseOrdersApi.reject(projectId, orderId);
+      load();
+      onChange();
+    } catch (err) {
+      setError(extractError(err));
+    }
+  };
+
   if (!order) return null;
-  const canClose = order.status !== 'cerrada' && order.status !== 'cerrada_con_faltantes';
+  const isPending = order.approvalState === 'pendiente_aprobacion';
+  const isRejected = order.approvalState === 'rechazada';
+  const canClose = !isPending && !isRejected && order.status !== 'cerrada' && order.status !== 'cerrada_con_faltantes';
   const fullyDelivered = order.items?.every((i) => i.pending <= 0);
   const itemsLocked = !canClose || !!order.expenseId;
 
   return (
     <Card title={t('execution.purchaseOrders.orderDetail', { supplier: order.supplier })}>
+      {isPending && (
+        <div className="mb-3 bg-yellow-50 border border-yellow-200 rounded px-3 py-2">
+          <p className="text-sm text-yellow-800 mb-2">{t('execution.purchaseOrders.pendingApprovalNote')}</p>
+          <Can module="ordenes_compra" action="edit">
+            <Button onClick={approve}>{t('execution.purchaseOrders.approve')}</Button>
+            <Button variant="danger" className="ml-2" onClick={reject}>{t('execution.purchaseOrders.reject')}</Button>
+          </Can>
+        </div>
+      )}
+      {isRejected && (
+        <p className="text-sm text-red-700 mb-3 bg-red-50 border border-red-200 rounded px-3 py-2">
+          {t('execution.purchaseOrders.rejectedNote')}
+        </p>
+      )}
       {order.expenseId && (
         <p className="text-sm text-green-700 mb-3 bg-green-50 border border-green-200 rounded px-3 py-2">
           {t('execution.purchaseOrders.transferredNote')}
@@ -470,7 +517,7 @@ function OrderDetail({ projectId, orderId, budgetItems, cashBoxes, onChange }) {
       )}
       {order.closureReason && <p className="text-sm text-gray-500 mt-2">{t('execution.purchaseOrders.closureReasonLabel')}: {order.closureReason}</p>}
 
-      {!order.expenseId && order.cashBoxId && (
+      {!isPending && !isRejected && !order.expenseId && order.cashBoxId && (
         <Can module="ordenes_compra" action="edit">
           <div className="mt-4 border-t pt-3">
             {!showConvert ? (

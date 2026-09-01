@@ -9,6 +9,12 @@ const emptyForm = {
   adminName: '', adminEmail: '', adminPassword: '',
 };
 
+// Catálogo de módulos "plus" activables (ver backend/config/permissions.js y
+// platformAdminController.AVAILABLE_FEATURES) — agregar un futuro plus es agregar una entrada acá.
+const AVAILABLE_FEATURES = [
+  { key: 'estudio_mercado', label: 'Estudio de Mercado de Cotizaciones' },
+];
+
 // Panel de super-admin: lista de empresas (tenants), activar/desactivar acceso, alta de empresas
 // nuevas y edición del plan (esqueleto de planes/límites — ver Company.js: planTier es una
 // etiqueta libre, maxUsers/maxActiveProjects son topes blandos, vacío = sin límite). No usa
@@ -22,6 +28,8 @@ export default function PlatformAdminDashboardPage() {
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const [editingFeaturesId, setEditingFeaturesId] = useState(null);
 
   const [editingPlanId, setEditingPlanId] = useState(null);
   const [planForm, setPlanForm] = useState({ planTier: '', maxUsers: '', maxActiveProjects: '' });
@@ -88,6 +96,17 @@ export default function PlatformAdminDashboardPage() {
   const toggleActive = async (company) => {
     try {
       await platformAdminApi.setCompanyStatus(company.id, !company.active);
+      load();
+    } catch (err) {
+      setError(extractError(err));
+    }
+  };
+
+  const toggleFeature = async (company, featureKey) => {
+    const current = company.enabledFeatures || [];
+    const next = current.includes(featureKey) ? current.filter((f) => f !== featureKey) : [...current, featureKey];
+    try {
+      await platformAdminApi.updateCompanyFeatures(company.id, next);
       load();
     } catch (err) {
       setError(extractError(err));
@@ -243,6 +262,13 @@ export default function PlatformAdminDashboardPage() {
                       <Button
                         type="button"
                         variant="secondary"
+                        onClick={() => setEditingFeaturesId(editingFeaturesId === c.id ? null : c.id)}
+                      >
+                        {editingFeaturesId === c.id ? 'Cancelar' : 'Módulos plus'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
                         disabled={!c.active || impersonating === c.id}
                         onClick={() => enterAsSupport(c)}
                       >
@@ -250,6 +276,27 @@ export default function PlatformAdminDashboardPage() {
                       </Button>
                     </td>
                   </tr>
+                  {editingFeaturesId === c.id && (
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <td colSpan={7} className="py-3 px-3">
+                        <p className="text-xs text-gray-500 mb-2">
+                          Módulos "plus" activados para esta empresa. No visibles ni accesibles (ni por menú ni por URL directa) si están apagados aquí, sin importar los permisos de sus usuarios.
+                        </p>
+                        <div className="flex flex-wrap gap-4">
+                          {AVAILABLE_FEATURES.map((f) => (
+                            <label key={f.key} className="text-sm flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={(c.enabledFeatures || []).includes(f.key)}
+                                onChange={() => toggleFeature(c, f.key)}
+                              />
+                              {f.label}
+                            </label>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                   {editingPlanId === c.id && (
                     <tr className="border-b border-gray-100 bg-gray-50">
                       <td colSpan={7} className="py-3 px-3">

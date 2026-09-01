@@ -51,8 +51,16 @@ export function AuthProvider({ children }) {
     return user.permissions?.includes(`${moduleName}:${action}`);
   }, [user, isAdmin]);
 
+  // Módulo "plus" activado para la empresa (ver Company.enabledFeatures) — a diferencia de can(),
+  // esto NO se salta ni siendo admin: es un interruptor de producto que solo controla el
+  // super-administrador de la plataforma (ver HasFeature.jsx).
+  const hasFeature = useCallback((featureKey) => {
+    if (!user) return false;
+    return Boolean(user.enabledFeatures?.includes(featureKey));
+  }, [user]);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, can, isAdmin }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, can, isAdmin, hasFeature }}>
       {children}
     </AuthContext.Provider>
   );

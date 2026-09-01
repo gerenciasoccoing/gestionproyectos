@@ -51,4 +51,20 @@ function requireOptionalProjectAccess(getResource) {
   };
 }
 
-module.exports = { requirePermission, requireProjectAccess, requireOptionalProjectAccess };
+// Verifica que la EMPRESA (no el usuario) tenga activado un módulo "plus" (ver
+// Company.enabledFeatures / platformAdminController.updateCompanyFeatures). A diferencia de
+// requirePermission, esto no lo puede saltar un admin de la empresa: es un interruptor de
+// producto que solo controla el super-administrador de la plataforma. Se aplica en TODAS las
+// rutas del módulo (no solo en el frontend) para que una empresa sin el flag no pueda acceder ni
+// siquiera por URL directa.
+function requireFeature(featureKey) {
+  return (req, res, next) => {
+    if (!req.user) return next(new ApiError(401, 'No autenticado'));
+    if (!req.user.enabledFeatures?.includes(featureKey)) {
+      return next(new ApiError(403, 'Este módulo no está activado para tu empresa. Contacta a tu administrador.'));
+    }
+    return next();
+  };
+}
+
+module.exports = { requirePermission, requireProjectAccess, requireOptionalProjectAccess, requireFeature };

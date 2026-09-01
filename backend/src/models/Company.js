@@ -32,6 +32,13 @@ module.exports = (sequelize) => {
     planTier: { type: DataTypes.STRING, allowNull: false, defaultValue: 'estandar' },
     maxUsers: { type: DataTypes.INTEGER, allowNull: true },
     maxActiveProjects: { type: DataTypes.INTEGER, allowNull: true },
+    // Módulos "plus" activados para esta empresa (ver middleware/authorize.js#requireFeature),
+    // controlado únicamente desde el panel de super-administrador. Array de claves libres (ej.
+    // "estudio_mercado") en vez de una columna booleana por feature, para que activar un futuro
+    // módulo plus sea agregar una clave nueva a este catálogo, sin tocar el esquema otra vez.
+    // Apagado por defecto: una empresa nueva no tiene ningún plus activo hasta que el operador se
+    // lo active a mano.
+    enabledFeatures: { type: DataTypes.JSONB, allowNull: false, defaultValue: [] },
   });
 
   return Company;

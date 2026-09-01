@@ -7,6 +7,7 @@ const MODULES = [
   'contractual',
   'ejecucion',
   'ordenes_compra',
+  'estudio_mercado',
   'personal',
   'gastos',
   'informes',

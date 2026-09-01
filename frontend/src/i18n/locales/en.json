@@ -50,7 +50,8 @@
     "logoutShort": "Log out",
     "openMenu": "Open menu",
     "toggleSidebar": "Show/hide menu",
-    "language": "Language"
+    "language": "Language",
+    "marketStudy": "Market Study"
   },
   "purchaseOrdersMenu": {
     "title": "Purchase Orders",
@@ -123,7 +124,8 @@
       "execution": "Execution",
       "personnel": "Personnel",
       "expenses": "Expenses",
-      "reports": "Reports"
+      "reports": "Reports",
+      "marketStudy": "Market Study"
     },
     "consortium": {
       "label": "Contracting entity",
@@ -358,7 +360,17 @@
       "confirmDelete": "Delete this purchase order? This action cannot be undone.",
       "editOrder": "Edit order",
       "itemHasDeliveries": "Already has {{qty}} delivered: cannot be removed",
-      "closedOrderNotEditable": "This order is closed and cannot be edited (header or items)."
+      "closedOrderNotEditable": "This order is closed and cannot be edited (header or items).",
+      "approve": "Approve",
+      "reject": "Reject",
+      "confirmReject": "Reject this order? It will stay outside the normal flow and will never generate expenses.",
+      "pendingApprovalNote": "This order is a draft generated from a Market Study Comparison and is pending approval. You can edit it freely; it cannot receive deliveries, be closed, or be transferred to expenses until it is approved.",
+      "rejectedNote": "This order was rejected and stays outside the normal flow. It never generates expenses.",
+      "approvalState": {
+        "pendiente_aprobacion": "Pending approval",
+        "aprobada": "Approved",
+        "rechazada": "Rejected"
+      }
     },
     "milestones": {
       "title": "Milestones",
@@ -1561,5 +1573,69 @@
     "expired": "This link has expired. Contact the administrator to handle it manually.",
     "notFound": "Confirmation link not found or invalid.",
     "confirmFailed": "Could not register the confirmation."
+  },
+  "marketStudy": {
+    "title": "Market Study Comparison",
+    "subtitle": "Compare quotations from different suppliers for the same purchase requirement and decide who to buy from.",
+    "new": "+ New study",
+    "studyTitle": "Study title",
+    "project": "Project",
+    "noProjectPlaceholder": "No project",
+    "budgetItem": "Budget item (optional)",
+    "table": {
+      "title": "Title",
+      "project": "Project",
+      "suppliers": "Quotations",
+      "status": "Status",
+      "created": "Created",
+      "supplier": "Supplier",
+      "items": "Items"
+    },
+    "status": {
+      "abierta": "Open",
+      "decidida": "Decided"
+    },
+    "viewDetail": "View detail",
+    "empty": "No market studies yet.",
+    "decidedNote": "This study was already decided. The following draft purchase orders were generated:",
+    "quotationsTitle": "Uploaded quotations",
+    "noQuotations": "No quotation has been uploaded yet.",
+    "confirmDeleteQuotation": "Delete this quotation? This cannot be undone.",
+    "deliveryTime": "Delivery time",
+    "validUntil": "Offer valid until",
+    "extractionStatus": "AI reading",
+    "extraction": {
+      "ok": "OK",
+      "revisar": "Needs review"
+    },
+    "addQuotation": "Add quotation",
+    "file": "File (PDF, image, or Excel)",
+    "reading": "Reading…",
+    "readAuto": "Read automatically",
+    "scanDone": "Data read. Review and correct it before saving.",
+    "scanNote": "The automatic reading is a suggestion: review the data before saving, especially items flagged for review.",
+    "registeredSupplier": "Registered supplier",
+    "newSupplierPlaceholder": "New supplier (not linked)",
+    "supplierName": "Supplier name",
+    "supplierRequired": "Supplier name is required",
+    "itemsRequired": "Must include at least one item with a name",
+    "paymentTerms": "Payment terms",
+    "noLinkedSupplierNote": "This supplier is not linked to your Suppliers catalog.",
+    "createSupplierLink": "Create supplier",
+    "items": "Quoted items",
+    "itemName": "Item",
+    "groupKey": "Comparison label",
+    "groupKeyHint": "Items with the same label across suppliers are compared in the same matrix row. Fix it if two suppliers described the same item with different wording.",
+    "comparisonTitle": "Comparison matrix",
+    "item": "Item",
+    "supplierTotal": "Total per supplier",
+    "needsReview": "Review",
+    "noOffer": "no offer",
+    "splitSuggested": "AI suggestion: the best price is split across several suppliers (reason: lowest price). You can split the purchase manually or buy everything from a single supplier.",
+    "generateDraftTitle": "Generate draft purchase order(s)",
+    "generateDraftHint": "Choose which supplier(s) to buy from and which items from each to include. The best-price suggestion is preselected — adjust it freely. Each order stays a draft, pending approval, and 100% editable before approval.",
+    "selectAtLeastOneSupplier": "Select at least one supplier to generate its draft order",
+    "confirmGenerateDraft": "Generate draft purchase order(s)",
+    "draftGenerated": "{{count}} draft purchase order(s) generated. You can review and approve them from Purchase Orders."
   }
 }

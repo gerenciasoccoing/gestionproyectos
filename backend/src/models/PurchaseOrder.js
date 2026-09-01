@@ -41,6 +41,17 @@ module.exports = (sequelize) => {
     // momento, o si la orden no tiene proyecto. No se recalcula si el número del proyecto cambia
     // después.
     contractPrefix: { type: DataTypes.STRING(3), allowNull: true },
+    // Borrador generado desde el Estudio de Mercado de Cotizaciones (ver marketStudyService.js):
+    // STRING en vez de sumarse al ENUM `status` de arriba, para no tener que ALTERar ese tipo ya
+    // existente en producción (riesgoso vía sync alter). null = flujo normal de siempre (orden
+    // creada a mano, o ya aprobada). 'pendiente_aprobacion' bloquea convertToExpense/addReceipt/
+    // close (ver purchaseOrderController.js) pero NO bloquea editar — la orden sigue siendo
+    // 'abierta' en status y 100% editable hasta que se apruebe. 'rechazada' la deja fuera del
+    // flujo normal para siempre (nunca genera gastos).
+    approvalState: { type: DataTypes.STRING, allowNull: true },
+    // Estudio de Mercado que originó este borrador (ver MarketStudy.js), null en una orden creada
+    // por el flujo normal de siempre. Solo trazabilidad — no afecta ninguna lógica existente.
+    marketStudyId: { type: DataTypes.UUID, allowNull: true },
   });
 
   PurchaseOrder.associate = (models) => {
@@ -48,6 +59,7 @@ module.exports = (sequelize) => {
     PurchaseOrder.belongsTo(models.ThirdParty, { foreignKey: 'supplierId', as: 'supplierParty' });
     PurchaseOrder.belongsTo(models.Expense, { foreignKey: 'expenseId', as: 'expense' });
     PurchaseOrder.belongsTo(models.CashBox, { foreignKey: 'cashBoxId' });
+    PurchaseOrder.belongsTo(models.MarketStudy, { foreignKey: 'marketStudyId', as: 'marketStudy' });
     PurchaseOrder.hasMany(models.PurchaseOrderItem, { foreignKey: 'purchaseOrderId', as: 'items', onDelete: 'CASCADE' });
   };
 
