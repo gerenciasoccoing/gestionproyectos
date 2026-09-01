@@ -353,9 +353,12 @@ const updateOrder = asyncHandler(async (req, res) => {
 });
 
 // Elimina la orden completa (sus ítems se borran en cascada). Bloqueada si ya generó cualquier
-// gasto real (traslado a gastos o alguna recepción registrada): borrar la orden no revierte esos
-// gastos ni el saldo que ya salió de la caja — quedarían huérfanos, sin la orden que los originó,
-// mientras el dinero ya se movió. Hay que resolver esos gastos desde el módulo de Gastos primero.
+// gasto real (traslado a gastos, ver expenseId) o ya tiene recepciones registradas: borrar la
+// orden no revierte un gasto ya generado ni el saldo que ya salió de la caja (quedaría huérfano,
+// sin la orden que lo originó), y borrar recepciones ya registradas perdería el control real de
+// qué material se recibió. Si ya hay un gasto (order.expenseId), hay que resolverlo desde el
+// módulo de Gastos primero; si solo hay recepciones sin gasto (addReceipt ya no genera uno, ver
+// esa función), hay que revertirlas desde la orden antes de poder eliminarla.
 const remove = asyncHandler(async (req, res) => {
   const order = await PurchaseOrder.findOne({ where: scopeWhere(req), include: [{ model: PurchaseOrderItem, as: 'items' }] });
   if (!order) throw new ApiError(404, 'Orden de compra no encontrada');
@@ -366,7 +369,7 @@ const remove = asyncHandler(async (req, res) => {
   const itemIds = order.items.map((it) => it.id);
   const receiptCount = itemIds.length ? await PurchaseReceipt.count({ where: { purchaseOrderItemId: itemIds } }) : 0;
   if (receiptCount > 0) {
-    throw new ApiError(400, 'Esta orden ya tiene recepciones registradas, cada una con su propio gasto. Elimina esos gastos desde el módulo de Gastos antes de eliminar la orden.');
+    throw new ApiError(400, 'Esta orden ya tiene recepciones registradas. Revierte esas recepciones antes de eliminar la orden.');
   }
 
   await order.destroy();
@@ -449,8 +452,16 @@ const convertToExpense = asyncHandler(async (req, res) => {
   res.status(201).json({ ...full.toJSON(), warning });
 });
 
-// Registra una recepción (total o parcial) y genera automáticamente el gasto en la categoría
-// "materiales". Requiere proyecto asignado por la misma razón que convertToExpense.
+// Registra una recepción (total o parcial): SOLO actualiza qué se entregó vs. lo ordenado (esta
+// orden y el "Reporte de compras", ver purchaseOrderService.getPurchaseReport, se basan
+// directamente en PurchaseReceipt). NO genera ningún gasto — antes sí lo hacía automáticamente
+// (un Expense por recepción, category 'materiales'), lo que duplicaba el valor cuando la orden
+// ADEMÁS se trasladaba por completo con "Pasar a Gastos" (ver convertToExpense): el mismo
+// material quedaba contado dos veces. El único camino para que una recepción genere un gasto real
+// es la acción explícita "Pasar a Gastos" sobre la orden. Requiere proyecto asignado por la misma
+// razón que convertToExpense (un gasto, cuando se genere más adelante, siempre pertenece a un
+// proyecto). Ya no exige caja asignada: al no mover dinero, no hay de dónde descontar todavía —
+// la caja se sigue pidiendo (y validando) recién al ejecutar "Pasar a Gastos".
 const addReceipt = asyncHandler(async (req, res) => {
   const order = await PurchaseOrder.findOne({ where: scopeWhere(req) });
   if (!order) throw new ApiError(404, 'Orden de compra no encontrada');
@@ -468,12 +479,6 @@ const addReceipt = asyncHandler(async (req, res) => {
   const { date, quantityReceived, notes } = req.body;
   if (!date || quantityReceived === undefined) throw new ApiError(400, 'date y quantityReceived son obligatorios');
   if (Number(quantityReceived) < 0) throw new ApiError(400, 'La cantidad recibida no puede ser negativa');
-  // Misma caja para toda la orden (ver comentario en convertToExpense): ya no se vuelve a
-  // preguntar en cada recepción.
-  if (!order.cashBoxId) {
-    throw new ApiError(400, 'Esta orden no tiene una caja asignada. Edítala para asignarle una antes de registrar recepciones.');
-  }
-  const cashBoxId = order.cashBoxId;
 
   const existingReceipts = await PurchaseReceipt.findAll({ where: { purchaseOrderItemId: item.id } });
   const deliveredBefore = existingReceipts.reduce((sum, r) => sum + Number(r.quantityReceived), 0);
@@ -482,47 +487,24 @@ const addReceipt = asyncHandler(async (req, res) => {
     ? `La cantidad entregada acumulada (${deliveredAfter}) supera la cantidad ordenada (${item.quantityOrdered}).`
     : null;
 
-  const { receipt, expense, cashBoxWarning } = await sequelize.transaction(async (t) => {
-    await assertCashBoxUsable(cashBoxId, { transaction: t });
-    const expenseNumber = await nextExpenseNumber(t);
-    const contractPrefix = await contractPrefixForProject(order.projectId, t);
-    const expenseCreated = await Expense.create({
-      projectId: order.projectId,
-      cashBoxId,
-      supplierId: order.supplierId,
-      category: 'materiales',
-      amount: Number(quantityReceived) * Number(item.unitPrice),
-      date,
-      description: `Recepción de "${item.name}" - orden de compra ${order.id}`,
-      source: 'purchase_receipt',
-      sourceId: null,
-      createdBy: req.user.id,
-      expenseNumber,
-      contractPrefix,
-    }, { transaction: t });
-
+  const receipt = await sequelize.transaction(async (t) => {
     const receiptCreated = await PurchaseReceipt.create({
       purchaseOrderItemId: item.id,
       date,
       quantityReceived,
       notes,
-      expenseId: expenseCreated.id,
       createdBy: req.user.id,
     }, { transaction: t });
-
-    expenseCreated.sourceId = receiptCreated.id;
-    await expenseCreated.save({ transaction: t });
 
     if (order.status === 'abierta') {
       order.status = 'parcial';
       await order.save({ transaction: t });
     }
 
-    const cbWarning = await overdraftWarning(cashBoxId, { transaction: t });
-    return { receipt: receiptCreated, expense: expenseCreated, cashBoxWarning: cbWarning };
+    return receiptCreated;
   });
 
-  res.status(201).json({ receipt, expense, warning, cashBoxWarning });
+  res.status(201).json({ receipt, warning });
 });
 
 // Cierre normal (todo entregado) o cierre con faltantes justificados (requiere closureReason).

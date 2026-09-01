@@ -342,21 +342,20 @@ function PurchaseOrderMenuDetail({ orderId, cashBoxes, onChange }) {
 
   const assignedCashBox = order && cashBoxes.find((cb) => cb.id === order.cashBoxId);
 
-  const submitReceipt = async (itemId) => {
+  const [submitReceiptFor, submittingReceipt] = useSubmitGuard(async (itemId) => {
     setError(''); setWarning('');
     const data = receiptForms[itemId] || {};
     if (!data.date || !data.quantityReceived) { setError(t('execution.purchaseOrders.receiptRequired')); return; }
     try {
       const res = await supplierPurchaseOrdersApi.addReceipt(orderId, itemId, data);
       if (res.warning) setWarning(res.warning);
-      if (res.cashBoxWarning) setWarning((w) => (w ? `${w} ${res.cashBoxWarning}` : res.cashBoxWarning));
       setReceiptForms((f) => ({ ...f, [itemId]: {} }));
       load();
       onChange();
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   const close = async (withReason) => {
     setError('');
@@ -369,7 +368,7 @@ function PurchaseOrderMenuDetail({ orderId, cashBoxes, onChange }) {
     }
   };
 
-  const convertToExpense = async () => {
+  const [convertToExpense, convertingToExpense] = useSubmitGuard(async () => {
     setError('');
     if (!confirm(t('execution.purchaseOrders.confirmConvertDialog'))) return;
     try {
@@ -381,9 +380,9 @@ function PurchaseOrderMenuDetail({ orderId, cashBoxes, onChange }) {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
-  const approve = async () => {
+  const [approve, approving] = useSubmitGuard(async () => {
     setError('');
     try {
       await supplierPurchaseOrdersApi.approve(orderId);
@@ -392,9 +391,9 @@ function PurchaseOrderMenuDetail({ orderId, cashBoxes, onChange }) {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
-  const reject = async () => {
+  const [reject, rejecting] = useSubmitGuard(async () => {
     if (!confirm(t('execution.purchaseOrders.confirmReject'))) return;
     setError('');
     try {
@@ -404,7 +403,7 @@ function PurchaseOrderMenuDetail({ orderId, cashBoxes, onChange }) {
     } catch (err) {
       setError(extractError(err));
     }
-  };
+  });
 
   if (!order) return null;
   const isPending = order.approvalState === 'pendiente_aprobacion';
@@ -419,8 +418,8 @@ function PurchaseOrderMenuDetail({ orderId, cashBoxes, onChange }) {
         <div className="mb-3 bg-yellow-50 border border-yellow-200 rounded px-3 py-2">
           <p className="text-sm text-yellow-800 mb-2">{t('execution.purchaseOrders.pendingApprovalNote')}</p>
           <Can module="ordenes_compra" action="edit">
-            <Button onClick={approve}>{t('execution.purchaseOrders.approve')}</Button>
-            <Button variant="danger" className="ml-2" onClick={reject}>{t('execution.purchaseOrders.reject')}</Button>
+            <Button onClick={approve} loading={approving} disabled={rejecting}>{t('execution.purchaseOrders.approve')}</Button>
+            <Button variant="danger" className="ml-2" onClick={reject} loading={rejecting} disabled={approving}>{t('execution.purchaseOrders.reject')}</Button>
           </Can>
         </div>
       )}
@@ -456,11 +455,11 @@ function PurchaseOrderMenuDetail({ orderId, cashBoxes, onChange }) {
             <td className="py-2 pr-3">
               {hasProject && (
                 <Can module="ordenes_compra" action="edit">
-                  {canClose && order.cashBoxId && (
+                  {canClose && (
                     <div className="flex flex-wrap gap-2">
                       <Input type="date" value={receiptForms[it.id]?.date || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], date: e.target.value } }))} />
                       <Input type="number" min="0" step="0.01" placeholder={t('execution.purchaseOrders.receiptQty')} value={receiptForms[it.id]?.quantityReceived || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], quantityReceived: e.target.value } }))} />
-                      <Button onClick={() => submitReceipt(it.id)}>{t('execution.purchaseOrders.register')}</Button>
+                      <Button onClick={() => submitReceiptFor(it.id)} loading={submittingReceipt}>{t('execution.purchaseOrders.register')}</Button>
                     </div>
                   )}
                 </Can>
@@ -511,8 +510,8 @@ function PurchaseOrderMenuDetail({ orderId, cashBoxes, onChange }) {
                   {CATEGORIES.map((c) => <option key={c} value={c}>{t(`execution.dashboard.categories.${c}`)}</option>)}
                 </Select>
                 <Input label={t('execution.purchaseOrders.expenseDate')} type="date" value={convertForm.date} onChange={(e) => setConvertForm({ ...convertForm, date: e.target.value })} placeholder={order.date} />
-                <Button onClick={convertToExpense}>{t('execution.purchaseOrders.confirmTransfer')}</Button>
-                <Button variant="secondary" onClick={() => setShowConvert(false)}>{t('execution.purchaseOrders.cancel')}</Button>
+                <Button onClick={convertToExpense} loading={convertingToExpense}>{t('execution.purchaseOrders.confirmTransfer')}</Button>
+                <Button variant="secondary" onClick={() => setShowConvert(false)} disabled={convertingToExpense}>{t('execution.purchaseOrders.cancel')}</Button>
               </div>
             )}
             <p className="text-xs text-gray-400 mt-1">{t('execution.purchaseOrders.transferNote', { count: order.items?.length || 0 })}</p>
