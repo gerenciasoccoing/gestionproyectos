@@ -297,7 +297,9 @@
         "status": "Status",
         "items": "Items",
         "expenses": "Expenses",
-        "total": "Total value"
+        "total": "Total value",
+        "paid": "Paid",
+        "balance": "Balance"
       },
       "transferred": "Transferred",
       "detail": "Detail",
@@ -372,7 +374,21 @@
         "aprobada": "Approved",
         "rechazada": "Rejected"
       },
-      "projectTotal": "Total Purchase Orders for this project: {{amount}}"
+      "projectTotal": "Total Purchase Orders for this project: {{amount}}",
+      "totalsPaid": "Total paid",
+      "totalsBalance": "Balance due",
+      "confirmEditReceiptWithDownstream": "This receipt was already used by an expense or has registered payments. Correcting the quantity may affect those records. Continue anyway?",
+      "receiptNotes": "Notes",
+      "receiptEdited": "edited on {{date}}",
+      "paymentsTitle": "Payments",
+      "noPayments": "No payments registered.",
+      "addPayment": "+ Add payment",
+      "paymentAmount": "Payment amount",
+      "paymentDate": "Payment date",
+      "paymentNotes": "Notes (optional)",
+      "paymentReceiptFile": "Payment receipt",
+      "paymentRequired": "Amount, date and payment receipt are required",
+      "viewReceipt": "View receipt"
     },
     "milestones": {
       "title": "Milestones",
@@ -729,7 +745,10 @@
       "equipos": "Equipment",
       "viaticos": "Per diem",
       "imprevistos": "Contingencies"
-    }
+    },
+    "uploading": "Uploading...",
+    "replace": "Replace",
+    "attach": "Attach"
   },
   "thirdParties": {
     "tabs": {

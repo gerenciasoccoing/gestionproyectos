@@ -39,12 +39,14 @@ export default function ExpensesPage() {
     ? {
       list: (params) => generalExpensesApi.list(params),
       create: (fd) => generalExpensesApi.create(fd),
+      update: (id, fd) => generalExpensesApi.update(id, fd),
       remove: (id) => generalExpensesApi.remove(id),
       scan: (fd) => generalExpensesApi.scan(fd),
     }
     : {
       list: () => expensesApi.list(projectId),
       create: (fd) => expensesApi.create(projectId, fd),
+      update: (id, fd) => expensesApi.update(projectId, id, fd),
       remove: (id) => expensesApi.remove(projectId, id),
       scan: (fd) => expensesApi.scan(projectId, fd),
     };
@@ -63,6 +65,7 @@ export default function ExpensesPage() {
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   const [expandedId, setExpandedId] = useState(null);
+  const [uploadingDoc, setUploadingDoc] = useState(null);
 
   const [cashBoxes, setCashBoxes] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -212,6 +215,26 @@ export default function ExpensesPage() {
     if (!confirm(t('expenses.confirmDelete'))) return;
     await api.remove(id);
     load();
+  };
+
+  // Adjunta o reemplaza SOLO la factura o SOLO el comprobante de pago de un gasto ya creado — en
+  // gastos no manuales (generados por recepción/traslado desde una Orden de Compra), el backend
+  // solo acepta estos dos campos de archivo (ver expenseController.js#update), así que aquí nunca
+  // se envían los demás campos del gasto.
+  const uploadDoc = async (expenseId, field, file) => {
+    if (!file) return;
+    setUploadingDoc(`${expenseId}:${field}`);
+    setError('');
+    try {
+      const fd = new FormData();
+      fd.append(field, file);
+      await api.update(expenseId, fd);
+      load();
+    } catch (err) {
+      setError(extractError(err));
+    } finally {
+      setUploadingDoc(null);
+    }
   };
 
   return (
@@ -413,8 +436,24 @@ export default function ExpensesPage() {
                 <td className="py-1 pr-3 text-xs text-gray-500">
                   {t(`expenses.sources.${e.source}`, e.source === 'manual' ? 'Manual' : e.source)}
                 </td>
-                <td className="py-1 pr-3">{e.supportFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(e.supportFilePath)} target="_blank" rel="noreferrer">{t('common.view')}</a> : '-'}</td>
-                <td className="py-1 pr-3">{e.paymentReceiptFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(e.paymentReceiptFilePath)} target="_blank" rel="noreferrer">{t('common.view')}</a> : '-'}</td>
+                <td className="py-1 pr-3">
+                  {e.supportFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(e.supportFilePath)} target="_blank" rel="noreferrer">{t('common.view')}</a> : '-'}
+                  <Can module="gastos" action="edit">
+                    <label className="block mt-1 text-xs text-blue-600 hover:underline cursor-pointer">
+                      {uploadingDoc === `${e.id}:invoiceFile` ? t('expenses.uploading') : (e.supportFilePath ? t('expenses.replace') : t('expenses.attach'))}
+                      <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" disabled={uploadingDoc === `${e.id}:invoiceFile`} onChange={(ev) => { uploadDoc(e.id, 'invoiceFile', ev.target.files?.[0]); ev.target.value = ''; }} />
+                    </label>
+                  </Can>
+                </td>
+                <td className="py-1 pr-3">
+                  {e.paymentReceiptFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(e.paymentReceiptFilePath)} target="_blank" rel="noreferrer">{t('common.view')}</a> : '-'}
+                  <Can module="gastos" action="edit">
+                    <label className="block mt-1 text-xs text-blue-600 hover:underline cursor-pointer">
+                      {uploadingDoc === `${e.id}:paymentReceiptFile` ? t('expenses.uploading') : (e.paymentReceiptFilePath ? t('expenses.replace') : t('expenses.attach'))}
+                      <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" disabled={uploadingDoc === `${e.id}:paymentReceiptFile`} onChange={(ev) => { uploadDoc(e.id, 'paymentReceiptFile', ev.target.files?.[0]); ev.target.value = ''; }} />
+                    </label>
+                  </Can>
+                </td>
                 <td className="py-1 pr-3 text-right">
                   {e.source === 'manual' && (
                     <Can module="gastos" action="delete"><Button variant="danger" onClick={() => remove(e.id)}>{t('common.delete')}</Button></Can>
@@ -452,6 +491,21 @@ export default function ExpensesPage() {
                           </tr>
                         ))}
                       </Table>
+                    )}
+                    {e.purchaseOrderPayments?.length > 0 && (
+                      <div className="mt-3">
+                        <h5 className="text-xs font-semibold text-gray-600 mb-1">{t('execution.purchaseOrders.paymentsTitle')} ({t('expenses.sources.purchase_order')})</h5>
+                        <Table columns={[t('execution.purchaseOrders.paymentDate'), t('execution.purchaseOrders.paymentAmount'), t('execution.purchaseOrders.paymentNotes'), '']}>
+                          {e.purchaseOrderPayments.map((p) => (
+                            <tr key={p.id} className="border-b border-gray-100">
+                              <td className="py-1 pr-3">{p.date}</td>
+                              <td className="py-1 pr-3">{money(p.amount)}</td>
+                              <td className="py-1 pr-3">{p.notes || '-'}</td>
+                              <td className="py-1 pr-3"><a className="text-blue-600 hover:underline" href={fileUrl(p.receiptFilePath)} target="_blank" rel="noreferrer">{t('execution.purchaseOrders.viewReceipt')}</a></td>
+                            </tr>
+                          ))}
+                        </Table>
+                      </div>
                     )}
                   </td>
                 </tr>

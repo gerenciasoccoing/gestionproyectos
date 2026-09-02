@@ -142,10 +142,12 @@ export const purchaseOrdersApi = {
   updateItem: (pid, id, itemId, data) => client.put(`/projects/${pid}/purchase-orders/${id}/items/${itemId}`, data).then((r) => r.data),
   convertToExpense: (pid, id, data) => client.post(`/projects/${pid}/purchase-orders/${id}/convert-to-expense`, data).then((r) => r.data),
   addReceipt: (pid, id, itemId, data) => client.post(`/projects/${pid}/purchase-orders/${id}/items/${itemId}/receipts`, data).then((r) => r.data),
+  updateReceipt: (pid, id, itemId, receiptId, data) => client.put(`/projects/${pid}/purchase-orders/${id}/items/${itemId}/receipts/${receiptId}`, data).then((r) => r.data),
   close: (pid, id, closureReason) => client.post(`/projects/${pid}/purchase-orders/${id}/close`, { closureReason }).then((r) => r.data),
   report: (pid, params) => client.get(`/projects/${pid}/purchase-orders/report`, { params }).then((r) => r.data),
   approve: (pid, id) => client.post(`/projects/${pid}/purchase-orders/${id}/approve`).then((r) => r.data),
   reject: (pid, id) => client.post(`/projects/${pid}/purchase-orders/${id}/reject`).then((r) => r.data),
+  addPayment: (pid, id, formData) => client.post(`/projects/${pid}/purchase-orders/${id}/payments`, formData).then((r) => r.data),
 };
 
 export const executionApi = {
@@ -239,9 +241,11 @@ export const supplierPurchaseOrdersApi = {
   updateItem: (id, itemId, data) => client.put(`/purchase-orders/${id}/items/${itemId}`, data).then((r) => r.data),
   convertToExpense: (id, data) => client.post(`/purchase-orders/${id}/convert-to-expense`, data).then((r) => r.data),
   addReceipt: (id, itemId, data) => client.post(`/purchase-orders/${id}/items/${itemId}/receipts`, data).then((r) => r.data),
+  updateReceipt: (id, itemId, receiptId, data) => client.put(`/purchase-orders/${id}/items/${itemId}/receipts/${receiptId}`, data).then((r) => r.data),
   close: (id, closureReason) => client.post(`/purchase-orders/${id}/close`, { closureReason }).then((r) => r.data),
   approve: (id) => client.post(`/purchase-orders/${id}/approve`).then((r) => r.data),
   reject: (id) => client.post(`/purchase-orders/${id}/reject`).then((r) => r.data),
+  addPayment: (id, formData) => client.post(`/purchase-orders/${id}/payments`, formData).then((r) => r.data),
 };
 
 // Estudio de Mercado de Cotizaciones: módulo "plus" (ver Company.enabledFeatures / HasFeature),

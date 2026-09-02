@@ -1,7 +1,7 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const {
-  sequelize, PurchaseOrder, PurchaseOrderItem, PurchaseReceipt, Expense, ExpenseItem, BudgetItem, APU, Project, ThirdParty, User,
+  sequelize, PurchaseOrder, PurchaseOrderItem, PurchaseReceipt, PurchaseOrderPayment, Expense, ExpenseItem, BudgetItem, APU, Project, ThirdParty, User,
 } = require('../models');
 const {
   getOrderItemsWithDelivery, getItemWithDelivery, isOrderFullyDelivered, getPurchaseReport, nextOrderNumber,
@@ -11,6 +11,29 @@ const { generatePurchaseOrderPdf } = require('../services/pdfService');
 const { getLetterheadForProject } = require('../services/letterheadService');
 const { assertCashBoxUsable, overdraftWarning } = require('../services/cashBoxService');
 const { nextExpenseNumber, contractPrefixForProject } = require('../services/numberingService');
+const { relativePath } = require('../middleware/upload');
+
+// Una sola consulta de agregación (SUM ... GROUP BY) para TODAS las órdenes de un listado a la
+// vez, en vez de una consulta por orden — ver PurchaseOrderPayment (abonos). Devuelve un Map
+// purchaseOrderId -> total abonado (solo trae las órdenes que sí tienen algún abono).
+async function totalPaidByOrder(orderIds) {
+  if (!orderIds.length) return new Map();
+  const rows = await PurchaseOrderPayment.findAll({
+    attributes: ['purchaseOrderId', [sequelize.fn('SUM', sequelize.col('amount')), 'totalPaid']],
+    where: { purchaseOrderId: orderIds },
+    group: ['purchaseOrderId'],
+    raw: true,
+  });
+  return new Map(rows.map((r) => [r.purchaseOrderId, Number(r.totalPaid)]));
+}
+
+function withPaymentTotals(orderJson, totalPaid) {
+  const paid = totalPaid || 0;
+  return {
+    ...orderJson,
+    totals: { ...orderJson.totals, totalPaid: paid, balance: orderJson.totals.grandTotal - paid },
+  };
+}
 
 // Estos controladores atienden DOS montajes de ruta: el anidado en proyecto
 // (/projects/:projectId/purchase-orders, ver purchaseOrderRoutes.js — comportamiento sin cambios)
@@ -37,7 +60,11 @@ const list = asyncHandler(async (req, res) => {
     include: [{ model: PurchaseOrderItem, as: 'items', include: [{ model: PurchaseReceipt, as: 'receipts' }] }],
     order: [['date', 'DESC']],
   });
-  res.json(orders.map((o) => ({ ...o.toJSON(), totals: computeOrderTotals(o.items, o.retentionPercent) })));
+  const paidByOrder = await totalPaidByOrder(orders.map((o) => o.id));
+  res.json(orders.map((o) => withPaymentTotals(
+    { ...o.toJSON(), totals: computeOrderTotals(o.items, o.retentionPercent) },
+    paidByOrder.get(o.id),
+  )));
 });
 
 // Listado global (ruta /purchase-orders, sin :projectId en la URL): usado tanto desde la ficha de
@@ -58,15 +85,26 @@ const listBySupplier = asyncHandler(async (req, res) => {
     ],
     order: [['date', 'DESC']],
   });
-  res.json(orders.map((o) => ({ ...o.toJSON(), totals: computeOrderTotals(o.items, o.retentionPercent) })));
+  const paidByOrder = await totalPaidByOrder(orders.map((o) => o.id));
+  res.json(orders.map((o) => withPaymentTotals(
+    { ...o.toJSON(), totals: computeOrderTotals(o.items, o.retentionPercent) },
+    paidByOrder.get(o.id),
+  )));
 });
 
 const get = asyncHandler(async (req, res) => {
-  const order = await PurchaseOrder.findOne({ where: scopeWhere(req), include: [{ model: Project, attributes: ['id', 'name'] }] });
+  const order = await PurchaseOrder.findOne({
+    where: scopeWhere(req),
+    include: [
+      { model: Project, attributes: ['id', 'name'] },
+      { model: PurchaseOrderPayment, as: 'payments', separate: true, order: [['date', 'DESC']] },
+    ],
+  });
   if (!order) throw new ApiError(404, 'Orden de compra no encontrada');
   const items = await getOrderItemsWithDelivery(order.id);
   const totals = computeOrderTotals(items, order.retentionPercent);
-  res.json({ ...order.toJSON(), items, totals });
+  const totalPaid = order.payments.reduce((s, p) => s + Number(p.amount), 0);
+  res.json({ ...order.toJSON(), items, totals: { ...totals, totalPaid, balance: totals.grandTotal - totalPaid } });
 });
 
 const create = asyncHandler(async (req, res) => {
@@ -455,6 +493,35 @@ const convertToExpense = asyncHandler(async (req, res) => {
   res.status(201).json({ ...full.toJSON(), warning });
 });
 
+// Registra un abono (pago parcial) sobre la orden, independiente de si sus ítems ya se recibieron
+// o no. Bloqueado solo si la orden ya se trasladó a Gastos (order.expenseId): de ahí en adelante
+// los pagos adicionales se registran directo en el Gasto resultante (ver expenseController.update,
+// que ahora admite adjuntar/actualizar comprobantes en cualquier momento). No se mueve ni se
+// duplica nada al convertir: el Gasto queda trazable a esta orden (Expense.sourceId = order.id),
+// así que su detalle simplemente lista estos abonos por purchaseOrderId — ver expenseController.get.
+const addPayment = asyncHandler(async (req, res) => {
+  const order = await PurchaseOrder.findOne({ where: scopeWhere(req) });
+  if (!order) throw new ApiError(404, 'Orden de compra no encontrada');
+  if (order.expenseId) {
+    throw new ApiError(400, 'Esta orden ya fue trasladada a gastos. Registra pagos adicionales directamente en el gasto resultante.');
+  }
+
+  const { amount, date, notes } = req.body;
+  if (amount === undefined || Number(amount) <= 0) throw new ApiError(400, 'amount es obligatorio y debe ser mayor a 0');
+  if (!date) throw new ApiError(400, 'date es obligatorio');
+  if (!req.file) throw new ApiError(400, 'Debe adjuntar el comprobante de pago del abono');
+
+  const payment = await PurchaseOrderPayment.create({
+    purchaseOrderId: order.id,
+    amount,
+    date,
+    notes: notes || null,
+    receiptFilePath: relativePath(req.file),
+    createdBy: req.user.id,
+  });
+  res.status(201).json(payment);
+});
+
 // Registra una recepción (total o parcial): SOLO actualiza qué se entregó vs. lo ordenado (esta
 // orden y el "Reporte de compras", ver purchaseOrderService.getPurchaseReport, se basan
 // directamente en PurchaseReceipt). NO genera ningún gasto — antes sí lo hacía automáticamente
@@ -508,6 +575,44 @@ const addReceipt = asyncHandler(async (req, res) => {
   });
 
   res.status(201).json({ receipt, warning });
+});
+
+// Corrige la cantidad recibida de una recepción ya registrada (ej. el usuario puso 3 cuando la
+// orden pedía 2, dejando un "pendiente" negativo sin forma de arreglarlo). Solo administradores
+// (rol, no un permiso de módulo — mismo criterio que la sumatoria de órdenes por proyecto).
+// Deliberadamente NO se bloquea aunque la orden ya esté cerrada, convertida a gasto o tenga
+// abonos: es justamente el caso que hay que poder corregir. La advertencia previa ("esto puede
+// afectar procesos ya relacionados") es responsabilidad del frontend antes de llamar acá — el
+// mismo patrón que ya usan "Pasar a Gastos"/"Rechazar" en esta pantalla (confirm() del lado del
+// cliente), no algo que el backend deba bloquear. "pendiente" se recalcula solo en cualquier
+// lugar que lo muestre (se computa en vivo desde quantityOrdered - suma de recepciones, nunca se
+// guarda) — corregir acá ya lo resuelve, sin tocar order.status.
+const updateReceipt = asyncHandler(async (req, res) => {
+  if (!req.user.isAdmin) throw new ApiError(403, 'Solo un administrador puede corregir una cantidad recibida.');
+
+  const order = await PurchaseOrder.findOne({ where: scopeWhere(req) });
+  if (!order) throw new ApiError(404, 'Orden de compra no encontrada');
+
+  const item = await PurchaseOrderItem.findOne({ where: { id: req.params.itemId, purchaseOrderId: order.id } });
+  if (!item) throw new ApiError(404, 'Ítem de orden de compra no encontrado');
+
+  const receipt = await PurchaseReceipt.findOne({ where: { id: req.params.receiptId, purchaseOrderItemId: item.id } });
+  if (!receipt) throw new ApiError(404, 'Recepción no encontrada');
+
+  const { quantityReceived, date, notes } = req.body;
+  if (quantityReceived === undefined) throw new ApiError(400, 'quantityReceived es obligatorio');
+  if (Number(quantityReceived) < 0) throw new ApiError(400, 'La cantidad recibida no puede ser negativa');
+
+  receipt.quantityReceived = quantityReceived;
+  if (date !== undefined) receipt.date = date;
+  if (notes !== undefined) receipt.notes = notes;
+  receipt.editedBy = req.user.id;
+  receipt.editedAt = new Date();
+  await receipt.save();
+
+  const items = await getOrderItemsWithDelivery(order.id);
+  const totals = computeOrderTotals(items, order.retentionPercent);
+  res.json({ ...order.toJSON(), items, totals });
 });
 
 // Cierre normal (todo entregado) o cierre con faltantes justificados (requiere closureReason).
@@ -620,6 +725,6 @@ const exportPdf = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  list, listBySupplier, get, create, updateOrder, remove, updateItem, convertToExpense, addReceipt, close, report, exportPdf,
-  approve, reject,
+  list, listBySupplier, get, create, updateOrder, remove, updateItem, convertToExpense, addReceipt, updateReceipt, close, report, exportPdf,
+  approve, reject, addPayment,
 };

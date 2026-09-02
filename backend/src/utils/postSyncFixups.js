@@ -1,13 +1,12 @@
 const fs = require('fs');
 const path = require('path');
-const { Op } = require('sequelize');
 // Conexión de administración: este archivo hace DDL (ALTER TABLE, políticas RLS, creación del rol
 // restringido) y backfills que cruzan empresas — todo eso exige el rol dueño de las tablas, no el
 // restringido que usa la app en tiempo real (ver models/adminModels.js).
 const {
   sequelize, Company, CashBox,
   Contract, Employee, Expense, ExpenseItem, ExpenseTax, InventoryItem, Minute, PaymentReceipt, Policy,
-  ProgressPhoto, PurchaseOrder, PurchaseOrderItem, PurchaseReceipt, Severance, SocialSecurityDocument,
+  ProgressPhoto, PurchaseReceipt, Severance, SocialSecurityDocument,
   SocialSecurityProvider, ThirdParty,
 } = require('../models/adminModels');
 const { TENANT_SCOPING_EXCLUDED } = require('../models/defineModels');
@@ -359,48 +358,36 @@ async function backfillPurchaseOrderCashBox() {
 
 // Corrige el bug de gastos duplicados por Orden de Compra: antes, cada recepción registrada (ver
 // purchaseOrderController.addReceipt, ya corregido) generaba automáticamente su propio Expense
-// (source:'purchase_receipt'), ADEMÁS del que genera "Pasar a Gastos" sobre la orden completa
-// (source:'purchase_order', PurchaseOrder.expenseId) — si una orden pasó por los dos caminos, el
-// mismo material quedaba contado dos veces en Gastos.
+// (source:'purchase_receipt') — un gasto que, por diseño, nunca debió existir: recibir material
+// solo debe actualizar cantidades, el único camino real a Gastos es "Pasar a Gastos" explícito.
 //
-// Esta limpieza es deliberadamente conservadora: SOLO toca el gasto de una recepción cuando su
-// orden TAMBIÉN tiene su propio expenseId (o sea, cuando de verdad hay un "Pasar a Gastos" que ya
-// cubre ese mismo material) — ese es el único caso comprobable de duplicado real. Una recepción
-// cuya orden nunca se convirtió con "Pasar a Gastos" no se toca: ahí el gasto de la recepción es
-// el ÚNICO registro de esa compra, y borrarlo perdería plata real, no un duplicado.
+// A partir de esta versión, la limpieza es TOTAL (decisión explícita del negocio, no solo el caso
+// de duplicado comprobable contra un "Pasar a Gastos" que hacía la versión anterior de esta
+// función): borra TODO Expense con source='purchase_receipt', sin excepción, en todas las
+// empresas. Consecuencia real a tener presente: si una orden nunca se trasladó con "Pasar a
+// Gastos", su único registro en Gastos desaparece con esta limpieza — hay que convertirla o
+// cargar el gasto a mano si esa plata sí se pagó. No se pierde el dato: queda respaldado.
 //
 // Antes de borrar, respalda cada gasto afectado (con sus ítems e impuestos) en un JSON por empresa
 // dentro de uploads/<companyId>/backups/ (volumen persistente de Docker, sobrevive a un redeploy).
 // Recorre TODAS las empresas de una sola vez (conexión de administración, exenta de RLS). Corre en
 // cada arranque, sin intervención manual; una vez limpio, la consulta no vuelve a encontrar nada
-// (addReceipt ya no crea gastos, así que no puede volver a generarse este mismo duplicado), por lo
-// que es seguro y barato de repetir siempre.
+// (addReceipt ya no crea gastos, así que no puede volver a generarse este mismo caso), por lo que
+// es seguro y barato de repetir siempre.
 async function cleanupDuplicatePurchaseReceiptExpenses() {
-  // hooks:false en cada consulta: esta función cruza TODAS las empresas a la vez (como el resto
-  // de este archivo), así que salta a propósito el aislamiento multi-tenant de Capa 1 (ver
-  // applyTenantScoping.js — exige un companyId de contexto que acá no existe ni debe existir).
-  // Capa 2 (RLS) ya está fuera de juego porque esta conexión es la de administración.
-  const duplicateReceipts = await PurchaseReceipt.findAll({
-    where: { expenseId: { [Op.not]: null } },
-    include: [{
-      model: PurchaseOrderItem,
-      required: true,
-      include: [{ model: PurchaseOrder, required: true, where: { expenseId: { [Op.not]: null } } }],
-    }],
-    hooks: false,
-  });
-  if (!duplicateReceipts.length) return;
-
-  const expenseIds = [...new Set(duplicateReceipts.map((r) => r.expenseId))];
-  const duplicateExpenses = await Expense.findAll({
-    where: { id: expenseIds, source: 'purchase_receipt' },
+  // hooks:false: esta función cruza TODAS las empresas a la vez (como el resto de este archivo),
+  // así que salta a propósito el aislamiento multi-tenant de Capa 1 (ver applyTenantScoping.js —
+  // exige un companyId de contexto que acá no existe ni debe existir). Capa 2 (RLS) ya está fuera
+  // de juego porque esta conexión es la de administración.
+  const receiptExpenses = await Expense.findAll({
+    where: { source: 'purchase_receipt' },
     include: [{ model: ExpenseItem, as: 'items' }, { model: ExpenseTax, as: 'taxes' }],
     hooks: false,
   });
-  if (!duplicateExpenses.length) return;
+  if (!receiptExpenses.length) return;
 
   const byCompany = new Map();
-  for (const exp of duplicateExpenses) {
+  for (const exp of receiptExpenses) {
     const list = byCompany.get(exp.companyId) || [];
     list.push(exp);
     byCompany.set(exp.companyId, list);
@@ -416,15 +403,15 @@ async function cleanupDuplicatePurchaseReceiptExpenses() {
       companyId,
       companyName: company?.companyName || null,
       generatedAt: new Date().toISOString(),
-      reason: 'Gastos duplicados por recepción automática de ítems de Orden de Compra (source=purchase_receipt), ya cubiertos por un "Pasar a Gastos" explícito (source=purchase_order) sobre la misma orden.',
+      reason: 'Gastos generados incorrectamente por recepción automática de ítems de Orden de Compra (source=purchase_receipt) — recibir material nunca debe generar un gasto; el único camino real es "Pasar a Gastos" explícito sobre la orden.',
       expenses: expenses.map((e) => e.toJSON()),
     }, null, 2));
 
     const total = expenses.reduce((s, e) => s + Number(e.amount), 0);
-    console.log(`[postSyncFixups] [${company?.companyName || companyId}] Respaldados y eliminados ${expenses.length} gasto(s) duplicado(s) de recepción de Orden de Compra por $${total.toFixed(2)} — respaldo en uploads/${companyId}/backups/${path.basename(backupPath)}`);
+    console.log(`[postSyncFixups] [${company?.companyName || companyId}] Respaldados y eliminados ${expenses.length} gasto(s) de recepción de Orden de Compra por $${total.toFixed(2)} — respaldo en uploads/${companyId}/backups/${path.basename(backupPath)}`);
   }
 
-  const allIds = duplicateExpenses.map((e) => e.id);
+  const allIds = receiptExpenses.map((e) => e.id);
   await PurchaseReceipt.update({ expenseId: null }, { where: { expenseId: allIds }, hooks: false });
   await Expense.destroy({ where: { id: allIds }, hooks: false }); // cascada: ExpenseItem/ExpenseTax (onDelete: CASCADE)
 }

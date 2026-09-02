@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { thirdPartiesApi, supplierPurchaseOrdersApi, projectsApi, budgetApi, cashBoxesApi } from '../../api';
 import { Card, Button, Input, Select, SearchSelect, TextArea, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { fileUrl, purchaseOrderPdfUrl } from '../../api/client';
 import Can from '../../components/Can';
+import { useAuth } from '../../context/AuthContext';
 import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 const emptyForm = { name: '', nit: '', email: '', phone: '', address: '', contactName: '', notes: '' };
@@ -461,11 +462,17 @@ function SupplierOrders({ supplier }) {
 // se explica por qué esos controles no aparecen).
 function SupplierOrderDetail({ orderId, cashBoxes = [], onChange }) {
   const { t } = useTranslation();
+  const { isAdmin } = useAuth();
   const [order, setOrder] = useState(null);
   const [receiptForms, setReceiptForms] = useState({});
   const [closureReason, setClosureReason] = useState('');
+  const [editingReceiptId, setEditingReceiptId] = useState(null);
+  const [editReceiptForm, setEditReceiptForm] = useState({});
   const [convertForm, setConvertForm] = useState({ category: 'materiales', date: '' });
   const [showConvert, setShowConvert] = useState(false);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({ amount: '', date: '', notes: '' });
+  const [paymentFile, setPaymentFile] = useState(null);
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
 
@@ -482,6 +489,49 @@ function SupplierOrderDetail({ orderId, cashBoxes = [], onChange }) {
       const res = await supplierPurchaseOrdersApi.addReceipt(orderId, itemId, data);
       if (res.warning) setWarning(res.warning);
       setReceiptForms((f) => ({ ...f, [itemId]: {} }));
+      load();
+      onChange();
+    } catch (err) {
+      setError(extractError(err));
+    }
+  });
+
+  const startEditReceipt = (receipt) => {
+    setEditingReceiptId(receipt.id);
+    setEditReceiptForm({ date: receipt.date, quantityReceived: receipt.quantityReceived, notes: receipt.notes || '' });
+  };
+
+  const [saveEditReceipt, savingReceipt] = useSubmitGuard(async (itemId, receiptId) => {
+    setError('');
+    const hasDownstream = Boolean(order.expenseId) || (order.payments?.length || 0) > 0;
+    if (hasDownstream && !confirm(t('execution.purchaseOrders.confirmEditReceiptWithDownstream'))) return;
+    try {
+      await supplierPurchaseOrdersApi.updateReceipt(orderId, itemId, receiptId, editReceiptForm);
+      setEditingReceiptId(null);
+      load();
+      onChange();
+    } catch (err) {
+      setError(extractError(err));
+    }
+  });
+
+  const [submitPayment, submittingPayment] = useSubmitGuard(async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!paymentForm.amount || !paymentForm.date || !paymentFile) {
+      setError(t('execution.purchaseOrders.paymentRequired'));
+      return;
+    }
+    try {
+      const fd = new FormData();
+      fd.append('amount', paymentForm.amount);
+      fd.append('date', paymentForm.date);
+      if (paymentForm.notes) fd.append('notes', paymentForm.notes);
+      fd.append('file', paymentFile);
+      await supplierPurchaseOrdersApi.addPayment(orderId, fd);
+      setPaymentForm({ amount: '', date: '', notes: '' });
+      setPaymentFile(null);
+      setShowPaymentForm(false);
       load();
       onChange();
     } catch (err) {
@@ -540,7 +590,8 @@ function SupplierOrderDetail({ orderId, cashBoxes = [], onChange }) {
       )}
       <Table columns={[t('execution.purchaseOrders.detailTable.item'), t('execution.purchaseOrders.detailTable.ordered'), t('execution.purchaseOrders.detailTable.delivered'), t('execution.purchaseOrders.detailTable.pending'), hasProject ? t('execution.purchaseOrders.detailTable.registerReceipt') : '']}>
         {order.items?.map((it) => (
-          <tr key={it.id} className="border-b border-gray-100 align-top">
+          <Fragment key={it.id}>
+          <tr className="border-b border-gray-100 align-top">
             <td className="py-2 pr-3">{it.name} ({it.unit})</td>
             <td className="py-2 pr-3">{Number(it.quantityOrdered)}</td>
             <td className="py-2 pr-3">{it.delivered}</td>
@@ -559,6 +610,36 @@ function SupplierOrderDetail({ orderId, cashBoxes = [], onChange }) {
               )}
             </td>
           </tr>
+          {it.receipts?.length > 0 && (
+            <tr className="border-b border-gray-100 bg-gray-50">
+              <td colSpan={5} className="py-1 pr-3 pl-4">
+                <div className="text-xs text-gray-600 space-y-1 py-1">
+                  {it.receipts.map((r) => (
+                    editingReceiptId === r.id ? (
+                      <div key={r.id} className="flex flex-wrap gap-2 items-end bg-white p-2 rounded border border-gray-200">
+                        <Input type="date" label={t('execution.purchaseOrders.receiptDate')} value={editReceiptForm.date || ''} onChange={(e) => setEditReceiptForm({ ...editReceiptForm, date: e.target.value })} />
+                        <Input type="number" min="0" step="0.01" label={t('execution.purchaseOrders.receiptQty')} value={editReceiptForm.quantityReceived ?? ''} onChange={(e) => setEditReceiptForm({ ...editReceiptForm, quantityReceived: e.target.value })} />
+                        <Input label={t('execution.purchaseOrders.receiptNotes')} value={editReceiptForm.notes || ''} onChange={(e) => setEditReceiptForm({ ...editReceiptForm, notes: e.target.value })} />
+                        <Button onClick={() => saveEditReceipt(it.id, r.id)} loading={savingReceipt}>{t('execution.purchaseOrders.save')}</Button>
+                        <Button variant="secondary" onClick={() => setEditingReceiptId(null)} disabled={savingReceipt}>{t('execution.purchaseOrders.cancel')}</Button>
+                      </div>
+                    ) : (
+                      <div key={r.id} className="flex items-center gap-2">
+                        <span>{r.date} · {Number(r.quantityReceived)} {it.unit}</span>
+                        {r.editedAt && (
+                          <span className="text-gray-400">({t('execution.purchaseOrders.receiptEdited', { date: String(r.editedAt).slice(0, 10) })})</span>
+                        )}
+                        {isAdmin && (
+                          <button type="button" className="text-blue-600 hover:underline" onClick={() => startEditReceipt(r)}>{t('execution.purchaseOrders.edit')}</button>
+                        )}
+                      </div>
+                    )
+                  ))}
+                </div>
+              </td>
+            </tr>
+          )}
+          </Fragment>
         ))}
       </Table>
       {order.totals && (
@@ -570,11 +651,48 @@ function SupplierOrderDetail({ orderId, cashBoxes = [], onChange }) {
               <div className="flex justify-between text-red-700"><span>{t('execution.purchaseOrders.totalsRetention')}</span><span>-{money(order.totals.retentionAmount)}</span></div>
             )}
             <div className="flex justify-between font-semibold border-t pt-1"><span>{t('execution.purchaseOrders.totalsGrandTotal')}</span><span>{money(order.totals.grandTotal)}</span></div>
+            <div className="flex justify-between text-green-700"><span>{t('execution.purchaseOrders.totalsPaid')}</span><span>{money(order.totals.totalPaid)}</span></div>
+            <div className="flex justify-between font-semibold"><span>{t('execution.purchaseOrders.totalsBalance')}</span><span>{money(order.totals.balance)}</span></div>
           </div>
         </div>
       )}
       <ErrorText>{error}</ErrorText>
       {warning && <p className="text-sm text-yellow-600 mt-1">⚠ {warning}</p>}
+
+      <div className="mt-4 border-t pt-3">
+        <h4 className="text-sm font-semibold text-gray-700 mb-2">{t('execution.purchaseOrders.paymentsTitle')}</h4>
+        {order.payments?.length > 0 ? (
+          <div className="space-y-1 mb-2">
+            {order.payments.map((p) => (
+              <div key={p.id} className="flex items-center justify-between text-sm border-b border-gray-100 py-1">
+                <span>{p.date} · {money(p.amount)}{p.notes ? ` · ${p.notes}` : ''}</span>
+                <a href={fileUrl(p.receiptFilePath)} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-xs">{t('execution.purchaseOrders.viewReceipt')}</a>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400 mb-2">{t('execution.purchaseOrders.noPayments')}</p>
+        )}
+        {!order.expenseId && (
+          <Can module="ordenes_compra" action="edit">
+            {!showPaymentForm ? (
+              <Button variant="secondary" onClick={() => setShowPaymentForm(true)}>{t('execution.purchaseOrders.addPayment')}</Button>
+            ) : (
+              <form onSubmit={submitPayment} className="flex flex-wrap gap-2 items-end">
+                <Input label={t('execution.purchaseOrders.paymentAmount')} type="number" min="0" step="0.01" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
+                <Input label={t('execution.purchaseOrders.paymentDate')} type="date" value={paymentForm.date} onChange={(e) => setPaymentForm({ ...paymentForm, date: e.target.value })} />
+                <Input label={t('execution.purchaseOrders.paymentNotes')} value={paymentForm.notes} onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })} />
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">{t('execution.purchaseOrders.paymentReceiptFile')}</label>
+                  <input type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp" onChange={(e) => setPaymentFile(e.target.files?.[0] || null)} />
+                </div>
+                <Button type="submit" loading={submittingPayment}>{t('execution.purchaseOrders.save')}</Button>
+                <Button type="button" variant="secondary" onClick={() => setShowPaymentForm(false)} disabled={submittingPayment}>{t('execution.purchaseOrders.cancel')}</Button>
+              </form>
+            )}
+          </Can>
+        )}
+      </div>
 
       {canClose && (
         <Can module="ordenes_compra" action="edit">

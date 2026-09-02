@@ -297,7 +297,9 @@
         "status": "Estado",
         "items": "Ítems",
         "expenses": "Gastos",
-        "total": "Valor total"
+        "total": "Valor total",
+        "paid": "Abonado",
+        "balance": "Saldo"
       },
       "transferred": "Trasladada",
       "detail": "Detalle",
@@ -372,7 +374,21 @@
         "aprobada": "Aprobada",
         "rechazada": "Rechazada"
       },
-      "projectTotal": "Total de Órdenes de Compra del proyecto: {{amount}}"
+      "projectTotal": "Total de Órdenes de Compra del proyecto: {{amount}}",
+      "totalsPaid": "Total abonado",
+      "totalsBalance": "Saldo por cancelar",
+      "confirmEditReceiptWithDownstream": "Esta recepción ya fue usada por un gasto o tiene abonos registrados. Corregir la cantidad puede afectar esos registros. ¿Deseas continuar de todas formas?",
+      "receiptNotes": "Notas",
+      "receiptEdited": "editado el {{date}}",
+      "paymentsTitle": "Abonos",
+      "noPayments": "Sin abonos registrados.",
+      "addPayment": "+ Agregar abono",
+      "paymentAmount": "Valor del abono",
+      "paymentDate": "Fecha del abono",
+      "paymentNotes": "Notas (opcional)",
+      "paymentReceiptFile": "Comprobante de pago",
+      "paymentRequired": "Valor, fecha y comprobante de pago son obligatorios",
+      "viewReceipt": "Ver comprobante"
     },
     "milestones": {
       "title": "Hitos",
@@ -729,7 +745,10 @@
       "allCashBoxes": "-- todas las cajas --",
       "noProject": "Sin proyecto",
       "clear": "Limpiar filtros"
-    }
+    },
+    "uploading": "Subiendo...",
+    "replace": "Reemplazar",
+    "attach": "Adjuntar"
   },
   "thirdParties": {
     "tabs": {

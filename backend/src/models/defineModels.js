@@ -31,6 +31,7 @@ const modelDefiners = [
   require('./PurchaseOrder'),
   require('./PurchaseOrderItem'),
   require('./PurchaseReceipt'),
+  require('./PurchaseOrderPayment'),
   require('./MarketStudyQuotation'),
   require('./MarketStudyQuotationItem'),
   require('./Employee'),

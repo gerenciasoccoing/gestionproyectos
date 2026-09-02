@@ -61,6 +61,7 @@ module.exports = (sequelize) => {
     PurchaseOrder.belongsTo(models.CashBox, { foreignKey: 'cashBoxId' });
     PurchaseOrder.belongsTo(models.MarketStudy, { foreignKey: 'marketStudyId', as: 'marketStudy' });
     PurchaseOrder.hasMany(models.PurchaseOrderItem, { foreignKey: 'purchaseOrderId', as: 'items', onDelete: 'CASCADE' });
+    PurchaseOrder.hasMany(models.PurchaseOrderPayment, { foreignKey: 'purchaseOrderId', as: 'payments', onDelete: 'CASCADE' });
   };
 
   return PurchaseOrder;

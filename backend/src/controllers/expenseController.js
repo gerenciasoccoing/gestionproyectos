@@ -2,7 +2,7 @@ const { Op } = require('sequelize');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const {
-  sequelize, Expense, ExpenseItem, ExpenseTax, ExpenseBudget, Project, CashBox, ThirdParty,
+  sequelize, Expense, ExpenseItem, ExpenseTax, ExpenseBudget, Project, CashBox, ThirdParty, PurchaseOrderPayment,
 } = require('../models');
 const { relativePath } = require('../middleware/upload');
 const { scanInvoice } = require('../services/invoiceScanService');
@@ -98,7 +98,25 @@ const list = asyncHandler(async (req, res) => {
     if (to) where.date[Op.lte] = to;
   }
   const expenses = await Expense.findAll({ where, include: EXPENSE_INCLUDE, order: [['date', 'DESC']] });
-  res.json(expenses);
+
+  // Abonos de la Orden de Compra de origen (ver purchaseOrderController.addPayment): nunca se
+  // mueven ni se duplican al convertir a gasto, quedan trazables por Expense.sourceId = order.id.
+  // Una sola consulta para todos los gastos de la página, no una por fila.
+  const orderIds = expenses.filter((e) => e.source === 'purchase_order').map((e) => e.sourceId);
+  const paymentsByOrder = new Map();
+  if (orderIds.length) {
+    const payments = await PurchaseOrderPayment.findAll({ where: { purchaseOrderId: orderIds }, order: [['date', 'DESC']] });
+    for (const p of payments) {
+      const list = paymentsByOrder.get(p.purchaseOrderId) || [];
+      list.push(p);
+      paymentsByOrder.set(p.purchaseOrderId, list);
+    }
+  }
+
+  res.json(expenses.map((e) => ({
+    ...e.toJSON(),
+    purchaseOrderPayments: e.source === 'purchase_order' ? (paymentsByOrder.get(e.sourceId) || []) : undefined,
+  })));
 });
 
 const create = asyncHandler(async (req, res) => {
@@ -183,7 +201,27 @@ const scan = asyncHandler(async (req, res) => {
 const update = asyncHandler(async (req, res) => {
   const expense = await Expense.findOne({ where: scopeWhere(req) });
   if (!expense) throw new ApiError(404, 'Gasto no encontrado');
-  if (expense.source !== 'manual') throw new ApiError(400, 'Este gasto se generó automáticamente y no puede editarse manualmente');
+
+  const { invoiceFile, paymentReceiptFile } = filesFromRequest(req);
+
+  if (expense.source !== 'manual') {
+    // Un gasto generado automáticamente (Pasar a Gastos, liquidación, ...) no se puede editar en
+    // sus datos — el monto/ítems quedarían desincronizados de su origen — pero sí se le puede
+    // completar o reemplazar la factura y/o el comprobante de pago en cualquier momento después
+    // de creado, sin afectar nada más. Solo se permite acá si la petición trae ÚNICAMENTE
+    // archivo(s): cualquier otro campo se rechaza con el mismo mensaje de siempre.
+    const otherFieldsSent = Object.keys(req.body).some((k) => k !== 'items' && k !== 'taxes')
+      || (req.body.items !== undefined && req.body.items !== '' && req.body.items !== '[]')
+      || (req.body.taxes !== undefined && req.body.taxes !== '' && req.body.taxes !== '[]');
+    if (otherFieldsSent || (!invoiceFile && !paymentReceiptFile)) {
+      throw new ApiError(400, 'Este gasto se generó automáticamente: solo se le puede adjuntar o reemplazar la factura y el comprobante de pago.');
+    }
+    if (invoiceFile) expense.supportFilePath = relativePath(invoiceFile);
+    if (paymentReceiptFile) expense.paymentReceiptFilePath = relativePath(paymentReceiptFile);
+    await expense.save();
+    const full = await Expense.findByPk(expense.id, { include: EXPENSE_INCLUDE });
+    return res.json(full);
+  }
 
   const {
     category, amount, date, description, vendorName, vendorNit, vendorPhone, vendorEmail,
@@ -215,7 +253,6 @@ const update = asyncHandler(async (req, res) => {
     }
     expense.projectId = newProjectId;
   }
-  const { invoiceFile, paymentReceiptFile } = filesFromRequest(req);
   if (invoiceFile) expense.supportFilePath = relativePath(invoiceFile);
   if (paymentReceiptFile) expense.paymentReceiptFilePath = relativePath(paymentReceiptFile);
 
