@@ -231,11 +231,11 @@ export default function PurchaseOrdersMenuPage() {
           </form>
         )}
 
-        <Table columns={[t('suppliers.orders.table.number'), t('suppliers.orders.table.project'), t('execution.purchaseOrders.table.supplier'), t('execution.purchaseOrders.table.date'), t('execution.purchaseOrders.table.status'), t('execution.purchaseOrders.table.items'), '']}>
+        <Table columns={[t('suppliers.orders.table.number'), t('suppliers.orders.table.project'), t('execution.purchaseOrders.table.supplier'), t('execution.purchaseOrders.table.date'), t('execution.purchaseOrders.table.status'), t('execution.purchaseOrders.table.items'), t('execution.purchaseOrders.table.total'), '']}>
           {orders.map((o) => (
             editingOrderId === o.id ? (
               <tr key={o.id} className="border-b border-gray-100 bg-blue-50">
-                <td className="py-3 pr-3" colSpan={7}>
+                <td className="py-3 pr-3" colSpan={8}>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
                     <SearchSelect
                       label={t('suppliers.orders.assignProject')}
@@ -298,6 +298,7 @@ export default function PurchaseOrdersMenuPage() {
                   )}
                 </td>
                 <td className="py-1 pr-3">{o.items?.length || 0}</td>
+                <td className="py-1 pr-3 font-medium">{money(o.totals?.grandTotal ?? 0)}</td>
                 <td className="py-1 pr-3 text-right whitespace-nowrap">
                   <Button variant="secondary" onClick={() => window.open(purchaseOrderPdfUrl(o.id, i18n.language), '_blank')}>{t('suppliers.orders.pdf')}</Button>
                   <Button variant="secondary" className="ml-2" onClick={() => setExpandedId(expandedId === o.id ? null : o.id)}>
@@ -315,7 +316,7 @@ export default function PurchaseOrdersMenuPage() {
               </tr>
             )
           ))}
-          {orders.length === 0 && <tr><td colSpan={7} className="py-3 text-center text-gray-400">{t('suppliers.orders.empty')}</td></tr>}
+          {orders.length === 0 && <tr><td colSpan={8} className="py-3 text-center text-gray-400">{t('suppliers.orders.empty')}</td></tr>}
         </Table>
       </Card>
 

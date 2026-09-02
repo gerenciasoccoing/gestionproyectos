@@ -5,6 +5,7 @@ import { purchaseOrdersApi, budgetApi, thirdPartiesApi, cashBoxesApi } from '../
 import { Card, Button, Input, Select, SearchSelect, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { purchaseOrderPdfUrl } from '../../api/client';
 import Can from '../../components/Can';
+import { useAuth } from '../../context/AuthContext';
 import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 const STATUS_COLORS = {
@@ -20,6 +21,7 @@ function emptyOrderLine() { return { name: '', unit: '', quantityOrdered: '', un
 
 export default function PurchaseOrdersPage() {
   const { t, i18n } = useTranslation();
+  const { isAdmin } = useAuth();
   const { projectId, project } = useOutletContext();
   const [orders, setOrders] = useState([]);
   const [budgetItems, setBudgetItems] = useState([]);
@@ -186,11 +188,11 @@ export default function PurchaseOrdersPage() {
           </form>
         )}
 
-        <Table columns={[t('suppliers.orders.table.number'), t('execution.purchaseOrders.table.supplier'), t('execution.purchaseOrders.table.date'), t('execution.purchaseOrders.table.status'), t('execution.purchaseOrders.table.items'), t('execution.purchaseOrders.table.expenses'), '']}>
+        <Table columns={[t('suppliers.orders.table.number'), t('execution.purchaseOrders.table.supplier'), t('execution.purchaseOrders.table.date'), t('execution.purchaseOrders.table.status'), t('execution.purchaseOrders.table.items'), t('execution.purchaseOrders.table.total'), t('execution.purchaseOrders.table.expenses'), '']}>
           {orders.map((o) => (
             editingOrderId === o.id ? (
               <tr key={o.id} className="border-b border-gray-100 bg-blue-50">
-                <td className="py-3 pr-3" colSpan={7}>
+                <td className="py-3 pr-3" colSpan={8}>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
                     <Input label={t('execution.purchaseOrders.date')} type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} />
                     <Select label={t('expenses.cashBox')} value={editForm.cashBoxId} onChange={(e) => setEditForm({ ...editForm, cashBoxId: e.target.value })}>
@@ -244,6 +246,7 @@ export default function PurchaseOrdersPage() {
                   )}
                 </td>
                 <td className="py-2 pr-3">{o.items?.length || 0}</td>
+                <td className="py-2 pr-3 font-medium">{money(o.totals?.grandTotal ?? 0)}</td>
                 <td className="py-2 pr-3">{o.expenseId ? <Badge color="green">{t('execution.purchaseOrders.transferred')}</Badge> : <span className="text-gray-400 text-xs">-</span>}</td>
                 <td className="py-2 pr-3 text-right whitespace-nowrap">
                   <Button variant="secondary" onClick={() => window.open(purchaseOrderPdfUrl(o.id, i18n.language), '_blank')}>
@@ -264,8 +267,13 @@ export default function PurchaseOrdersPage() {
               </tr>
             )
           ))}
-          {orders.length === 0 && <tr><td colSpan={7} className="py-3 text-center text-gray-400">{t('execution.purchaseOrders.empty')}</td></tr>}
+          {orders.length === 0 && <tr><td colSpan={8} className="py-3 text-center text-gray-400">{t('execution.purchaseOrders.empty')}</td></tr>}
         </Table>
+        {isAdmin && (
+          <p className="text-right text-sm font-semibold text-gray-700 mt-2">
+            {t('execution.purchaseOrders.projectTotal', { amount: money(orders.reduce((s, o) => s + Number(o.totals?.grandTotal ?? 0), 0)) })}
+          </p>
+        )}
       </Card>
 
       {expandedId && <OrderDetail projectId={projectId} orderId={expandedId} budgetItems={budgetItems} cashBoxes={cashBoxes} onChange={load} />}

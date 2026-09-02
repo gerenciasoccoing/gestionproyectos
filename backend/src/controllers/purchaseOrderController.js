@@ -28,13 +28,16 @@ function scopeWhere(req) {
   return where;
 }
 
+// `totals` por orden (ver computeOrderTotals) se calcula acá reusando los `items` que YA se
+// cargan con un JOIN para el conteo/estado de entrega — no es una consulta extra por orden, solo
+// una suma en memoria sobre datos que de todas formas ya viajaron desde la base de datos.
 const list = asyncHandler(async (req, res) => {
   const orders = await PurchaseOrder.findAll({
     where: { projectId: req.params.projectId },
     include: [{ model: PurchaseOrderItem, as: 'items', include: [{ model: PurchaseReceipt, as: 'receipts' }] }],
     order: [['date', 'DESC']],
   });
-  res.json(orders);
+  res.json(orders.map((o) => ({ ...o.toJSON(), totals: computeOrderTotals(o.items, o.retentionPercent) })));
 });
 
 // Listado global (ruta /purchase-orders, sin :projectId en la URL): usado tanto desde la ficha de
@@ -55,7 +58,7 @@ const listBySupplier = asyncHandler(async (req, res) => {
     ],
     order: [['date', 'DESC']],
   });
-  res.json(orders);
+  res.json(orders.map((o) => ({ ...o.toJSON(), totals: computeOrderTotals(o.items, o.retentionPercent) })));
 });
 
 const get = asyncHandler(async (req, res) => {
