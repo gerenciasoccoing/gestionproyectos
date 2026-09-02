@@ -27,6 +27,15 @@ module.exports = (sequelize) => {
     // laborales creados DESDE ESTE MOMENTO (ver numberingService.js) — cambiarlo después no
     // recalcula el prefijo de lo ya creado, para no alterar referencias existentes.
     contractNumber: { type: DataTypes.STRING, allowNull: true },
+    // Lugar de ejecución del proyecto (texto libre, ej. dirección u obra). Usado en la portada del
+    // Informe para Cliente (ver reportEngineService.js) — editable desde Contractual, igual que
+    // contractNumber.
+    address: { type: DataTypes.STRING, allowNull: true },
+    // Foto de presentación del proyecto y captura/pantallazo del mapa de ubicación: ambas de carga
+    // manual (sin geocodificación automática), mostradas juntas en la portada del Informe para
+    // Cliente. Editables desde Contractual (ContractualPage.jsx > "Presentación del proyecto").
+    presentationPhotoPath: { type: DataTypes.STRING, allowNull: true },
+    locationMapImagePath: { type: DataTypes.STRING, allowNull: true },
   });
 
   Project.associate = (models) => {

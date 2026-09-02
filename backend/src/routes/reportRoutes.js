@@ -10,5 +10,7 @@ router.get('/s-curve', requirePermission('informes', 'view'), reportController.s
 router.get('/milestones-minutes', requirePermission('informes', 'view'), reportController.milestonesAndMinutesSummary);
 router.get('/progress-by-item', requirePermission('informes', 'view'), reportController.progressByItem);
 router.get('/export-pdf', requirePermission('informes', 'view'), reportController.exportPdf);
+router.get('/client-pdf', requirePermission('informes', 'view'), reportController.clientReportPdf);
+router.get('/internal-pdf', requirePermission('informes', 'view'), reportController.internalReportPdf);
 
 module.exports = router;

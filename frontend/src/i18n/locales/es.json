@@ -184,6 +184,14 @@
       "placeholder": "Ej. 045-2026",
       "empty": "Sin número de contrato asignado.",
       "warning": "Sin número de contrato asignado: los gastos, órdenes de compra y contratos laborales que se creen en este proyecto no llevarán prefijo hasta que lo definas."
+    },
+    "presentation": {
+      "title": "Presentación del proyecto",
+      "address": "Lugar de ejecución",
+      "addressEmpty": "Sin dirección registrada",
+      "photo": "Foto de presentación",
+      "map": "Mapa de ubicación",
+      "empty": "Sin imagen cargada"
     }
   },
   "execution": {
@@ -1277,6 +1285,17 @@
       },
       "confirmDelete": "¿Eliminar este riesgo?",
       "empty": "Sin riesgos registrados."
+    },
+    "aiReports": {
+      "title": "Informes con IA",
+      "subtitle": "Genera informes en PDF a partir de los datos ya cargados del proyecto (presupuesto, avance, fotos y gastos). Las cifras salen siempre del sistema; la IA solo redacta el texto.",
+      "clientTitle": "Informe para el Cliente",
+      "clientDescription": "Formato ejecutivo/comercial, con corte a la fecha de hoy. No incluye costos reales ni márgenes internos.",
+      "internalTitle": "Informe Interno para la Empresa",
+      "internalDescription": "Formato gerencial con gastos reales y desviación presupuestal, por rango de fechas.",
+      "generate": "Generar informe",
+      "from": "Desde",
+      "to": "Hasta"
     }
   },
   "admin": {

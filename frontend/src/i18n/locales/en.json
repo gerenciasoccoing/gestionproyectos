@@ -184,6 +184,14 @@
       "placeholder": "E.g. 045-2026",
       "empty": "No contract number assigned.",
       "warning": "No contract number assigned: expenses, purchase orders, and labor contracts created in this project won't carry a prefix until you set one."
+    },
+    "presentation": {
+      "title": "Project presentation",
+      "address": "Execution site",
+      "addressEmpty": "No address on file",
+      "photo": "Presentation photo",
+      "map": "Location map",
+      "empty": "No image uploaded"
     }
   },
   "execution": {
@@ -1277,6 +1285,17 @@
       },
       "confirmDelete": "Delete this risk?",
       "empty": "No risks recorded."
+    },
+    "aiReports": {
+      "title": "AI Reports",
+      "subtitle": "Generate PDF reports from the project's existing data (budget, progress, photos and expenses). Figures always come from the system; AI only writes the narrative text.",
+      "clientTitle": "Client Report",
+      "clientDescription": "Executive/commercial format, as of today. Does not include real costs or internal margins.",
+      "internalTitle": "Internal Management Report",
+      "internalDescription": "Management format with real expenses and budget deviation, by date range.",
+      "generate": "Generate report",
+      "from": "From",
+      "to": "To"
     }
   },
   "admin": {

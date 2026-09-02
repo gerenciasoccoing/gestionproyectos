@@ -82,6 +82,8 @@ export const projectsApi = {
   update: (id, data) => client.put(`/projects/${id}`, data).then((r) => r.data),
   remove: (id) => client.delete(`/projects/${id}`),
   assignUsers: (id, userIds) => client.put(`/projects/${id}/users`, { userIds }).then((r) => r.data),
+  uploadPresentationPhoto: (id, formData) => client.post(`/projects/${id}/presentation-photo`, formData).then((r) => r.data),
+  uploadLocationMap: (id, formData) => client.post(`/projects/${id}/location-map`, formData).then((r) => r.data),
 };
 
 export const contractsApi = {
@@ -309,6 +311,19 @@ export const reportsApi = {
     const base = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api');
     const token = localStorage.getItem('token');
     return `${base}/projects/${pid}/reports/export-pdf?token=${encodeURIComponent(token)}`;
+  },
+  clientReportPdfUrl: (pid) => {
+    const base = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api');
+    const token = localStorage.getItem('token');
+    return `${base}/projects/${pid}/reports/client-pdf?token=${encodeURIComponent(token)}`;
+  },
+  internalReportPdfUrl: (pid, from, to) => {
+    const base = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api');
+    const token = localStorage.getItem('token');
+    const params = new URLSearchParams({ token: token || '' });
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    return `${base}/projects/${pid}/reports/internal-pdf?${params.toString()}`;
   },
 };
 

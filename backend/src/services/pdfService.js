@@ -1,4 +1,6 @@
 const PDFDocument = require('pdfkit');
+const path = require('path');
+const { UPLOAD_ROOT } = require('../middleware/upload');
 
 function money(n) {
   return `$ ${Number(n || 0).toLocaleString('es-CO', { maximumFractionDigits: 2 })}`;
@@ -10,6 +12,201 @@ function sectionTitle(doc, text) {
   doc.moveDown(0.2);
   doc.fontSize(10).fillColor('#000000').font('Helvetica');
 }
+
+// Salto de página manual si lo que sigue no cabe en lo que queda de la actual — PDFKit solo
+// pagina automático dentro de doc.text(); un doc.image() o un bloque dibujado a mano (barra de
+// avance) en una posición fija puede salirse de la página si no se valida antes. Usado por los
+// Informes con IA (generateClientReportPdf/generateInternalReportPdf), donde cada ítem/foto se
+// posiciona a mano.
+function ensureSpace(doc, neededHeight) {
+  const bottom = doc.page.height - doc.page.margins.bottom;
+  if (doc.y + neededHeight > bottom) doc.addPage();
+}
+
+// Barra de avance simple (fondo gris + relleno proporcional al %), dibujada con primitivas
+// vectoriales de PDFKit — sin librería de gráficos externa, igual criterio que el resto del PDF.
+// Deja el cursor (doc.y) justo debajo de la barra para que el llamador pueda seguir escribiendo.
+function drawProgressBar(doc, { width = 300, height = 10, percent, color = '#2563eb', label } = {}) {
+  const p = Math.max(0, Math.min(100, Number(percent) || 0));
+  const x = doc.x;
+  const y = doc.y;
+  doc.rect(x, y, width, height).fill('#e5e7eb');
+  if (p > 0) doc.rect(x, y, width * (p / 100), height).fill(color);
+  doc.fillColor('#000000');
+  doc.fontSize(9).font('Helvetica-Bold').text(label != null ? label : `${p.toFixed(1)}%`, x + width + 8, y - 2, { width: 60 });
+  doc.fontSize(10).font('Helvetica');
+  doc.x = x;
+  doc.y = y + height + 8;
+}
+
+// Encabezado de portada compartido por los dos Informes con IA (Cliente/Interno): logo + datos de
+// la empresa (igual patrón que generateProjectReportPdf), título del tipo de informe y nombre del
+// proyecto centrados debajo.
+function reportCoverHeading(doc, { company, title, project, subtitle }) {
+  if (company && company.logoPath && require('fs').existsSync(company.logoPath)) {
+    try {
+      doc.image(company.logoPath, 50, 45, { width: 90 });
+    } catch (e) { /* si el logo no puede leerse, se omite sin romper la generación */ }
+  }
+  doc.fontSize(16).font('Helvetica-Bold').text(company ? company.companyName : 'Empresa', 160, 50);
+  doc.fontSize(9).font('Helvetica').fillColor('#555')
+    .text(company?.nit ? `NIT: ${company.nit}` : '', 160, 70)
+    .text(company?.address || '', 160, 84);
+  doc.fillColor('#000');
+
+  doc.moveDown(3);
+  doc.fontSize(18).font('Helvetica-Bold').text(title, { align: 'center' });
+  doc.moveDown(0.3);
+  doc.fontSize(12).font('Helvetica').text(project.name, { align: 'center' });
+  if (subtitle) {
+    doc.fontSize(9).fillColor('#555').text(subtitle, { align: 'center' });
+    doc.fillColor('#000');
+  }
+  doc.moveDown(1);
+}
+
+// Informe para Cliente (formato ejecutivo/comercial, corte a hoy): portada con lugar de
+// ejecución (mapa + foto de presentación, ambos de carga manual — ver Project.presentationPhotoPath
+// / locationMapImagePath), presupuesto total vs ejecutado, y avance por ítem con barra de % y
+// registro fotográfico. Nunca incluye costos reales de gastos, márgenes ni rentabilidad — eso es
+// exclusivo del Informe Interno (generateInternalReportPdf).
+function generateClientReportPdf({ project, snapshot, asOfDate, summaryText, company, presentationPhotoAbsPath, locationMapAbsPath }) {
+  const fs = require('fs');
+  const doc = new PDFDocument({ margin: 50 });
+
+  reportCoverHeading(doc, {
+    company,
+    title: 'Informe de Avance para Cliente',
+    project,
+    subtitle: `Cliente: ${project.client || '-'}  |  Fecha de corte: ${asOfDate.toISOString().slice(0, 10)}`,
+  });
+
+  sectionTitle(doc, 'Lugar de ejecución');
+  doc.font('Helvetica').fontSize(10).text(project.address || 'Sin dirección registrada.');
+  doc.moveDown(0.3);
+  const imgY = doc.y;
+  const imgW = 230;
+  const imgH = 150;
+  let anyImage = false;
+  if (presentationPhotoAbsPath && fs.existsSync(presentationPhotoAbsPath)) {
+    try {
+      doc.rect(50, imgY, imgW, imgH).stroke('#e5e7eb');
+      doc.image(presentationPhotoAbsPath, 50, imgY, { fit: [imgW, imgH], align: 'center', valign: 'center' });
+      anyImage = true;
+    } catch (e) { /* imagen ilegible: se omite */ }
+  }
+  if (locationMapAbsPath && fs.existsSync(locationMapAbsPath)) {
+    try {
+      doc.rect(50 + imgW + 20, imgY, imgW, imgH).stroke('#e5e7eb');
+      doc.image(locationMapAbsPath, 50 + imgW + 20, imgY, { fit: [imgW, imgH], align: 'center', valign: 'center' });
+      anyImage = true;
+    } catch (e) { /* imagen ilegible: se omite */ }
+  }
+  doc.y = anyImage ? imgY + imgH + 10 : imgY;
+  if (!anyImage) doc.fontSize(9).fillColor('#888').text('Sin foto de presentación ni mapa de ubicación cargados.').fillColor('#000');
+
+  sectionTitle(doc, 'Resumen ejecutivo');
+  doc.font('Helvetica').fontSize(10).text(summaryText, { align: 'justify' });
+
+  sectionTitle(doc, 'Presupuesto total vs. ejecutado');
+  doc.font('Helvetica').fontSize(10).text(`Presupuesto total del proyecto: ${money(snapshot.totalBudgetedValue)}`);
+  doc.text(`Valor ejecutado a la fecha: ${money(snapshot.totalExecutedValue)}`);
+  doc.moveDown(0.3);
+  drawProgressBar(doc, { percent: snapshot.physicalProgressPercent, color: '#16a34a' });
+
+  sectionTitle(doc, 'Avance por ítem de presupuesto');
+  if (!snapshot.items.length) doc.text('Sin ítems de presupuesto.');
+  snapshot.items.forEach((item) => {
+    ensureSpace(doc, 90);
+    doc.font('Helvetica-Bold').fontSize(10).text(item.description);
+    doc.font('Helvetica').fontSize(9).fillColor('#555')
+      .text(`${item.accumulatedQty} / ${Number(item.quantity)} ${item.unit}`);
+    doc.fillColor('#000');
+    drawProgressBar(doc, { width: 250, percent: item.percent, color: item.percent >= 100 ? '#16a34a' : '#2563eb' });
+
+    const photos = (item.photos || []).slice(0, 4);
+    if (photos.length) {
+      ensureSpace(doc, 66);
+      const thumbY = doc.y;
+      photos.forEach((p, idx) => {
+        const abs = path.join(UPLOAD_ROOT, p);
+        if (!fs.existsSync(abs)) return;
+        try {
+          doc.rect(50 + idx * 65, thumbY, 60, 60).stroke('#e5e7eb');
+          doc.image(abs, 50 + idx * 65, thumbY, { fit: [60, 60], align: 'center', valign: 'center' });
+        } catch (e) { /* foto ilegible: se omite */ }
+      });
+      doc.y = thumbY + 66;
+    }
+    doc.moveDown(0.5);
+  });
+
+  doc.end();
+  return doc;
+}
+
+// Informe Interno (formato gerencial, por rango de fechas): presupuesto del contrato, gastado
+// desglosado por ítem/tipo de gasto comparado contra presupuesto, avance físico, y análisis
+// gerencial con desviación presupuestal — sí incluye cifras financieras reales, a diferencia del
+// Informe para Cliente.
+function generateInternalReportPdf({ project, snapshot, from, to, analysisText, company }) {
+  const doc = new PDFDocument({ margin: 50 });
+
+  reportCoverHeading(doc, {
+    company,
+    title: 'Informe Interno de Proyecto',
+    project,
+    subtitle: `Rango: ${from} a ${to}`,
+  });
+
+  sectionTitle(doc, 'Presupuesto del contrato');
+  doc.font('Helvetica').fontSize(10).text(`Presupuesto total (ítems de presupuesto/APU): ${money(snapshot.totalBudgetedValue)}`);
+  doc.text(`Valor ejecutado (valor ganado) en el rango: ${money(snapshot.totalExecutedValue)}`);
+
+  sectionTitle(doc, 'Avance físico del proyecto');
+  drawProgressBar(doc, { percent: snapshot.physicalProgressPercent, color: '#16a34a' });
+
+  sectionTitle(doc, 'Gastado vs. presupuestado por tipo de gasto');
+  const deviation = snapshot.totalBudgetedValue - snapshot.totalExpenses;
+  doc.font('Helvetica').fontSize(10).text(`Total gastado en el rango: ${money(snapshot.totalExpenses)}`);
+  doc.fillColor(deviation < 0 ? '#dc2626' : '#000000');
+  doc.text(`Desviación (presupuesto - gastado): ${money(deviation)}${deviation < 0 ? ' (sobrecosto)' : ''}`);
+  doc.fillColor('#000000');
+  doc.moveDown(0.3);
+  snapshot.expensesByCategory.forEach((c) => {
+    const catDeviation = c.available;
+    doc.font('Helvetica-Bold').fontSize(9).text(CATEGORY_LABELS_ES[c.category] || c.category, { continued: false });
+    doc.font('Helvetica').fontSize(9).fillColor('#555')
+      .text(`  Presupuestado: ${money(c.budgeted)}  |  Gastado: ${money(c.amount)}  |  Disponible: ${money(catDeviation)}`);
+    doc.fillColor('#000000');
+  });
+
+  sectionTitle(doc, 'Avance por ítem de presupuesto (rango seleccionado)');
+  if (!snapshot.items.length) doc.text('Sin ítems de presupuesto.');
+  snapshot.items.forEach((item) => {
+    ensureSpace(doc, 45);
+    doc.font('Helvetica-Bold').fontSize(9).text(item.description);
+    doc.font('Helvetica').fontSize(8).fillColor('#555')
+      .text(`${item.accumulatedQty} / ${Number(item.quantity)} ${item.unit}  |  Valor ejecutado: ${money(item.executedValue)}`);
+    doc.fillColor('#000000');
+    drawProgressBar(doc, { width: 220, height: 8, percent: item.percent, color: item.percent >= 100 ? '#16a34a' : '#2563eb' });
+    doc.moveDown(0.2);
+  });
+
+  sectionTitle(doc, 'Análisis gerencial');
+  doc.font('Helvetica').fontSize(10).text(analysisText, { align: 'justify' });
+
+  doc.end();
+  return doc;
+}
+
+const CATEGORY_LABELS_ES = {
+  mano_obra: 'Mano de obra',
+  materiales: 'Materiales',
+  equipos: 'Equipos',
+  viaticos: 'Viáticos',
+  imprevistos: 'Imprevistos',
+};
 
 // Genera el informe consolidado de proyecto (EVM, hitos/actas, riesgos, avance por ítem, compras).
 function generateProjectReportPdf({ project, evm, milestones, minutes, risks, progressItems, purchases, company }) {
@@ -838,5 +1035,6 @@ function generateLaborCalculationPdf({ title, employee, company, breakdown, meta
 }
 
 module.exports = {
-  generateProjectReportPdf, generateQuotationPdf, generateApuPdf, generateBudgetWithApuAnnexPdf, generatePurchaseOrderPdf, generateContractPdf, generateLaborCalculationPdf, money,
+  generateProjectReportPdf, generateQuotationPdf, generateApuPdf, generateBudgetWithApuAnnexPdf, generatePurchaseOrderPdf, generateContractPdf, generateLaborCalculationPdf,
+  generateClientReportPdf, generateInternalReportPdf, money,
 };

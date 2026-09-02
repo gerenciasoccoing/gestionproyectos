@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const ApiError = require('../utils/ApiError');
 const { sequelize, Budget, BudgetItem, APU, APUComponent, PriceItem, ProgressEntry } = require('../models');
 
@@ -145,8 +146,13 @@ async function getProjectBudgetTotal(projectId) {
   return budget.items.reduce((sum, item) => sum + Number(item.totalCost), 0);
 }
 
-// Devuelve los ítems de presupuesto del proyecto con avance acumulado, % y valor ejecutado calculados.
-async function getBudgetItemsWithProgress(projectId) {
+// Devuelve los ítems de presupuesto del proyecto con avance acumulado, % y valor ejecutado
+// calculados. `{ from, to }` es opcional (YYYY-MM-DD): si se pasa, solo cuenta los ProgressEntry
+// con fecha dentro del rango — usado por el Informe Interno (reportEngineService.js) para que el
+// avance por ítem refleje solo lo ocurrido en el rango seleccionado, sin tocar el cálculo por
+// defecto (sin filtro) que sigue usando el resto de la app (Dashboard de Ejecución, EVM en vivo,
+// avance del presupuesto, Informe para Cliente).
+async function getBudgetItemsWithProgress(projectId, { from, to } = {}) {
   const budget = await getCurrentBudgetForProject(projectId);
   if (!budget) return { budget: null, items: [] };
 
@@ -155,9 +161,13 @@ async function getBudgetItemsWithProgress(projectId) {
   // presupuesto real puede tener decenas de ítems — a esa frecuencia, aunque las consultas corran
   // en secuencia (obligatorio, ver mapSeries.js), seguir haciendo una por ítem satura igual el pool
   // de conexiones bajo uso real (cada conexión queda ocupada mucho más tiempo del necesario).
-  const allEntries = await ProgressEntry.findAll({
-    where: { budgetItemId: budget.items.map((i) => i.id) },
-  });
+  const entryWhere = { budgetItemId: budget.items.map((i) => i.id) };
+  if (from || to) {
+    entryWhere.date = {};
+    if (from) entryWhere.date[Op.gte] = from;
+    if (to) entryWhere.date[Op.lte] = to;
+  }
+  const allEntries = await ProgressEntry.findAll({ where: entryWhere });
   const entriesByItem = new Map();
   for (const entry of allEntries) {
     const list = entriesByItem.get(entry.budgetItemId) || [];

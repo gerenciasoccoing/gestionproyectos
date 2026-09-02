@@ -23,8 +23,114 @@ export default function ContractualPage() {
   return (
     <div>
       <ContractNumberSection projectId={projectId} project={project} onChange={load} />
+      <ProjectPresentationSection projectId={projectId} project={project} onChange={load} />
       <ContractsSection projectId={projectId} project={project} contracts={contracts} onChange={load} />
       <PoliciesSection projectId={projectId} policies={policies} onChange={load} />
+    </div>
+  );
+}
+
+// Datos usados en la portada del Informe para Cliente (ver reports/ReportsPage.jsx y
+// reportEngineService.js en el backend): lugar de ejecución (texto), foto de presentación y
+// captura/pantallazo del mapa de ubicación — ambas de carga manual, sin geocodificación
+// automática. Mismo patrón de edición inline que ContractNumberSection arriba.
+function ProjectPresentationSection({ projectId, project, onChange }) {
+  const { t } = useTranslation();
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [addressDraft, setAddressDraft] = useState('');
+  const [uploading, setUploading] = useState(null);
+  const [error, setError] = useState('');
+
+  const [saveAddress, savingAddress] = useSubmitGuard(async () => {
+    setError('');
+    try {
+      await projectsApi.update(projectId, { address: addressDraft.trim() || null });
+      setEditingAddress(false);
+      onChange();
+    } catch (err) {
+      setError(extractError(err));
+    }
+  });
+
+  const uploadPhoto = async (field, file) => {
+    if (!file) return;
+    setUploading(field);
+    setError('');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      if (field === 'presentationPhotoPath') await projectsApi.uploadPresentationPhoto(projectId, fd);
+      else await projectsApi.uploadLocationMap(projectId, fd);
+      onChange();
+    } catch (err) {
+      setError(extractError(err));
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  if (!project) return null;
+
+  return (
+    <Card title={t('contractual.presentation.title')}>
+      <div className="mb-4">
+        {editingAddress ? (
+          <div className="flex flex-wrap items-end gap-2">
+            <Input label={t('contractual.presentation.address')} value={addressDraft} onChange={(e) => setAddressDraft(e.target.value)} className="max-w-md" autoFocus />
+            <Button onClick={saveAddress} loading={savingAddress}>{t('common.save')}</Button>
+            <Button variant="secondary" onClick={() => setEditingAddress(false)}>{t('common.cancel')}</Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-sm text-gray-700">
+              {project.address || <span className="text-gray-400">{t('contractual.presentation.addressEmpty')}</span>}
+            </span>
+            <Can module="proyectos" action="edit">
+              <Button variant="secondary" onClick={() => { setAddressDraft(project.address || ''); setEditingAddress(true); }}>{t('common.edit')}</Button>
+            </Can>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <PhotoUploadField
+          label={t('contractual.presentation.photo')}
+          currentPath={project.presentationPhotoPath}
+          uploading={uploading === 'presentationPhotoPath'}
+          onSelect={(file) => uploadPhoto('presentationPhotoPath', file)}
+        />
+        <PhotoUploadField
+          label={t('contractual.presentation.map')}
+          currentPath={project.locationMapImagePath}
+          uploading={uploading === 'locationMapImagePath'}
+          onSelect={(file) => uploadPhoto('locationMapImagePath', file)}
+        />
+      </div>
+      <ErrorText>{error}</ErrorText>
+    </Card>
+  );
+}
+
+function PhotoUploadField({ label, currentPath, uploading, onSelect }) {
+  const { t } = useTranslation();
+  return (
+    <div>
+      <p className="text-sm font-medium text-gray-700 mb-2">{label}</p>
+      {currentPath ? (
+        <a href={fileUrl(currentPath)} target="_blank" rel="noreferrer">
+          <img src={fileUrl(currentPath)} alt={label} className="w-full h-36 object-cover rounded border border-gray-200 mb-2" />
+        </a>
+      ) : (
+        <div className="w-full h-36 rounded border border-dashed border-gray-300 flex items-center justify-center text-gray-400 text-xs mb-2">
+          {t('contractual.presentation.empty')}
+        </div>
+      )}
+      <Can module="proyectos" action="edit">
+        <label className="inline-block text-xs text-blue-600 hover:underline cursor-pointer">
+          {uploading ? t('expenses.uploading') : (currentPath ? t('expenses.replace') : t('expenses.attach'))}
+          <input type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden" disabled={uploading} onChange={(e) => { onSelect(e.target.files?.[0]); e.target.value = ''; }} />
+        </label>
+      </Can>
     </div>
   );
 }

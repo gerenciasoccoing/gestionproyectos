@@ -4,6 +4,7 @@ const { Project, User, ProjectUser, Consortium } = require('../models');
 const { deleteProjectCascade } = require('../services/projectDeletionService');
 const { assertWithinLimit } = require('../utils/planLimits');
 const { mapSeries } = require('../utils/mapSeries');
+const { relativePath } = require('../middleware/upload');
 
 const list = asyncHandler(async (req, res) => {
   const where = req.user.isAdmin ? {} : { id: req.user.projectIds };
@@ -44,7 +45,7 @@ const create = asyncHandler(async (req, res) => {
 const update = asyncHandler(async (req, res) => {
   const project = await Project.findByPk(req.params.id);
   if (!project) throw new ApiError(404, 'Proyecto no encontrado');
-  const { name, client, clientId, description, status, consortiumId, contractNumber } = req.body;
+  const { name, client, clientId, description, status, consortiumId, contractNumber, address } = req.body;
   if (name !== undefined) {
     if (!name.trim()) throw new ApiError(400, 'El nombre del proyecto es obligatorio');
     project.name = name;
@@ -57,6 +58,28 @@ const update = asyncHandler(async (req, res) => {
   // Edición explícita del No. de Contrato (a diferencia del auto-llenado de contractController.js,
   // este SÍ sobreescribe): es el gesto intencional para corregirlo en cualquier momento.
   if (contractNumber !== undefined) project.contractNumber = contractNumber ? contractNumber.trim() : null;
+  if (address !== undefined) project.address = address ? address.trim() : null;
+  await project.save();
+  res.json(project);
+});
+
+// Foto de presentación del proyecto y mapa de ubicación (captura manual, sin geocodificación): dos
+// campos de imagen independientes, cada uno reemplazable en cualquier momento. Usados en la
+// portada del Informe para Cliente (ver reportEngineService.js / pdfService.js).
+const uploadPresentationPhoto = asyncHandler(async (req, res) => {
+  const project = await Project.findByPk(req.params.id);
+  if (!project) throw new ApiError(404, 'Proyecto no encontrado');
+  if (!req.file) throw new ApiError(400, 'Debe adjuntar una imagen');
+  project.presentationPhotoPath = relativePath(req.file);
+  await project.save();
+  res.json(project);
+});
+
+const uploadLocationMap = asyncHandler(async (req, res) => {
+  const project = await Project.findByPk(req.params.id);
+  if (!project) throw new ApiError(404, 'Proyecto no encontrado');
+  if (!req.file) throw new ApiError(400, 'Debe adjuntar una imagen');
+  project.locationMapImagePath = relativePath(req.file);
   await project.save();
   res.json(project);
 });
@@ -78,4 +101,4 @@ const assignUsers = asyncHandler(async (req, res) => {
   res.json(full);
 });
 
-module.exports = { list, get, create, update, remove, assignUsers };
+module.exports = { list, get, create, update, remove, assignUsers, uploadPresentationPhoto, uploadLocationMap };

@@ -25,6 +25,8 @@ export default function ReportsPage() {
 
   return (
     <div>
+      <AiReportsSection projectId={projectId} projectStart={evm?.start} />
+
       <Card title={t('reports.evmTitle')} actions={
         <a href={reportsApi.exportPdfUrl(projectId)} target="_blank" rel="noreferrer">
           <Button variant="secondary">{t('reports.exportPdf')}</Button>
@@ -105,6 +107,48 @@ export default function ReportsPage() {
 
       <RisksSection projectId={projectId} />
     </div>
+  );
+}
+
+// Motor de Informes con IA (ver reportEngineService.js/pdfService.js en el backend): dos informes
+// generados bajo demanda a partir de los datos ya cargados del proyecto — nunca cifras distintas a
+// las que ya se ven en este mismo módulo/el Dashboard de Ejecución, la IA solo redacta el texto.
+// El de Cliente siempre corta a hoy (sin selector); el Interno pide un rango, precargado con
+// [inicio del proyecto (evm.start), hoy] igual que hace el backend por defecto si no se manda rango.
+function AiReportsSection({ projectId, projectStart }) {
+  const { t } = useTranslation();
+  const today = new Date().toISOString().slice(0, 10);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState(today);
+
+  useEffect(() => {
+    if (projectStart && !from) setFrom(String(projectStart).slice(0, 10));
+  }, [projectStart]);
+
+  return (
+    <Card title={t('reports.aiReports.title')}>
+      <p className="text-sm text-gray-500 mb-4">{t('reports.aiReports.subtitle')}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="border border-gray-200 rounded p-3">
+          <h4 className="font-medium text-sm text-gray-800 mb-1">{t('reports.aiReports.clientTitle')}</h4>
+          <p className="text-xs text-gray-500 mb-3">{t('reports.aiReports.clientDescription')}</p>
+          <a href={reportsApi.clientReportPdfUrl(projectId)} target="_blank" rel="noreferrer">
+            <Button>{t('reports.aiReports.generate')}</Button>
+          </a>
+        </div>
+        <div className="border border-gray-200 rounded p-3">
+          <h4 className="font-medium text-sm text-gray-800 mb-1">{t('reports.aiReports.internalTitle')}</h4>
+          <p className="text-xs text-gray-500 mb-3">{t('reports.aiReports.internalDescription')}</p>
+          <div className="flex flex-wrap gap-2 items-end mb-3">
+            <Input label={t('reports.aiReports.from')} type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <Input label={t('reports.aiReports.to')} type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+          <a href={reportsApi.internalReportPdfUrl(projectId, from || undefined, to || undefined)} target="_blank" rel="noreferrer">
+            <Button>{t('reports.aiReports.generate')}</Button>
+          </a>
+        </div>
+      </div>
+    </Card>
   );
 }
 

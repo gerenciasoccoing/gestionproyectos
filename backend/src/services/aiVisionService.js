@@ -94,4 +94,48 @@ async function extractStructuredDataFromText({ text, instructions, schemaDescrip
   return callClaude({ type: 'text', text }, instructions, schemaDescription, maxTokens);
 }
 
-module.exports = { extractStructuredData, extractStructuredDataFromText, isConfigured };
+// Redacción de texto narrativo (no extracción de JSON) para los Informes con IA (ver
+// reportEngineService.js): recibe un prompt que YA incluye las cifras exactas calculadas por el
+// backend (presupuesto, ejecutado, % avance, gastos por categoría, etc.) y le pide a Claude que
+// redacte prosa profesional a partir de ELLAS — nunca calcula ni inventa un número, solo los
+// convierte en texto legible. Devuelve `null` (nunca lanza) ante falta de configuración, error de
+// red o respuesta vacía: la generación del informe es siempre best-effort respecto al texto de IA
+// — el PDF se genera igual, con un texto de respaldo determinístico armado por quien llama (ver
+// buildFallbackSummary en reportEngineService.js), para que "Generar informe" nunca falle por
+// esto.
+async function generateText(prompt, maxTokens = 900) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+
+  let res;
+  try {
+    res = await fetch(ANTHROPIC_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: ANTHROPIC_MODEL,
+        max_tokens: maxTokens,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+  } catch (err) {
+    console.error(`[aiVisionService] generateText: no se pudo contactar al servicio de IA: ${err.message}`);
+    return null;
+  }
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    console.error(`[aiVisionService] generateText: el servicio de IA respondió con error ${res.status}${body ? `: ${body.slice(0, 300)}` : ''}`);
+    return null;
+  }
+
+  const data = await res.json();
+  const text = (data.content?.[0]?.text || '').trim();
+  return text || null;
+}
+
+module.exports = { extractStructuredData, extractStructuredDataFromText, generateText, isConfigured };
