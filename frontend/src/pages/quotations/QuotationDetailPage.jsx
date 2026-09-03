@@ -11,6 +11,7 @@ export default function QuotationDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
+  const [loadError, setLoadError] = useState('');
   const [apus, setApus] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ apuId: '', description: '', notes: '', unit: '', quantity: '' });
@@ -31,7 +32,12 @@ export default function QuotationDetailPage() {
   const [exportDownloading, setExportDownloading] = useState('');
   const [exportError, setExportError] = useState('');
 
+  // Antes no tenía .catch(): si la petición fallaba (permiso, red, 404, 500), `data` se quedaba en
+  // null para siempre y la pantalla mostraba el spinner de carga indefinidamente, sin ningún
+  // mensaje — igual síntoma que reportaron los usuarios. Ahora un fallo real muestra el error en
+  // vez de quedarse colgado.
   const load = () => quotationsApi.get(id).then((d) => {
+    setLoadError('');
     setData(d);
     if (d.budget) {
       setAiuForm({
@@ -40,9 +46,32 @@ export default function QuotationDetailPage() {
         utilidadPercent: String(d.budget.utilidadPercent),
       });
     }
-  });
+  }).catch((err) => setLoadError(extractError(err)));
   useEffect(() => { load(); apuApi.list().then(setApus); }, [id]);
 
+  // IMPORTANTE: useSubmitGuard es un Hook y debe llamarse siempre, en el mismo orden, en cada
+  // render — por eso va ANTES del "if (!data) return ..." de abajo. Declararlo después de un
+  // return condicional (como estaba antes) hace que se llame en el 2do render (cuando `data` ya
+  // llegó) pero NO en el 1er render (mientras `data` es null): React detecta un número distinto
+  // de Hooks entre renders y lanza "Rendered more hooks than during the previous render", lo que
+  // tumba el árbol de React entero justo cuando los datos ya cargaron — esta era la causa real del
+  // bloqueo/pantalla en blanco al entrar al detalle de una cotización recién creada.
+  const [submitItem, submittingItem] = useSubmitGuard(async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      const payload = { ...form };
+      if (!payload.apuId) delete payload.apuId;
+      await quotationsApi.addItem(id, payload);
+      setForm({ apuId: '', description: '', notes: '', unit: '', quantity: '' });
+      setShowForm(false);
+      load();
+    } catch (err) {
+      setError(extractError(err));
+    }
+  });
+
+  if (loadError) return <ErrorText>{loadError}</ErrorText>;
   if (!data) return <div className="text-gray-500">{t('common.loading')}</div>;
   const { quotation, budget } = data;
   const items = budget?.items || [];
@@ -68,21 +97,6 @@ export default function QuotationDetailPage() {
     const apu = apus.find((a) => a.id === apuId);
     setForm((f) => ({ ...f, apuId, description: apu ? apu.name : '', unit: apu ? apu.unit : f.unit }));
   };
-
-  const [submitItem, submittingItem] = useSubmitGuard(async (e) => {
-    e.preventDefault();
-    setError('');
-    try {
-      const payload = { ...form };
-      if (!payload.apuId) delete payload.apuId;
-      await quotationsApi.addItem(id, payload);
-      setForm({ apuId: '', description: '', notes: '', unit: '', quantity: '' });
-      setShowForm(false);
-      load();
-    } catch (err) {
-      setError(extractError(err));
-    }
-  });
 
   const downloadExport = async (format) => {
     setExportError('');

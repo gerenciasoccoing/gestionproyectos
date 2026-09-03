@@ -301,6 +301,50 @@ async function applyPostSyncFixups() {
 
   await ensureAppDbRole();
   await applyRowLevelSecurity();
+  await applyPerformanceIndexes();
+}
+
+// Índices faltantes, causa raíz de la lentitud reportada en varios módulos (Cotizaciones,
+// Ejecución de Proyecto, Órdenes de Compra): CADA consulta a una tabla de negocio pasa por la
+// política RLS de aislamiento multi-tenant (ver applyRowLevelSecurity arriba), que filtra por
+// "companyId" — sin un índice en esa columna, Postgres hace un seq scan de TODA la tabla (de
+// TODAS las empresas juntas) en cada consulta, sin importar cuán específico sea el resto del
+// WHERE. Esto empeora con el tiempo a medida que crece cualquier tenant, no solo el que hace la
+// consulta. CREATE INDEX IF NOT EXISTS es seguro de repetir en cada arranque (no-op si ya existe).
+//
+// Además de companyId (genérico, todas las tablas con aislamiento), se agregan índices puntuales
+// sobre las llaves foráneas que SÍ se consultan directo (WHERE/JOIN) en los flujos más pesados ya
+// identificados: el detalle de una Cotización (Quotation -> Budget -> BudgetItem -> APU), el
+// Dashboard de Ejecución (que además se refresca solo cada ~8s, ver executionDashboardController.js
+// y budgetService.getBudgetItemsWithProgress) y el detalle de una Orden de Compra (ítems +
+// recepciones + abonos).
+async function applyPerformanceIndexes() {
+  for (const model of Object.values(sequelize.models)) {
+    if (!isTenantScopedModel(model)) continue;
+    const table = model.getTableName();
+    const indexName = `idx_${table.toLowerCase()}_companyid`;
+    // eslint-disable-next-line no-await-in-loop
+    await sequelize.query(`CREATE INDEX IF NOT EXISTS "${indexName}" ON "${table}" ("companyId")`);
+  }
+
+  const foreignKeyIndexes = [
+    ['Budgets', 'quotationId'],
+    ['Budgets', 'projectId'],
+    ['BudgetItems', 'budgetId'],
+    ['BudgetItems', 'apuId'],
+    ['ProgressEntries', 'budgetItemId'],
+    ['ProgressPhotos', 'progressEntryId'],
+    ['Expenses', 'projectId'],
+    ['PurchaseOrders', 'projectId'],
+    ['PurchaseOrderItems', 'purchaseOrderId'],
+    ['PurchaseReceipts', 'purchaseOrderItemId'],
+    ['PurchaseOrderPayments', 'purchaseOrderId'],
+  ];
+  for (const [table, column] of foreignKeyIndexes) {
+    const indexName = `idx_${table.toLowerCase()}_${column.toLowerCase()}`;
+    // eslint-disable-next-line no-await-in-loop
+    await sequelize.query(`CREATE INDEX IF NOT EXISTS "${indexName}" ON "${table}" ("${column}")`);
+  }
 }
 
 // SocialSecurityProvider (catálogo de EPS/pensión/ARL) se siembra con sus valores por defecto al

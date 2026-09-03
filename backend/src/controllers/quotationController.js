@@ -24,8 +24,11 @@ const list = asyncHandler(async (req, res) => {
 });
 
 const get = asyncHandler(async (req, res) => {
+  // getQuotationWithBudget devuelve `null` (no { quotation: null }) cuando el id no existe —
+  // acceder a `data.quotation` sin este chequeo lanzaba un TypeError sin capturar en vez del 404
+  // esperado.
   const data = await getQuotationWithBudget(req.params.id);
-  if (!data.quotation) throw new ApiError(404, 'Cotización no encontrada');
+  if (!data || !data.quotation) throw new ApiError(404, 'Cotización no encontrada');
   res.json(data);
 });
 
