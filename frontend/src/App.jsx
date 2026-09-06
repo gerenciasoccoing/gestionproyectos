@@ -17,7 +17,8 @@ import ExecutionLayout from './pages/execution/ExecutionLayout';
 import ExecutionDashboardPage from './pages/execution/ExecutionDashboardPage';
 import MinutesPage from './pages/execution/MinutesPage';
 import MilestonesPage from './pages/execution/MilestonesPage';
-import BudgetProgressPage from './pages/execution/BudgetProgressPage';
+import BudgetPage from './pages/execution/BudgetPage';
+import ProgressPage from './pages/execution/ProgressPage';
 import PurchaseOrdersPage from './pages/execution/PurchaseOrdersPage';
 
 import PersonnelListPage from './pages/personnel/PersonnelListPage';
@@ -104,7 +105,8 @@ export default function App() {
             <Route path="dashboard" element={<ExecutionDashboardPage />} />
             <Route path="minutes" element={<MinutesPage />} />
             <Route path="milestones" element={<MilestonesPage />} />
-            <Route path="progress" element={<BudgetProgressPage />} />
+            <Route path="budget" element={<BudgetPage />} />
+            <Route path="progress" element={<ProgressPage />} />
             <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
           </Route>
 

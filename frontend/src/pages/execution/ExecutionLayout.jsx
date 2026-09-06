@@ -9,6 +9,7 @@ export default function ExecutionLayout() {
     { to: 'dashboard', label: t('execution.tabs.dashboard') },
     { to: 'minutes', label: t('execution.tabs.minutes') },
     { to: 'milestones', label: t('execution.tabs.milestones') },
+    { to: 'budget', label: t('execution.tabs.budget') },
     { to: 'progress', label: t('execution.tabs.progress') },
     { to: 'purchase-orders', label: t('execution.tabs.purchaseOrders') },
   ];

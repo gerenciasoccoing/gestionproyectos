@@ -230,7 +230,7 @@
         "generatingExcel": "Generating Excel…"
       },
       "items": {
-        "title": "Budget items and physical progress",
+        "title": "Budget items",
         "add": "+ Add item",
         "apuSearch": "APU (optional, search by code or name)",
         "manualPlaceholder": "-- Manual item (no APU) --",
@@ -447,7 +447,8 @@
       "minutes": "Minutes",
       "milestones": "Milestones",
       "progress": "Progress by item",
-      "purchaseOrders": "Purchase Orders"
+      "purchaseOrders": "Purchase Orders",
+      "budget": "Project Budget"
     },
     "dashboard": {
       "loading": "Loading dashboard...",
@@ -475,6 +476,10 @@
         "viaticos": "Per diem",
         "imprevistos": "Contingencies"
       }
+    },
+    "progress": {
+      "itemsTitle": "Budget items",
+      "noBudget": "This project doesn't have a budget loaded yet. Go to the \"Project Budget\" tab to load it."
     }
   },
   "personnel": {
