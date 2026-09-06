@@ -312,7 +312,10 @@
       },
       "consolidation": {
         "title": "Project Resource Consolidation",
-        "help": "Adds up, across the whole project, the quantity of each resource (materials, labor, equipment and transport) required by the budget items' cost breakdowns — ready to request supplier quotes. Recalculates automatically if you edit a quantity or a breakdown."
+        "help": "Adds up, across the whole project, the quantity of each resource (materials, labor, equipment and transport) required by the budget items' cost breakdowns — ready to request supplier quotes. Recalculates automatically if you edit a quantity or a breakdown.",
+        "purchased": "Purchased (PO)",
+        "percentConsumed": "% consumed",
+        "alertSummary": "{{count}} resource(s) already exceed, or are close (≥80%) to exceeding, the consolidated quantity, based on what's been ordered in Purchase Orders."
       }
     },
     "purchaseOrders": {
@@ -523,7 +526,14 @@
       "range": "Contract range: {{start}} to {{end}}",
       "generate": "Generate schedule",
       "regenerate": "Regenerate schedule",
-      "empty": "No schedule has been generated for this project yet."
+      "empty": "No schedule has been generated for this project yet.",
+      "lateAlert": "{{count}} item(s) are behind schedule: their planned end date has passed and their real progress logged in \"Progress by Item\" is still below 100%.",
+      "status": {
+        "pendiente": "Pending",
+        "en_curso": "In progress",
+        "completado": "Completed",
+        "atrasado": "Behind schedule"
+      }
     }
   },
   "personnel": {

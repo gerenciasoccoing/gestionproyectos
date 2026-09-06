@@ -1,7 +1,7 @@
 const { sequelize, BudgetScheduleItem } = require('../models');
 const ApiError = require('../utils/ApiError');
 const { extractStructuredDataFromText, isConfigured } = require('./aiVisionService');
-const { getCurrentBudgetForProject } = require('./budgetService');
+const { getCurrentBudgetForProject, getBudgetItemsWithProgress } = require('./budgetService');
 const { getProjectTimeframe } = require('./evmService');
 
 const MS_PER_DAY = 86400000;
@@ -112,22 +112,30 @@ async function generateSchedule(projectId) {
 }
 
 // Cronograma vigente del proyecto, con la descripción/unidad/cantidad de cada ítem (para mostrar
-// y exportar sin una segunda consulta desde el controlador) y el rango de contrato usado como
-// referencia del Gantt.
+// y exportar sin una segunda consulta desde el controlador), el rango de contrato usado como
+// referencia del Gantt, y el % de avance REAL ya registrado en Avance por Ítem (ver
+// budgetService.getBudgetItemsWithProgress — misma fuente que usa esa pantalla, sin datos
+// duplicados) para poder marcar qué ítems van atrasados respecto a su fecha planeada.
 async function getSchedule(projectId, { transaction } = {}) {
-  const budget = await getCurrentBudgetForProject(projectId);
-  const items = budget ? budget.items : [];
+  const { items } = await getBudgetItemsWithProgress(projectId);
   const itemIds = items.map((it) => it.id);
   const scheduleItems = itemIds.length
     ? await BudgetScheduleItem.findAll({ where: { budgetItemId: itemIds }, order: [['sequenceOrder', 'ASC']], transaction })
     : [];
   const itemById = new Map(items.map((it) => [it.id, it]));
   const timeframe = await getProjectTimeframe(projectId);
+  const todayStr = toDateOnly(new Date());
 
   return {
     timeframe: { start: toDateOnly(timeframe.start), end: toDateOnly(timeframe.end) },
     items: scheduleItems.map((s) => {
       const item = itemById.get(s.budgetItemId);
+      const percent = item ? item.percent : 0;
+      let status;
+      if (percent >= 100) status = 'completado';
+      else if (todayStr < s.plannedStart) status = 'pendiente';
+      else if (todayStr > s.plannedEnd) status = 'atrasado';
+      else status = 'en_curso';
       return {
         budgetItemId: s.budgetItemId,
         description: item?.description || '-',
@@ -136,6 +144,8 @@ async function getSchedule(projectId, { transaction } = {}) {
         sequenceOrder: s.sequenceOrder,
         plannedStart: s.plannedStart,
         plannedEnd: s.plannedEnd,
+        percent,
+        status,
       };
     }),
   };

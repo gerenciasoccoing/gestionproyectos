@@ -5,7 +5,7 @@ const { getBudgetItemsWithProgress, resolveBudgetItemFields, updateBudgetItemQua
 const { importBudgetFromWorkbook } = require('../services/budgetImportService');
 const { scanBudgetItemsFile } = require('../services/budgetItemsScanService');
 const { scanItemApu, createBudgetItemsWithProjectApu } = require('../services/projectApuService');
-const { computeResourceConsolidation } = require('../services/resourceConsolidationService');
+const { computeResourceConsolidation, computeResourceConsolidationWithPurchases } = require('../services/resourceConsolidationService');
 const { buildApuDataByIdMap, buildApuExportData } = require('../services/apuExportService');
 const { generateBudgetWithApuAnnexPdf, generateResourceConsolidationPdf } = require('../services/pdfService');
 const { generateBudgetWithApuAnnexExcelBuffer, generateResourceConsolidationExcelBuffer } = require('../services/apuExcelExportService');
@@ -198,9 +198,10 @@ async function buildBudgetExportContext(projectId, body) {
 }
 
 // Consolidado de recursos de todo el proyecto (ver resourceConsolidationService.js): 4 listados
-// (Materiales, Mano de Obra, Equipos y Herramientas, Transporte) recalculados siempre en vivo.
+// (Materiales, Mano de Obra, Equipos y Herramientas, Transporte) recalculados siempre en vivo,
+// con la comparación contra lo ya comprado en Órdenes de Compra (alerta de consumo real).
 const getResourceConsolidation = asyncHandler(async (req, res) => {
-  const result = await computeResourceConsolidation(req.params.projectId);
+  const result = await computeResourceConsolidationWithPurchases(req.params.projectId);
   res.json(result);
 });
 

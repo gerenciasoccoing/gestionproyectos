@@ -1,4 +1,4 @@
-const { APU, APUComponent, PriceItem } = require('../models');
+const { APU, APUComponent, PriceItem, PurchaseOrder, PurchaseOrderItem } = require('../models');
 const { getBudgetItemsWithProgress } = require('./budgetService');
 
 // Consolidado de recursos de TODO el proyecto (solo aplica a ítems con APU, ver "Presupuesto del
@@ -89,4 +89,52 @@ async function computeResourceConsolidation(projectId) {
   };
 }
 
-module.exports = { computeResourceConsolidation };
+const ALERT_WARNING_PERCENT = 80;
+
+function alertStatus(percent) {
+  if (percent === null) return null;
+  if (percent > 100) return 'exceeded';
+  if (percent >= ALERT_WARNING_PERCENT) return 'warning';
+  return 'ok';
+}
+
+// Cantidad ya comprada de cada recurso, tomada de TODAS las Órdenes de Compra del proyecto
+// (cualquier estado: una OC ya refleja una decisión de compra), agrupada por el mismo nombre
+// normalizado (trim + minúsculas) que usa el consolidado, para poder comparar uno a uno.
+async function getPurchasedQuantitiesByName(projectId) {
+  const orderItems = await PurchaseOrderItem.findAll({
+    include: [{ model: PurchaseOrder, attributes: [], where: { projectId }, required: true }],
+  });
+  const map = new Map();
+  for (const oi of orderItems) {
+    const key = oi.name.trim().toLowerCase();
+    map.set(key, (map.get(key) || 0) + Number(oi.quantityOrdered));
+  }
+  return map;
+}
+
+// Mismo consolidado de computeResourceConsolidation, pero además compara cada recurso contra lo
+// YA comprado en Órdenes de Compra del proyecto (por nombre) — alimenta a la vez la alerta de
+// consumo real ("¿ya se compró más de lo consolidado?") y la comparación OC vs. consolidado en
+// pantalla, con una sola tabla y un solo cálculo (ver ResourceConsolidationSection.jsx). Mano de
+// obra queda fuera de la comparación: Gastos solo registra valor, no jornales, así que no existe
+// ninguna fuente de cantidad real comparable en el sistema para ese recurso.
+async function computeResourceConsolidationWithPurchases(projectId) {
+  const consolidation = await computeResourceConsolidation(projectId);
+  const purchasedByName = await getPurchasedQuantitiesByName(projectId);
+
+  const annotate = (rows) => rows.map((row) => {
+    const purchasedQuantity = purchasedByName.get(row.name.trim().toLowerCase()) || 0;
+    const percent = row.quantity > 0 ? Math.round((purchasedQuantity / row.quantity) * 10000) / 100 : null;
+    return { ...row, purchasedQuantity, percent, status: alertStatus(percent) };
+  });
+
+  return {
+    materials: annotate(consolidation.materials),
+    labor: consolidation.labor.map((row) => ({ ...row, purchasedQuantity: null, percent: null, status: null })),
+    equipment: annotate(consolidation.equipment),
+    transport: annotate(consolidation.transport),
+  };
+}
+
+module.exports = { computeResourceConsolidation, computeResourceConsolidationWithPurchases };

@@ -312,7 +312,10 @@
       },
       "consolidation": {
         "title": "Consolidado de Recursos del Proyecto",
-        "help": "Suma, para todo el proyecto, la cantidad de cada recurso (materiales, mano de obra, equipos y transporte) requerida según los APU de los ítems del presupuesto — listo para solicitar cotizaciones a proveedores. Se recalcula solo si editas una cantidad o un APU."
+        "help": "Suma, para todo el proyecto, la cantidad de cada recurso (materiales, mano de obra, equipos y transporte) requerida según los APU de los ítems del presupuesto — listo para solicitar cotizaciones a proveedores. Se recalcula solo si editas una cantidad o un APU.",
+        "purchased": "Comprado (OC)",
+        "percentConsumed": "% consumido",
+        "alertSummary": "{{count}} recurso(s) ya superan o están cerca de superar (≥80%) la cantidad consolidada, según lo pedido en Órdenes de Compra."
       }
     },
     "purchaseOrders": {
@@ -523,7 +526,14 @@
       "range": "Rango de contrato: {{start}} a {{end}}",
       "generate": "Generar cronograma",
       "regenerate": "Regenerar cronograma",
-      "empty": "Aún no se ha generado un cronograma para este proyecto."
+      "empty": "Aún no se ha generado un cronograma para este proyecto.",
+      "lateAlert": "{{count}} ítem(s) van atrasados: ya pasó su fecha planeada de fin y su avance real registrado en \"Avance por Ítem\" aún no llega al 100%.",
+      "status": {
+        "pendiente": "Pendiente",
+        "en_curso": "En curso",
+        "completado": "Completado",
+        "atrasado": "Atrasado"
+      }
     }
   },
   "personnel": {
