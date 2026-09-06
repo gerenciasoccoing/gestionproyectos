@@ -61,9 +61,13 @@ function computeSectionCosts(components) {
 // El APU ya no incluye AIU: es puro costo directo (materiales, herramientas, personal,
 // transporte y otros costos directos). El AIU se define al crear el presupuesto (ver
 // applyBudgetAiu) y se aplica sobre este costo directo al agregar el ítem al presupuesto.
-async function computeApuUnitCost(apuId) {
+// `transaction` es opcional (el resto de la app lo llama sin ella, fuera de cualquier
+// transacción explícita); projectApuService.js sí la pasa porque necesita leer el APU y sus
+// componentes recién creados DENTRO de la misma transacción que los creó, antes de que se confirme.
+async function computeApuUnitCost(apuId, { transaction } = {}) {
   const apu = await APU.findByPk(apuId, {
     include: [{ model: APUComponent, as: 'components', include: [{ model: PriceItem, as: 'priceItem' }] }],
+    transaction,
   });
   if (!apu) return null;
   const sections = computeSectionCosts(apu.components);
@@ -75,10 +79,10 @@ async function computeApuUnitCost(apuId) {
 // Recalcula el costo directo de UN APU (tras crearlo/editarlo o agregar/quitar un componente
 // suyo) y lo persiste en APU.directCost, el valor cacheado que lee el listado (ver
 // apuController.list). Devuelve lo mismo que computeApuUnitCost para no duplicar la respuesta.
-async function recomputeAndPersistApuCost(apuId) {
-  const result = await computeApuUnitCost(apuId);
+async function recomputeAndPersistApuCost(apuId, { transaction } = {}) {
+  const result = await computeApuUnitCost(apuId, { transaction });
   if (!result) return null;
-  await result.apu.update({ directCost: result.directCost });
+  await result.apu.update({ directCost: result.directCost }, { transaction });
   return result;
 }
 
@@ -234,7 +238,7 @@ async function resolveBudgetItemFields({ budget, apuId, description, notes, unit
   let resolvedUnitCost = unitCost || 0;
   let itemCode = null;
   if (apuId) {
-    const result = await computeApuUnitCost(apuId);
+    const result = await computeApuUnitCost(apuId, { transaction });
     if (!result) throw new ApiError(404, 'APU no encontrado');
     resolvedDescription = result.apu.name;
     resolvedUnitCost = applyBudgetAiu(result.directCost, budget);

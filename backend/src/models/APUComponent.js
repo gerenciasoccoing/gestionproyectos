@@ -15,8 +15,14 @@ module.exports = (sequelize) => {
     category: { type: DataTypes.STRING, allowNull: false, defaultValue: 'material', validate: { isIn: [CATEGORIES] } },
     // Insumo de la base de precios. Obligatorio salvo en transporte, donde puede ser una tarifa manual.
     priceItemId: { type: DataTypes.UUID, allowNull: true },
-    // Etiqueta manual (ej. "Motocarro") cuando el componente de transporte no referencia un insumo.
+    // Etiqueta manual (ej. "Motocarro") cuando el componente no referencia un insumo de la Base
+    // de Precios (antes solo se usaba para Transporte; ahora también en material/personal/
+    // herramienta de un APU de proyecto — ver APU.projectId — donde priceItemId siempre es null).
     description: { type: DataTypes.STRING, allowNull: true },
+    // Unidad manual (ej. "kg", "jornal", "viaje") cuando el componente no referencia un insumo de
+    // la Base de Precios: para uno que sí lo referencia, la unidad sale de priceItem.unit. Sin
+    // esto, un componente de un APU de proyecto no tendría cómo mostrar/exportar su unidad.
+    unit: { type: DataTypes.STRING, allowNull: true },
     // Cantidad: unidades de material/herramienta/personal, o peso en kg para transporte por distancia.
     quantity: { type: DataTypes.DECIMAL(18, 6), allowNull: false, defaultValue: 1, validate: { min: 0 } },
     // Rendimiento: multiplica en herramientas, divide en personal. No aplica a material/transporte.

@@ -1,10 +1,11 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { sequelize, Budget, BudgetItem, Project } = require('../models');
+const { sequelize, Budget, BudgetItem, Project, APU, APUComponent, PriceItem } = require('../models');
 const { getBudgetItemsWithProgress, resolveBudgetItemFields, updateBudgetItemQuantity } = require('../services/budgetService');
 const { importBudgetFromWorkbook } = require('../services/budgetImportService');
 const { scanBudgetItemsFile } = require('../services/budgetItemsScanService');
-const { buildApuDataByIdMap } = require('../services/apuExportService');
+const { scanItemApu, createBudgetItemsWithProjectApu } = require('../services/projectApuService');
+const { buildApuDataByIdMap, buildApuExportData } = require('../services/apuExportService');
 const { generateBudgetWithApuAnnexPdf } = require('../services/pdfService');
 const { generateBudgetWithApuAnnexExcelBuffer } = require('../services/apuExcelExportService');
 const { getLetterheadForProject } = require('../services/letterheadService');
@@ -69,6 +70,27 @@ const updateItem = asyncHandler(async (req, res) => {
   res.json(item);
 });
 
+// Detalle desplegable del APU que compone un ítem (modo "con APU"): reutiliza EXACTAMENTE la
+// misma ficha (4 secciones + AIU + total) que ya arma buildApuExportData para el PDF/Excel del
+// presupuesto — ni la fórmula ni la consulta se repiten en el frontend, que solo la muestra en
+// pantalla. Funciona igual si el APU es privado de este proyecto o del catálogo global (ver
+// APU.projectId): el ítem simplemente no tiene detalle si nunca tuvo un APU asociado (modo sin APU).
+const getItemApuDetail = asyncHandler(async (req, res) => {
+  const budget = await Budget.findOne({ where: { id: req.params.budgetId, projectId: req.params.projectId } });
+  if (!budget) throw new ApiError(404, 'Presupuesto no encontrado');
+  const item = await BudgetItem.findOne({ where: { id: req.params.itemId, budgetId: budget.id } });
+  if (!item) throw new ApiError(404, 'Ítem de presupuesto no encontrado');
+  if (!item.apuId) throw new ApiError(400, 'Este ítem no tiene un APU asociado');
+
+  const apu = await APU.findByPk(item.apuId, {
+    include: [{ model: APUComponent, as: 'components', include: [{ model: PriceItem, as: 'priceItem' }] }],
+  });
+  if (!apu) throw new ApiError(404, 'APU no encontrado');
+
+  const aiu = { adminPercent: budget.adminPercent, imprevistosPercent: budget.imprevistosPercent, utilidadPercent: budget.utilidadPercent };
+  res.json(buildApuExportData(apu, aiu));
+});
+
 const removeItem = asyncHandler(async (req, res) => {
   const item = await BudgetItem.findOne({ where: { id: req.params.itemId, budgetId: req.params.budgetId } });
   if (!item) throw new ApiError(404, 'Ítem de presupuesto no encontrado');
@@ -120,6 +142,34 @@ const addItemsBulk = asyncHandler(async (req, res) => {
   res.status(201).json(created);
 });
 
+// Lee, con IA, el análisis de precio unitario de UN ítem ya identificado (modo "con APU" de
+// Presupuesto del Proyecto) — no crea nada, solo devuelve una vista previa editable (ver
+// projectApuService.scanItemApu). itemDescription identifica cuál ítem buscar dentro del archivo,
+// que puede ser el mismo que ya trae la lista de ítems o uno adicional subido solo para este ítem.
+const scanItemApuFile = asyncHandler(async (req, res) => {
+  if (!req.file) throw new ApiError(400, 'Debe adjuntar un archivo PDF, imagen (jpg, png, webp) o Excel (.xlsx, .xls)');
+  const { itemDescription } = req.body;
+  const result = await scanItemApu({
+    buffer: req.file.buffer,
+    mimetype: req.file.mimetype,
+    originalname: req.file.originalname,
+    itemDescription,
+  });
+  res.json(result);
+});
+
+// Confirma en bloque los ítems + APU revisados en la vista previa (scanItemApuFile por cada uno):
+// crea, en una sola transacción, un APU privado de este proyecto por ítem (nunca toca la Base de
+// Precios global, ver projectApuService.js) y el BudgetItem que lo referencia.
+const addItemsWithApu = asyncHandler(async (req, res) => {
+  const budget = await Budget.findOne({ where: { id: req.params.budgetId, projectId: req.params.projectId } });
+  if (!budget) throw new ApiError(404, 'Presupuesto no encontrado');
+
+  const { entries } = req.body;
+  const created = await createBudgetItemsWithProjectApu({ projectId: req.params.projectId, budget, entries });
+  res.status(201).json(created);
+});
+
 // Sube un Excel de listado de precios unitarios (hojas "Items de Presupuesto" + "Unitarios")
 // y crea automáticamente una nueva versión de presupuesto con sus ítems y los APU (con
 // materiales/personal/equipos) referenciados, creando en la Base de Precios los insumos que
@@ -165,5 +215,6 @@ const exportExcel = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  getProjectBudget, createBudgetVersion, updateBudget, addItem, updateItem, removeItem, scanItemsFile, addItemsBulk, importFromFile, exportPdf, exportExcel,
+  getProjectBudget, createBudgetVersion, updateBudget, addItem, updateItem, removeItem, scanItemsFile, addItemsBulk,
+  scanItemApuFile, addItemsWithApu, getItemApuDetail, importFromFile, exportPdf, exportExcel,
 };

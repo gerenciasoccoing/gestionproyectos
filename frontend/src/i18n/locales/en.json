@@ -266,7 +266,38 @@
         "aiPreviewEmpty": "No items left in the preview.",
         "aiPreviewTotal": "Total value: {{amount}}",
         "aiConfirm": "Confirm and create items",
-        "aiConfirming": "Creating items…"
+        "aiConfirming": "Creating items…",
+        "apuWizard": {
+          "toggle": "Load with AI (with cost breakdown)",
+          "help": "First the item list is read; then, for each item, its unit cost breakdown (APU) is read separately — from the same file or an additional one. Nothing is created until you confirm everything at the end. This cost breakdown stays private to this project: it's never compared or matched against the global price book or another project.",
+          "mainFile": "File with the item list",
+          "scanItems": "Read items with AI",
+          "continueToApu": "Confirm items and continue with cost breakdowns",
+          "apuLoaded": "Breakdown loaded",
+          "apuPending": "Breakdown missing",
+          "itemFile": "File with this item's cost breakdown",
+          "itemFileNote": "If you don't select one, the same item-list file is used.",
+          "scanApu": "Read breakdown with AI",
+          "addResource": "+ Add resource",
+          "noResources": "No resources in this category.",
+          "resourceName": "Resource",
+          "quantity": "Quantity",
+          "categories": {
+            "materials": "Materials",
+            "labor": "Labor",
+            "equipment": "Equipment & tools",
+            "transport": "Transport"
+          },
+          "apuSubtotal": "Breakdown subtotal: {{amount}}",
+          "confirmAll": "Confirm all and create budget",
+          "confirming": "Creating...",
+          "needAllApu": "Each item needs at least one resource loaded in its breakdown before confirming.",
+          "viewApu": "View cost breakdown",
+          "directCost": "Direct cost",
+          "aiuApplied": "Applied overhead/profit ({{percent}}%)",
+          "totalWithAiu": "Total unit price",
+          "sectionSubtotal": "Subtotal: {{amount}}"
+        }
       },
       "progress": {
         "title": "Progress records",

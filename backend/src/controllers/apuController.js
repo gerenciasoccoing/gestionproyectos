@@ -88,8 +88,12 @@ function sanitizeComponent(raw, index) {
 // componentes cada uno, ese JOIN (antes hecho en cada consulta, aunque fuera un solo query) era el
 // cuello de botella real de esta pantalla. No incluye el detalle de componentes en la respuesta:
 // para eso está GET /apus/:id, que sí los trae.
+// Catálogo GLOBAL de APU (Cotizaciones, Estudio de Mercado, presupuesto de Proyectos al buscar un
+// APU existente, y esta misma página /apu): excluye siempre los APU privados de un proyecto (ver
+// APU.projectId en Presupuesto del Proyecto > modo con APU) — esos nunca deben aparecer acá ni
+// cruzarse con otro proyecto ni con este catálogo.
 const list = asyncHandler(async (req, res) => {
-  const apus = await APU.findAll({ order: [['name', 'ASC']] });
+  const apus = await APU.findAll({ where: { projectId: null }, order: [['name', 'ASC']] });
   const withCosts = apus.map((apu) => {
     const directCost = Number(apu.directCost);
     return { ...apu.toJSON(), directCost, unitCost: directCost };

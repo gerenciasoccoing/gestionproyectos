@@ -21,7 +21,7 @@ function buildApuExportData(apu, aiu = {}) {
       return {
         code: c.priceItem?.code || '-',
         description: c.priceItem?.name || c.description || '-',
-        unit: c.priceItem?.unit || '-',
+        unit: c.priceItem?.unit || c.unit || '-',
         vUnit,
         rend,
         parcial: Number(c.quantity) * rend * vUnit,
@@ -43,8 +43,8 @@ function buildApuExportData(apu, aiu = {}) {
       const cantDesp = cantidad * (1 + wastePercent / 100);
       return {
         code: c.priceItem?.code || '-',
-        description: c.priceItem?.name || '-',
-        unit: c.priceItem?.unit || '-',
+        description: c.priceItem?.name || c.description || '-',
+        unit: c.priceItem?.unit || c.unit || '-',
         cantidad,
         wastePercent,
         cantDesp,
@@ -62,7 +62,7 @@ function buildApuExportData(apu, aiu = {}) {
       const rend = Number(c.yield) || 1;
       return {
         code: c.priceItem?.code || '-',
-        description: c.priceItem?.name || '-',
+        description: c.priceItem?.name || c.description || '-',
         cant,
         jornal: jornalDia,
         prestPercent,

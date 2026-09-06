@@ -83,8 +83,10 @@ async function importApuCatalog({ buffer, sourceLabel, effectiveDate, fileName, 
     // de precio puro (lo más común) quedaría invisible en la comparación (viejo vs. nuevo usarían
     // el mismo precio "nuevo").
     const codes = validBlocks.map(([code]) => code);
+    // projectId: null — esta importación actualiza el catálogo GLOBAL de APU; nunca debe tocar un
+    // APU privado de un proyecto (ver APU.projectId) aunque coincida por código.
     const existingApus = await APU.findAll({
-      where: { code: codes },
+      where: { code: codes, projectId: null },
       include: [{ model: APUComponent, as: 'components', include: [{ model: PriceItem, as: 'priceItem' }] }],
       order: [['createdAt', 'ASC']],
       transaction: t,

@@ -81,4 +81,4 @@ async function scanBudgetItemsFile({ buffer, mimetype, originalname }) {
   return { items };
 }
 
-module.exports = { scanBudgetItemsFile };
+module.exports = { scanBudgetItemsFile, workbookToText };

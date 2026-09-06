@@ -266,7 +266,38 @@
         "aiPreviewEmpty": "No quedan ítems en la vista previa.",
         "aiPreviewTotal": "Valor total: {{amount}}",
         "aiConfirm": "Confirmar y crear ítems",
-        "aiConfirming": "Creando ítems…"
+        "aiConfirming": "Creando ítems…",
+        "apuWizard": {
+          "toggle": "Cargar con IA (con APU)",
+          "help": "Primero se lee la lista de ítems del presupuesto; luego, para cada ítem, se lee su análisis unitario (APU) por separado — del mismo archivo o de uno adicional. Nada se crea hasta confirmar todo al final. Este APU queda privado de este proyecto: nunca se compara ni se cruza con la Base de Precios global ni con otro proyecto.",
+          "mainFile": "Archivo con la lista de ítems",
+          "scanItems": "Leer ítems con IA",
+          "continueToApu": "Confirmar ítems y continuar con los APU",
+          "apuLoaded": "APU cargado",
+          "apuPending": "Falta cargar el APU",
+          "itemFile": "Archivo con el APU de este ítem",
+          "itemFileNote": "Si no seleccionas uno, se usa el mismo archivo de la lista de ítems.",
+          "scanApu": "Leer APU con IA",
+          "addResource": "+ Agregar recurso",
+          "noResources": "Sin recursos en esta categoría.",
+          "resourceName": "Recurso",
+          "quantity": "Cantidad",
+          "categories": {
+            "materials": "Materiales",
+            "labor": "Mano de obra",
+            "equipment": "Equipos y herramientas",
+            "transport": "Transporte"
+          },
+          "apuSubtotal": "Subtotal del APU: {{amount}}",
+          "confirmAll": "Confirmar todo y crear presupuesto",
+          "confirming": "Creando...",
+          "needAllApu": "Cada ítem necesita al menos un recurso cargado en su APU antes de confirmar.",
+          "viewApu": "Ver detalle del APU",
+          "directCost": "Costo directo",
+          "aiuApplied": "AIU aplicado ({{percent}}%)",
+          "totalWithAiu": "Valor unitario total",
+          "sectionSubtotal": "Subtotal: {{amount}}"
+        }
       },
       "progress": {
         "title": "Registros de avance",

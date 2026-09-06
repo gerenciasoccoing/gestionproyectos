@@ -24,6 +24,15 @@ module.exports = (sequelize) => {
     directCost: { type: DataTypes.DECIMAL(18, 2), allowNull: false, defaultValue: 0, validate: { min: 0 } },
     // Último lote de listado de precios que creó o actualizó este APU (null si es 100% manual).
     lastPriceListImportId: { type: DataTypes.UUID, allowNull: true },
+    // null = catálogo global de APU (el de siempre: Cotizaciones, Estudio de Mercado, /apu, y el
+    // presupuesto de un proyecto cuando se referencia un APU del catálogo). Con valor = APU
+    // privado de ESE proyecto (ver "Presupuesto del Proyecto" > modo con APU,
+    // projectApuService.js): nunca aparece en el catálogo global (apuController.list lo excluye)
+    // ni se cruza con otro proyecto, aunque comparta nombre/código con uno global o de otro
+    // proyecto — no hay índice único sobre name/code que lo impida. Un APU de proyecto tampoco
+    // referencia jamás un PriceItem de la Base de Precios (ver APUComponent.priceItemId): sus
+    // componentes siempre usan unitValue/description/unit manuales, aunque el modelo lo permitiría.
+    projectId: { type: DataTypes.UUID, allowNull: true },
   });
 
   APU.associate = (models) => {
@@ -31,6 +40,7 @@ module.exports = (sequelize) => {
     APU.hasMany(models.BudgetItem, { foreignKey: 'apuId' });
     APU.hasMany(models.APUPriceHistory, { foreignKey: 'apuId', as: 'priceHistory', onDelete: 'CASCADE' });
     APU.belongsTo(models.PriceListImport, { foreignKey: 'lastPriceListImportId', as: 'lastImport' });
+    APU.belongsTo(models.Project, { foreignKey: 'projectId' });
   };
 
   return APU;

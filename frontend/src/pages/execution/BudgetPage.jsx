@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { budgetApi, apuApi } from '../../api';
 import { Card, Button, Input, SearchSelect, Table, Badge, ErrorText, extractError, money } from '../../components/ui';
 import Can from '../../components/Can';
 import useSubmitGuard from '../../hooks/useSubmitGuard';
+import ProjectApuWizard from './ProjectApuWizard';
 
 // Presupuesto del Proyecto: único lugar donde se carga/edita el presupuesto en ejecución
 // (import oficial, IA sin APU, AIU, cantidades, export). "Avance por Ítem" (ProgressPage.jsx)
@@ -19,6 +20,7 @@ export default function BudgetPage() {
   const [showItemForm, setShowItemForm] = useState(false);
   const [itemForm, setItemForm] = useState({ apuId: '', description: '', notes: '', unit: '', quantity: '', unitCost: '' });
   const [showAiForm, setShowAiForm] = useState(false);
+  const [showApuWizard, setShowApuWizard] = useState(false);
   const [aiFile, setAiFile] = useState(null);
   const [aiScanning, setAiScanning] = useState(false);
   const [aiError, setAiError] = useState('');
@@ -38,6 +40,11 @@ export default function BudgetPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [importError, setImportError] = useState('');
+
+  const [expandedApuItemId, setExpandedApuItemId] = useState(null);
+  const [apuDetail, setApuDetail] = useState(null);
+  const [apuDetailLoading, setApuDetailLoading] = useState(false);
+  const [apuDetailError, setApuDetailError] = useState('');
 
   const [showExport, setShowExport] = useState(false);
   const [exportNames, setExportNames] = useState({ elaboroNombre: '', revisoNombre: '' });
@@ -205,6 +212,25 @@ export default function BudgetPage() {
     }
   };
 
+  const toggleApuDetail = async (it) => {
+    if (expandedApuItemId === it.id) {
+      setExpandedApuItemId(null);
+      return;
+    }
+    setExpandedApuItemId(it.id);
+    setApuDetail(null);
+    setApuDetailError('');
+    setApuDetailLoading(true);
+    try {
+      const detail = await budgetApi.getItemApuDetail(projectId, it.budgetId, it.id);
+      setApuDetail(detail);
+    } catch (err) {
+      setApuDetailError(extractError(err));
+    } finally {
+      setApuDetailLoading(false);
+    }
+  };
+
   const downloadExport = async (format) => {
     setExportError('');
     setExportDownloading(format);
@@ -318,8 +344,18 @@ export default function BudgetPage() {
         <Can module="ejecucion" action="create">
           <Button onClick={() => setShowItemForm((s) => !s)}>{showItemForm ? t('common.cancel') : t('execution.budget.items.add')}</Button>
           <Button variant="secondary" onClick={() => setShowAiForm((s) => !s)}>{showAiForm ? t('common.cancel') : t('execution.budget.items.aiAdd')}</Button>
+          <Button variant="secondary" onClick={() => setShowApuWizard((s) => !s)}>{showApuWizard ? t('common.cancel') : t('execution.budget.items.apuWizard.toggle')}</Button>
         </Can>
       }>
+        {showApuWizard && (
+          <ProjectApuWizard
+            projectId={projectId}
+            ensureBudget={ensureBudget}
+            onDone={() => { setShowApuWizard(false); load(); }}
+            onCancel={() => setShowApuWizard(false)}
+          />
+        )}
+
         {showAiForm && (
           <div className="mb-4 border rounded p-3 bg-gray-50">
             <p className="text-sm text-gray-600 mb-3">{t('execution.budget.items.aiHelp')}</p>
@@ -421,9 +457,10 @@ export default function BudgetPage() {
           </form>
         )}
 
-        <Table columns={[t('execution.budget.items.table.code'), t('execution.budget.items.table.description'), t('execution.budget.items.table.budgetedQty'), t('execution.budget.items.table.unitValue'), t('execution.budget.items.table.total')]}>
+        <Table columns={[t('execution.budget.items.table.code'), t('execution.budget.items.table.description'), t('execution.budget.items.table.budgetedQty'), t('execution.budget.items.table.unitValue'), t('execution.budget.items.table.total'), '']}>
           {items.map((it) => (
-            <tr key={it.id} className="border-b border-gray-100">
+            <Fragment key={it.id}>
+            <tr className="border-b border-gray-100">
               <td className="py-2 pr-3 text-gray-400 font-mono text-xs">{it.APU?.code || it.itemCode || '-'}</td>
               <td className="py-2 pr-3">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -450,12 +487,91 @@ export default function BudgetPage() {
               </td>
               <td className="py-2 pr-3">{money(it.unitCost)}</td>
               <td className="py-2 pr-3">{money(it.totalCost)}</td>
+              <td className="py-2 pr-3 text-right">
+                {it.apuId && (
+                  <Button variant="secondary" onClick={() => toggleApuDetail(it)}>
+                    {expandedApuItemId === it.id ? t('execution.budget.items.closeButton') : t('execution.budget.items.apuWizard.viewApu')}
+                  </Button>
+                )}
+              </td>
             </tr>
+            {expandedApuItemId === it.id && (
+              <tr className="border-b border-gray-100 bg-gray-50">
+                <td colSpan={6} className="py-3 px-3">
+                  <ApuDetailView loading={apuDetailLoading} error={apuDetailError} detail={apuDetail} />
+                </td>
+              </tr>
+            )}
+            </Fragment>
           ))}
-          {items.length === 0 && <tr><td colSpan={5} className="py-3 text-center text-gray-400">{t('execution.budget.items.empty')}</td></tr>}
+          {items.length === 0 && <tr><td colSpan={6} className="py-3 text-center text-gray-400">{t('execution.budget.items.empty')}</td></tr>}
         </Table>
         <ErrorText>{qtyError}</ErrorText>
       </Card>
+    </div>
+  );
+}
+
+// Detalle desplegable del APU de un ítem (modo "con APU"): reutiliza tal cual la ficha que ya
+// arma buildApuExportData en el backend (misma que usa el PDF/Excel del presupuesto) — acá solo
+// se muestra en pantalla, sin recalcular nada.
+function ApuDetailView({ loading, error, detail }) {
+  const { t } = useTranslation();
+  if (loading) return <p className="text-sm text-gray-500">{t('common.loading')}</p>;
+  if (error) return <ErrorText>{error}</ErrorText>;
+  if (!detail) return null;
+
+  return (
+    <div className="space-y-3 text-sm">
+      <ApuSection title={t('execution.budget.items.apuWizard.categories.equipment')} rows={detail.herramientas} subtotal={detail.herramientasSubtotal} />
+      <ApuSection title={t('execution.budget.items.apuWizard.categories.materials')} rows={detail.materiales} subtotal={detail.materialesSubtotal} />
+      <ApuSection title={t('execution.budget.items.apuWizard.categories.labor')} rows={detail.personal.map((p) => ({ description: p.description, unit: '-', vUnit: p.jornal, parcial: p.parcial }))} subtotal={detail.personalSubtotal} />
+      <ApuSection title={t('execution.budget.items.apuWizard.categories.transport')} rows={detail.transporte.map((tr) => ({ description: tr.description, unit: '-', vUnit: tr.vUnit, parcial: tr.parcial }))} subtotal={detail.transporteSubtotal} />
+      <div className="border-t pt-2 flex justify-between font-medium">
+        <span>{t('execution.budget.items.apuWizard.directCost')}</span>
+        <span>{money(detail.directCost)}</span>
+      </div>
+      <div className="flex justify-between text-gray-600">
+        <span>{t('execution.budget.items.apuWizard.aiuApplied', { percent: detail.aiu.aiuPercent })}</span>
+        <span>{money(detail.aiu.aiuAmount)}</span>
+      </div>
+      <div className="flex justify-between font-semibold">
+        <span>{t('execution.budget.items.apuWizard.totalWithAiu')}</span>
+        <span>{money(detail.totalWithAiu)}</span>
+      </div>
+    </div>
+  );
+}
+
+function ApuSection({ title, rows, subtotal }) {
+  const { t } = useTranslation();
+  if (!rows.length) return null;
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-600 mb-1">{title}</p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-left text-gray-400 border-b">
+              <th className="py-1 pr-2">{t('execution.budget.items.apuWizard.resourceName')}</th>
+              <th className="py-1 pr-2">{t('execution.budget.items.unit')}</th>
+              <th className="py-1 pr-2 text-right">{t('execution.budget.items.unitValue')}</th>
+              <th className="py-1 pr-2 text-right">{t('execution.budget.items.table.total')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} className="border-b border-gray-50">
+                <td className="py-1 pr-2">{r.description}</td>
+                <td className="py-1 pr-2">{r.unit}</td>
+                <td className="py-1 pr-2 text-right">{money(r.vUnit)}</td>
+                <td className="py-1 pr-2 text-right">{money(r.parcial)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-right text-xs font-medium mt-1">{t('execution.budget.items.apuWizard.sectionSubtotal', { amount: money(subtotal) })}</p>
     </div>
   );
 }

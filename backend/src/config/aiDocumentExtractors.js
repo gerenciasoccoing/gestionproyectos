@@ -36,6 +36,18 @@ const EXTRACTORS = {
     // aiVisionService.callClaude).
     maxTokens: 8000,
   },
+  // Análisis de Precio Unitario (APU) de UN ítem específico de presupuesto, usado por
+  // "Presupuesto del Proyecto" > modo con APU (ver projectApuService.js). A diferencia de
+  // budgetItems (que lee la lista de ítems), esto lee el DESGLOSE de recursos de un solo ítem ya
+  // identificado — el nombre del ítem se inyecta en las instrucciones en tiempo de llamada (ver
+  // buildBudgetItemApuInstructions) para que la IA busque justo ESE análisis dentro del
+  // documento, que puede contener varios. Los componentes se cargan siempre con nombre/unidad/
+  // valor manual (nunca contra la Base de Precios): por eso no se pide código de insumo.
+  budgetItemApu: {
+    instructionsTemplate: 'Este documento es un presupuesto de obra con análisis de precios unitarios (APU). Busca específicamente el análisis de precio unitario del ítem "{{itemDescription}}" (puede aparecer como una tabla separada, una hoja aparte, o una sección con ese nombre/código). Extrae sus recursos agrupados en las 4 categorías estándar de un APU: materiales, mano de obra, equipos/herramientas y transporte. Para cada recurso extrae su nombre, unidad, cantidad (por unidad del ítem) y valor unitario, tal como aparecen en el documento. Si no encuentras un análisis unitario reconocible para ese ítem, devuelve las 4 listas vacías — no inventes recursos.',
+    schemaDescription: '{ "materials": [ { "name": string, "unit": string|null, "quantity": number|null, "unitValue": number|null } ], "labor": [ { "name": string, "unit": string|null, "quantity": number|null, "unitValue": number|null } ], "equipment": [ { "name": string, "unit": string|null, "quantity": number|null, "unitValue": number|null } ], "transport": [ { "name": string, "unit": string|null, "quantity": number|null, "unitValue": number|null } ] }',
+    maxTokens: 4000,
+  },
   // Cotización de un proveedor (Estudio de Mercado de Cotizaciones). Puede venir en formatos muy
   // distintos entre proveedores; un campo que no se pueda leer con confianza debe quedar en null
   // en vez de inventado (ver marketStudyScanService.js, que además marca needsReview por ítem).

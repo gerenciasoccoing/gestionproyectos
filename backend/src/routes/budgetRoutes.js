@@ -39,8 +39,11 @@ router.post('/', requirePermission('ejecucion', 'create'), preventDuplicateSubmi
 router.put('/:budgetId', requirePermission('ejecucion', 'edit'), budgetController.updateBudget);
 router.post('/import', requirePermission('ejecucion', 'create'), importUpload.single('file'), budgetController.importFromFile);
 router.post('/scan-items', requirePermission('ejecucion', 'create'), scanUpload.single('file'), budgetController.scanItemsFile);
+router.post('/scan-item-apu', requirePermission('ejecucion', 'create'), scanUpload.single('file'), budgetController.scanItemApuFile);
 router.post('/:budgetId/items', requirePermission('ejecucion', 'create'), preventDuplicateSubmit, budgetController.addItem);
 router.post('/:budgetId/items/bulk', requirePermission('ejecucion', 'create'), preventDuplicateSubmit, budgetController.addItemsBulk);
+router.post('/:budgetId/items/with-apu', requirePermission('ejecucion', 'create'), preventDuplicateSubmit, budgetController.addItemsWithApu);
+router.get('/:budgetId/items/:itemId/apu-detail', requirePermission('ejecucion', 'view'), budgetController.getItemApuDetail);
 router.put('/:budgetId/items/:itemId', requirePermission('ejecucion', 'edit'), budgetController.updateItem);
 router.delete('/:budgetId/items/:itemId', requirePermission('ejecucion', 'delete'), budgetController.removeItem);
 router.post('/export-pdf', requirePermission('ejecucion', 'view'), budgetController.exportPdf);
