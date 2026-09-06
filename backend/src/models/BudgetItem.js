@@ -28,6 +28,7 @@ module.exports = (sequelize) => {
     BudgetItem.belongsTo(models.APU, { foreignKey: 'apuId' });
     BudgetItem.hasMany(models.ProgressEntry, { foreignKey: 'budgetItemId', as: 'progressEntries' });
     BudgetItem.hasMany(models.PurchaseOrderItem, { foreignKey: 'budgetItemId' });
+    BudgetItem.hasOne(models.BudgetScheduleItem, { foreignKey: 'budgetItemId', as: 'scheduleItem', onDelete: 'CASCADE' });
   };
 
   return BudgetItem;

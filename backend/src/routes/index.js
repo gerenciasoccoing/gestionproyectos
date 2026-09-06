@@ -29,6 +29,7 @@ router.use('/projects/:projectId/minutes', require('./minuteRoutes'));
 router.use('/projects/:projectId/milestones', require('./milestoneRoutes'));
 router.use('/projects/:projectId/budget', require('./budgetRoutes'));
 router.use('/projects/:projectId/progress', require('./progressRoutes'));
+router.use('/projects/:projectId/schedule', require('./scheduleRoutes'));
 router.use('/projects/:projectId/purchase-orders', require('./purchaseOrderRoutes'));
 router.use('/projects/:projectId/market-studies', require('./marketStudyRoutes'));
 router.use('/projects/:projectId/employees', require('./employeeRoutes'));

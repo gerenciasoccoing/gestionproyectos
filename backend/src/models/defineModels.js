@@ -25,6 +25,7 @@ const modelDefiners = [
   require('./Quotation'),
   require('./Budget'),
   require('./BudgetItem'),
+  require('./BudgetScheduleItem'),
   require('./ProgressEntry'),
   require('./ProgressPhoto'),
   require('./MarketStudy'),

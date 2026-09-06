@@ -19,6 +19,7 @@ import MinutesPage from './pages/execution/MinutesPage';
 import MilestonesPage from './pages/execution/MilestonesPage';
 import BudgetPage from './pages/execution/BudgetPage';
 import ProgressPage from './pages/execution/ProgressPage';
+import SchedulePage from './pages/execution/SchedulePage';
 import PurchaseOrdersPage from './pages/execution/PurchaseOrdersPage';
 
 import PersonnelListPage from './pages/personnel/PersonnelListPage';
@@ -107,6 +108,7 @@ export default function App() {
             <Route path="milestones" element={<MilestonesPage />} />
             <Route path="budget" element={<BudgetPage />} />
             <Route path="progress" element={<ProgressPage />} />
+            <Route path="schedule" element={<SchedulePage />} />
             <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
           </Route>
 

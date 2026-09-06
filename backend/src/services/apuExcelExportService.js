@@ -416,4 +416,35 @@ async function generateResourceConsolidationExcelBuffer({ project, consolidation
   return workbook.xlsx.writeBuffer();
 }
 
-module.exports = { generateApuExcelBuffer, generateBudgetWithApuAnnexExcelBuffer, generateResourceConsolidationExcelBuffer };
+// Cronograma con IA (Ejecución de Proyecto): una hoja con orden/ítem/unidad/cantidad/fecha inicio/
+// fecha fin por ítem, en el mismo orden de secuencia constructiva sugerido por la IA.
+async function generateScheduleExcelBuffer({ project, schedule }) {
+  const workbook = new ExcelJS.Workbook();
+  const ws = workbook.addWorksheet('Cronograma');
+  ws.columns = [{ width: 8 }, { width: 45 }, { width: 10 }, { width: 12 }, { width: 14 }, { width: 14 }];
+  mergeAndStyle(ws, 'A1:F1', `Cronograma de Obra — ${project?.name || ''}`, { bold: true, size: 12, border: null, fill: null });
+  mergeAndStyle(ws, 'A2:F2', `Rango de contrato: ${schedule.timeframe.start} a ${schedule.timeframe.end}`, { size: 10, border: null, fill: null });
+  ['Orden', 'Ítem', 'Unidad', 'Cantidad', 'Fecha inicio', 'Fecha fin'].forEach((label, i) => {
+    setCell(ws, `${String.fromCharCode(65 + i)}4`, label, { bold: true, fill: GRAY_FILL, border: BOX_BORDER, align: i === 1 ? 'left' : 'center' });
+  });
+  let row = 5;
+  if (!schedule.items.length) {
+    mergeAndStyle(ws, `A${row}:F${row}`, EMPTY_ROW_LABEL, { align: 'center', border: BOX_BORDER });
+  } else {
+    schedule.items.forEach((it) => {
+      setCell(ws, `A${row}`, it.sequenceOrder, { align: 'center', border: BOX_BORDER });
+      setCell(ws, `B${row}`, it.description, { align: 'left', border: BOX_BORDER });
+      setCell(ws, `C${row}`, it.unit, { align: 'center', border: BOX_BORDER });
+      setCell(ws, `D${row}`, it.quantity, { align: 'center', numFmt: QTY_FMT, border: BOX_BORDER });
+      setCell(ws, `E${row}`, it.plannedStart, { align: 'center', border: BOX_BORDER });
+      setCell(ws, `F${row}`, it.plannedEnd, { align: 'center', border: BOX_BORDER });
+      row += 1;
+    });
+  }
+
+  return workbook.xlsx.writeBuffer();
+}
+
+module.exports = {
+  generateApuExcelBuffer, generateBudgetWithApuAnnexExcelBuffer, generateResourceConsolidationExcelBuffer, generateScheduleExcelBuffer,
+};

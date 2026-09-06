@@ -143,6 +143,21 @@ export const budgetApi = {
   },
 };
 
+export const scheduleApi = {
+  get: (pid) => client.get(`/projects/${pid}/schedule`).then((r) => r.data),
+  generate: (pid) => client.post(`/projects/${pid}/schedule/generate`).then((r) => r.data),
+  exportPdfUrl: (pid) => {
+    const base = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api');
+    const token = localStorage.getItem('token');
+    return `${base}/projects/${pid}/schedule/export-pdf?token=${encodeURIComponent(token)}`;
+  },
+  exportExcelUrl: (pid) => {
+    const base = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api');
+    const token = localStorage.getItem('token');
+    return `${base}/projects/${pid}/schedule/export-excel?token=${encodeURIComponent(token)}`;
+  },
+};
+
 export const progressApi = {
   listEntries: (pid, itemId) => client.get(`/projects/${pid}/progress/items/${itemId}/entries`).then((r) => r.data),
   createEntry: (pid, itemId, formData) => client.post(`/projects/${pid}/progress/items/${itemId}/entries`, formData).then((r) => r.data),

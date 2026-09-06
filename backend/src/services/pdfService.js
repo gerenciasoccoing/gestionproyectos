@@ -200,6 +200,47 @@ function generateInternalReportPdf({ project, snapshot, from, to, analysisText, 
   return doc;
 }
 
+// Cronograma con IA (Ejecución de Proyecto): un Gantt simple dibujado a mano con primitivas
+// vectoriales de PDFKit (sin librería de gráficos externa, igual criterio que el resto de este
+// archivo) — una barra de línea de tiempo por ítem, posicionada proporcionalmente dentro del
+// rango de fechas del contrato (schedule.timeframe), que es fijo para todas las barras.
+function generateSchedulePdf({ project, schedule, company }) {
+  const doc = new PDFDocument({ margin: 50 });
+
+  reportCoverHeading(doc, {
+    company,
+    title: 'Cronograma de Obra (con IA)',
+    project,
+    subtitle: `Rango de contrato: ${schedule.timeframe.start} a ${schedule.timeframe.end}`,
+  });
+
+  const rangeStart = new Date(schedule.timeframe.start).getTime();
+  const rangeEnd = new Date(schedule.timeframe.end).getTime();
+  const rangeMs = Math.max(1, rangeEnd - rangeStart);
+  const chartWidth = 300;
+
+  sectionTitle(doc, 'Ítems programados');
+  if (!schedule.items.length) doc.text('Sin cronograma generado.');
+  schedule.items.forEach((it) => {
+    ensureSpace(doc, 40);
+    doc.font('Helvetica-Bold').fontSize(9).text(`${it.sequenceOrder}. ${it.description}`, { width: 495 });
+    doc.font('Helvetica').fontSize(8).fillColor('#555').text(`${it.plannedStart} a ${it.plannedEnd}`);
+    doc.fillColor('#000');
+
+    const x = doc.x;
+    const y = doc.y;
+    const startOffset = (new Date(it.plannedStart).getTime() - rangeStart) / rangeMs;
+    const endOffset = (new Date(it.plannedEnd).getTime() - rangeStart) / rangeMs;
+    doc.rect(x, y, chartWidth, 8).fill('#e5e7eb');
+    doc.rect(x + startOffset * chartWidth, y, Math.max(2, (endOffset - startOffset) * chartWidth), 8).fill('#2563eb');
+    doc.fillColor('#000');
+    doc.y = y + 16;
+  });
+
+  doc.end();
+  return doc;
+}
+
 const CATEGORY_LABELS_ES = {
   mano_obra: 'Mano de obra',
   materiales: 'Materiales',
@@ -1073,5 +1114,5 @@ function generateLaborCalculationPdf({ title, employee, company, breakdown, meta
 
 module.exports = {
   generateProjectReportPdf, generateQuotationPdf, generateApuPdf, generateBudgetWithApuAnnexPdf, generatePurchaseOrderPdf, generateContractPdf, generateLaborCalculationPdf,
-  generateClientReportPdf, generateInternalReportPdf, generateResourceConsolidationPdf, money,
+  generateClientReportPdf, generateInternalReportPdf, generateResourceConsolidationPdf, generateSchedulePdf, money,
 };

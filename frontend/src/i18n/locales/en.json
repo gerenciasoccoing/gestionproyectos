@@ -483,7 +483,8 @@
       "milestones": "Milestones",
       "progress": "Progress by item",
       "purchaseOrders": "Purchase Orders",
-      "budget": "Project Budget"
+      "budget": "Project Budget",
+      "schedule": "AI Schedule"
     },
     "dashboard": {
       "loading": "Loading dashboard...",
@@ -515,6 +516,14 @@
     "progress": {
       "itemsTitle": "Budget items",
       "noBudget": "This project doesn't have a budget loaded yet. Go to the \"Project Budget\" tab to load it."
+    },
+    "schedule": {
+      "title": "Construction Schedule (AI)",
+      "help": "Distributes the budget items across the contract's available time, with a construction sequence and duration suggested by AI. Dates never fall outside the contract range (see Contractual). \"Generate\" replaces any previous schedule.",
+      "range": "Contract range: {{start}} to {{end}}",
+      "generate": "Generate schedule",
+      "regenerate": "Regenerate schedule",
+      "empty": "No schedule has been generated for this project yet."
     }
   },
   "personnel": {

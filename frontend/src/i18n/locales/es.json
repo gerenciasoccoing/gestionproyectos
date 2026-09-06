@@ -483,7 +483,8 @@
       "milestones": "Hitos",
       "progress": "Avance por ítem",
       "purchaseOrders": "Órdenes de Compra",
-      "budget": "Presupuesto del Proyecto"
+      "budget": "Presupuesto del Proyecto",
+      "schedule": "Cronograma con IA"
     },
     "dashboard": {
       "loading": "Cargando dashboard...",
@@ -515,6 +516,14 @@
     "progress": {
       "itemsTitle": "Ítems del presupuesto",
       "noBudget": "Este proyecto todavía no tiene presupuesto cargado. Ve a la pestaña \"Presupuesto del Proyecto\" para cargarlo."
+    },
+    "schedule": {
+      "title": "Cronograma de Obra (con IA)",
+      "help": "Distribuye los ítems del presupuesto en el tiempo disponible del contrato, con una secuencia constructiva y duración sugeridas por IA. Las fechas nunca se salen del rango de contrato (ver Contractual). \"Generar\" reemplaza cualquier cronograma anterior.",
+      "range": "Rango de contrato: {{start}} a {{end}}",
+      "generate": "Generar cronograma",
+      "regenerate": "Regenerar cronograma",
+      "empty": "Aún no se ha generado un cronograma para este proyecto."
     }
   },
   "personnel": {
