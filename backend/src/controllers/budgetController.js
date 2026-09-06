@@ -5,9 +5,10 @@ const { getBudgetItemsWithProgress, resolveBudgetItemFields, updateBudgetItemQua
 const { importBudgetFromWorkbook } = require('../services/budgetImportService');
 const { scanBudgetItemsFile } = require('../services/budgetItemsScanService');
 const { scanItemApu, createBudgetItemsWithProjectApu } = require('../services/projectApuService');
+const { computeResourceConsolidation } = require('../services/resourceConsolidationService');
 const { buildApuDataByIdMap, buildApuExportData } = require('../services/apuExportService');
-const { generateBudgetWithApuAnnexPdf } = require('../services/pdfService');
-const { generateBudgetWithApuAnnexExcelBuffer } = require('../services/apuExcelExportService');
+const { generateBudgetWithApuAnnexPdf, generateResourceConsolidationPdf } = require('../services/pdfService');
+const { generateBudgetWithApuAnnexExcelBuffer, generateResourceConsolidationExcelBuffer } = require('../services/apuExcelExportService');
 const { getLetterheadForProject } = require('../services/letterheadService');
 
 // Extrae y valida el AIU discriminado (Administración/Imprevistos/Utilidad) del body.
@@ -196,6 +197,32 @@ async function buildBudgetExportContext(projectId, body) {
   return { project, budget, items, apuDataById, elaboroNombre, revisoNombre };
 }
 
+// Consolidado de recursos de todo el proyecto (ver resourceConsolidationService.js): 4 listados
+// (Materiales, Mano de Obra, Equipos y Herramientas, Transporte) recalculados siempre en vivo.
+const getResourceConsolidation = asyncHandler(async (req, res) => {
+  const result = await computeResourceConsolidation(req.params.projectId);
+  res.json(result);
+});
+
+const exportResourceConsolidationPdf = asyncHandler(async (req, res) => {
+  const project = await Project.findByPk(req.params.projectId);
+  const consolidation = await computeResourceConsolidation(req.params.projectId);
+  const company = await getLetterheadForProject(req.params.projectId);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="consolidado-recursos-${(project?.name || 'proyecto').replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf"`);
+  const doc = generateResourceConsolidationPdf({ project, consolidation, company });
+  doc.pipe(res);
+});
+
+const exportResourceConsolidationExcel = asyncHandler(async (req, res) => {
+  const project = await Project.findByPk(req.params.projectId);
+  const consolidation = await computeResourceConsolidation(req.params.projectId);
+  const buffer = await generateResourceConsolidationExcelBuffer({ project, consolidation });
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="consolidado-recursos-${(project?.name || 'proyecto').replace(/[^a-zA-Z0-9-_]/g, '_')}.xlsx"`);
+  res.send(buffer);
+});
+
 const exportPdf = asyncHandler(async (req, res) => {
   const ctx = await buildBudgetExportContext(req.params.projectId, req.body);
   const company = await getLetterheadForProject(req.params.projectId);
@@ -217,4 +244,5 @@ const exportExcel = asyncHandler(async (req, res) => {
 module.exports = {
   getProjectBudget, createBudgetVersion, updateBudget, addItem, updateItem, removeItem, scanItemsFile, addItemsBulk,
   scanItemApuFile, addItemsWithApu, getItemApuDetail, importFromFile, exportPdf, exportExcel,
+  getResourceConsolidation, exportResourceConsolidationPdf, exportResourceConsolidationExcel,
 };

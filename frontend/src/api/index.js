@@ -130,6 +130,17 @@ export const budgetApi = {
   removeItem: (pid, budgetId, itemId) => client.delete(`/projects/${pid}/budget/${budgetId}/items/${itemId}`),
   exportPdf: (pid, data) => postAndDownload(`/projects/${pid}/budget/export-pdf`, data, 'presupuesto.pdf'),
   exportExcel: (pid, data) => postAndDownload(`/projects/${pid}/budget/export-excel`, data, 'presupuesto.xlsx'),
+  getResourceConsolidation: (pid) => client.get(`/projects/${pid}/budget/resource-consolidation`).then((r) => r.data),
+  resourceConsolidationPdfUrl: (pid) => {
+    const base = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api');
+    const token = localStorage.getItem('token');
+    return `${base}/projects/${pid}/budget/resource-consolidation/export-pdf?token=${encodeURIComponent(token)}`;
+  },
+  resourceConsolidationExcelUrl: (pid) => {
+    const base = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api');
+    const token = localStorage.getItem('token');
+    return `${base}/projects/${pid}/budget/resource-consolidation/export-excel?token=${encodeURIComponent(token)}`;
+  },
 };
 
 export const progressApi = {

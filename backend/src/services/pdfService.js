@@ -208,6 +208,43 @@ const CATEGORY_LABELS_ES = {
   imprevistos: 'Imprevistos',
 };
 
+// Consolidado de recursos de todo el proyecto (Presupuesto del Proyecto > modo con APU): 4
+// listados (Materiales, Mano de Obra, Equipos y Herramientas, Transporte), listos para enviar a
+// un proveedor a cotizar. Reutiliza el mismo encabezado que los Informes con IA.
+function generateResourceConsolidationPdf({ project, consolidation, company }) {
+  const doc = new PDFDocument({ margin: 50 });
+
+  reportCoverHeading(doc, {
+    company,
+    title: 'Consolidado de Recursos del Proyecto',
+    project,
+    subtitle: `Fecha: ${new Date().toISOString().slice(0, 10)}`,
+  });
+
+  const sections = [
+    { key: 'materials', title: 'Materiales' },
+    { key: 'labor', title: 'Mano de Obra' },
+    { key: 'equipment', title: 'Equipos y Herramientas' },
+    { key: 'transport', title: 'Transporte' },
+  ];
+
+  sections.forEach(({ key, title }) => {
+    const rows = consolidation[key] || [];
+    sectionTitle(doc, title);
+    if (!rows.length) {
+      doc.text('Sin recursos en esta categoría.');
+      return;
+    }
+    rows.forEach((r) => {
+      ensureSpace(doc, 16);
+      doc.text(`- ${r.name}: ${Number(r.quantity).toLocaleString('es-CO', { maximumFractionDigits: 4 })} ${r.unit}`);
+    });
+  });
+
+  doc.end();
+  return doc;
+}
+
 // Genera el informe consolidado de proyecto (EVM, hitos/actas, riesgos, avance por ítem, compras).
 function generateProjectReportPdf({ project, evm, milestones, minutes, risks, progressItems, purchases, company }) {
   const doc = new PDFDocument({ margin: 50 });
@@ -1036,5 +1073,5 @@ function generateLaborCalculationPdf({ title, employee, company, breakdown, meta
 
 module.exports = {
   generateProjectReportPdf, generateQuotationPdf, generateApuPdf, generateBudgetWithApuAnnexPdf, generatePurchaseOrderPdf, generateContractPdf, generateLaborCalculationPdf,
-  generateClientReportPdf, generateInternalReportPdf, money,
+  generateClientReportPdf, generateInternalReportPdf, generateResourceConsolidationPdf, money,
 };

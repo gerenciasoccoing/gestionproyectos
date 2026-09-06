@@ -309,6 +309,10 @@
         "units": "unidades",
         "confirmDelete": "¿Eliminar este registro de avance?",
         "empty": "Sin registros de avance para este ítem."
+      },
+      "consolidation": {
+        "title": "Consolidado de Recursos del Proyecto",
+        "help": "Suma, para todo el proyecto, la cantidad de cada recurso (materiales, mano de obra, equipos y transporte) requerida según los APU de los ítems del presupuesto — listo para solicitar cotizaciones a proveedores. Se recalcula solo si editas una cantidad o un APU."
       }
     },
     "purchaseOrders": {

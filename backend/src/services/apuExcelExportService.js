@@ -379,4 +379,41 @@ async function generateBudgetWithApuAnnexExcelBuffer({ project, items, apuDataBy
   return workbook.xlsx.writeBuffer();
 }
 
-module.exports = { generateApuExcelBuffer, generateBudgetWithApuAnnexExcelBuffer };
+// Consolidado de recursos de todo el proyecto (Presupuesto del Proyecto > modo con APU): una
+// hoja por categoría (Materiales, Mano de Obra, Equipos y Herramientas, Transporte), formato
+// simple listo para enviar a un proveedor a cotizar — sin fórmulas ni AIU, solo recurso/unidad/
+// cantidad total requerida.
+async function generateResourceConsolidationExcelBuffer({ project, consolidation }) {
+  const workbook = new ExcelJS.Workbook();
+  const sections = [
+    { key: 'materials', title: 'Materiales' },
+    { key: 'labor', title: 'Mano de Obra' },
+    { key: 'equipment', title: 'Equipos y Herramientas' },
+    { key: 'transport', title: 'Transporte' },
+  ];
+
+  sections.forEach(({ key, title }) => {
+    const ws = workbook.addWorksheet(title);
+    ws.columns = [{ width: 40 }, { width: 14 }, { width: 16 }];
+    mergeAndStyle(ws, 'A1:C1', `Consolidado de ${title} — ${project?.name || ''}`, { bold: true, size: 12, border: null, fill: null });
+    ['Recurso', 'Unidad', 'Cantidad total'].forEach((label, i) => {
+      setCell(ws, `${String.fromCharCode(65 + i)}3`, label, { bold: true, fill: GRAY_FILL, border: BOX_BORDER, align: i === 0 ? 'left' : 'center' });
+    });
+    const rows = consolidation[key] || [];
+    let row = 4;
+    if (!rows.length) {
+      mergeAndStyle(ws, `A${row}:C${row}`, EMPTY_ROW_LABEL, { align: 'center', border: BOX_BORDER });
+    } else {
+      rows.forEach((r) => {
+        setCell(ws, `A${row}`, r.name, { border: BOX_BORDER });
+        setCell(ws, `B${row}`, r.unit, { align: 'center', border: BOX_BORDER });
+        setCell(ws, `C${row}`, Number(r.quantity), { align: 'center', numFmt: QTY_FMT, border: BOX_BORDER });
+        row += 1;
+      });
+    }
+  });
+
+  return workbook.xlsx.writeBuffer();
+}
+
+module.exports = { generateApuExcelBuffer, generateBudgetWithApuAnnexExcelBuffer, generateResourceConsolidationExcelBuffer };

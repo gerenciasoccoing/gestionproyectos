@@ -309,6 +309,10 @@
         "units": "units",
         "confirmDelete": "Delete this progress record?",
         "empty": "No progress records for this item."
+      },
+      "consolidation": {
+        "title": "Project Resource Consolidation",
+        "help": "Adds up, across the whole project, the quantity of each resource (materials, labor, equipment and transport) required by the budget items' cost breakdowns — ready to request supplier quotes. Recalculates automatically if you edit a quantity or a breakdown."
       }
     },
     "purchaseOrders": {

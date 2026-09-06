@@ -6,6 +6,7 @@ import { Card, Button, Input, SearchSelect, Table, Badge, ErrorText, extractErro
 import Can from '../../components/Can';
 import useSubmitGuard from '../../hooks/useSubmitGuard';
 import ProjectApuWizard from './ProjectApuWizard';
+import ResourceConsolidationSection from './ResourceConsolidationSection';
 
 // Presupuesto del Proyecto: único lugar donde se carga/edita el presupuesto en ejecución
 // (import oficial, IA sin APU, AIU, cantidades, export). "Avance por Ítem" (ProgressPage.jsx)
@@ -508,6 +509,8 @@ export default function BudgetPage() {
         </Table>
         <ErrorText>{qtyError}</ErrorText>
       </Card>
+
+      <ResourceConsolidationSection projectId={projectId} refreshKey={items} />
     </div>
   );
 }

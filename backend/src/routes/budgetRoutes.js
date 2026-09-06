@@ -48,5 +48,8 @@ router.put('/:budgetId/items/:itemId', requirePermission('ejecucion', 'edit'), b
 router.delete('/:budgetId/items/:itemId', requirePermission('ejecucion', 'delete'), budgetController.removeItem);
 router.post('/export-pdf', requirePermission('ejecucion', 'view'), budgetController.exportPdf);
 router.post('/export-excel', requirePermission('ejecucion', 'view'), budgetController.exportExcel);
+router.get('/resource-consolidation', requirePermission('ejecucion', 'view'), budgetController.getResourceConsolidation);
+router.get('/resource-consolidation/export-pdf', requirePermission('ejecucion', 'view'), budgetController.exportResourceConsolidationPdf);
+router.get('/resource-consolidation/export-excel', requirePermission('ejecucion', 'view'), budgetController.exportResourceConsolidationExcel);
 
 module.exports = router;
