@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "ERGY Project",
+    "slug": "ergy-project-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "ergyproject",
+    "primaryColor": "#2563eb",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": ["assets/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.soccoing.ergyproject",
+      "infoPlist": {
+        "NSCameraUsageDescription": "ERGY Project usa la cámara para tomar fotos de avances de obra y de facturas/comprobantes de gastos.",
+        "NSPhotoLibraryUsageDescription": "ERGY Project necesita acceso a tus fotos para adjuntar imágenes de avances de obra y de facturas/comprobantes de gastos."
+      }
+    },
+    "android": {
+      "package": "com.soccoing.ergyproject",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2563eb"
+      },
+      "permissions": ["CAMERA", "READ_MEDIA_IMAGES"]
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ERGY Project necesita acceso a tus fotos para adjuntar imágenes de avances de obra y de facturas/comprobantes de gastos.",
+          "cameraPermission": "ERGY Project usa la cámara para tomar fotos de avances de obra y de facturas/comprobantes de gastos."
+        }
+      ]
+    ]
+  }
+}
