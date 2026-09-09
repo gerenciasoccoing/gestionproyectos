@@ -6,7 +6,7 @@ const { getBudgetItemsWithProgress } = require('../services/budgetService');
 const { getPurchaseReport } = require('../services/purchaseOrderService');
 const { generateProjectReportPdf, generateClientReportPdf, generateInternalReportPdf } = require('../services/pdfService');
 const { getLetterheadForProject } = require('../services/letterheadService');
-const { getClientReportData, getInternalReportData } = require('../services/reportEngineService');
+const { getClientReportDraft, applyClientReportOverrides, getInternalReportData } = require('../services/reportEngineService');
 const { UPLOAD_ROOT } = require('../middleware/upload');
 
 const evm = asyncHandler(async (req, res) => {
@@ -70,17 +70,27 @@ const exportPdf = asyncHandler(async (req, res) => {
   doc.pipe(res);
 });
 
-// Informe para Cliente: siempre corte a hoy, sin selector de rango (ver getClientReportData).
+// Borrador del Informe para Cliente para la vista previa editable (ver ClientReportPreviewPage.jsx
+// en el frontend): las 9 secciones completas, con los textos libres (introducción, descripción de
+// actas, descripción de cada avance) ya con su valor por defecto — nada de esto se persiste, se
+// recalcula desde cero en cada GET, igual que al exportar.
+const clientReportDraft = asyncHandler(async (req, res) => {
+  const draft = await getClientReportDraft(req.params.projectId);
+  res.json(draft);
+});
+
+// Exporta el Informe para Cliente a PDF. Recibe SOLO overrides de texto en el body (nunca cifras:
+// ver applyClientReportOverrides) — el resto del borrador se recalcula 100% desde la base de datos
+// en este mismo momento, así que es estructuralmente imposible que la vista previa altere un valor
+// numérico ya calculado por el sistema.
 const clientReportPdf = asyncHandler(async (req, res) => {
-  const data = await getClientReportData(req.params.projectId);
-  const company = await getLetterheadForProject(req.params.projectId);
+  const draft = applyClientReportOverrides(await getClientReportDraft(req.params.projectId), req.body);
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="informe-cliente-${data.project.name.replace(/\s+/g, '_')}.pdf"`);
+  res.setHeader('Content-Disposition', `attachment; filename="informe-cliente-${draft.project.name.replace(/\s+/g, '_')}.pdf"`);
   const doc = generateClientReportPdf({
-    ...data,
-    company,
-    presentationPhotoAbsPath: data.project.presentationPhotoPath ? path.join(UPLOAD_ROOT, data.project.presentationPhotoPath) : null,
-    locationMapAbsPath: data.project.locationMapImagePath ? path.join(UPLOAD_ROOT, data.project.locationMapImagePath) : null,
+    draft,
+    presentationPhotoAbsPath: draft.fotoPortadaPath ? path.join(UPLOAD_ROOT, draft.fotoPortadaPath) : null,
+    locationMapAbsPath: draft.locationMapImagePath ? path.join(UPLOAD_ROOT, draft.locationMapImagePath) : null,
   });
   doc.pipe(res);
 });
@@ -97,4 +107,7 @@ const internalReportPdf = asyncHandler(async (req, res) => {
   doc.pipe(res);
 });
 
-module.exports = { evm, sCurve, milestonesAndMinutesSummary, progressByItem, exportPdf, clientReportPdf, internalReportPdf };
+module.exports = {
+  evm, sCurve, milestonesAndMinutesSummary, progressByItem, exportPdf,
+  clientReportDraft, clientReportPdf, internalReportPdf,
+};

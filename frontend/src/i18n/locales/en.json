@@ -1349,12 +1349,64 @@
       "title": "AI Reports",
       "subtitle": "Generate PDF reports from the project's existing data (budget, progress, photos and expenses). Figures always come from the system; AI only writes the narrative text.",
       "clientTitle": "Client Report",
-      "clientDescription": "Executive/commercial format, as of today. Does not include real costs or internal margins.",
+      "clientDescription": "Executive/commercial 9-section format, as of today. Goes through an editable preview before exporting. Does not include real costs or internal margins.",
       "internalTitle": "Internal Management Report",
       "internalDescription": "Management format with real expenses and budget deviation, by date range.",
       "generate": "Generate report",
+      "preview": "View preview",
       "from": "From",
       "to": "To"
+    },
+    "clientPreview": {
+      "title": "Preview — Client Report",
+      "help": "Review and edit the free-text fields before exporting. Figures, quantities and dates are always recalculated from the system on export and cannot be edited here.",
+      "exportPdf": "Export to PDF",
+      "noMap": "No location map uploaded.",
+      "noMinutes": "No minutes have been recorded for this project yet.",
+      "noTeam": "No active personnel recorded for this project.",
+      "sections": {
+        "cover": "1. Cover",
+        "introduction": "2. Introduction",
+        "description": "3. Project description",
+        "location": "4. Location image",
+        "minutes": "5. Project minutes",
+        "team": "6. Work team",
+        "budget": "7. Contracted items budget",
+        "itemProgress": "8. Progress by item",
+        "summary": "9. Project general summary"
+      },
+      "fields": {
+        "object": "Project object",
+        "contractNumber": "Contract number",
+        "contractor": "Contractor",
+        "client": "Client"
+      },
+      "team": {
+        "name": "Name",
+        "id": "ID number",
+        "eps": "Health provider (EPS)",
+        "pension": "Pension fund",
+        "arl": "Occupational risk insurer (ARL)"
+      },
+      "budget": {
+        "code": "Code",
+        "description": "Description",
+        "unit": "Unit",
+        "qty": "Quantity",
+        "unitValue": "Unit value",
+        "total": "Total value",
+        "totalContract": "Total contract value"
+      },
+      "itemProgress": {
+        "physical": "Physical progress",
+        "economic": "Economic progress",
+        "noEntries": "No progress entries recorded for this item."
+      },
+      "summary": {
+        "physical": "Consolidated physical progress (%)",
+        "economic": "Consolidated economic progress",
+        "real": "Actual"
+      }
     }
   },
   "admin": {

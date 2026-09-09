@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { reportsApi, risksApi } from '../../api';
@@ -117,6 +117,7 @@ export default function ReportsPage() {
 // [inicio del proyecto (evm.start), hoy] igual que hace el backend por defecto si no se manda rango.
 function AiReportsSection({ projectId, projectStart }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const today = new Date().toISOString().slice(0, 10);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState(today);
@@ -132,9 +133,7 @@ function AiReportsSection({ projectId, projectStart }) {
         <div className="border border-gray-200 rounded p-3">
           <h4 className="font-medium text-sm text-gray-800 mb-1">{t('reports.aiReports.clientTitle')}</h4>
           <p className="text-xs text-gray-500 mb-3">{t('reports.aiReports.clientDescription')}</p>
-          <a href={reportsApi.clientReportPdfUrl(projectId)} target="_blank" rel="noreferrer">
-            <Button>{t('reports.aiReports.generate')}</Button>
-          </a>
+          <Button onClick={() => navigate('client-preview')}>{t('reports.aiReports.preview')}</Button>
         </div>
         <div className="border border-gray-200 rounded p-3">
           <h4 className="font-medium text-sm text-gray-800 mb-1">{t('reports.aiReports.internalTitle')}</h4>

@@ -39,6 +39,110 @@ function drawProgressBar(doc, { width = 300, height = 10, percent, color = '#256
   doc.y = y + height + 8;
 }
 
+// Cuadrícula de fotos de un avance (Informe para Cliente, sección 8): máximo 2 columnas, cada
+// celda cuadrada de al menos 5x5 cm — con el ancho de contenido de una página carta/A4 estándar
+// (margin:50 => contentWidth ~495pt) cada celda sale ~9cm, muy por encima del mínimo, así que en
+// la práctica esto siempre se cumple solo con el layout de 2 columnas; se deja un aviso en consola
+// (no se aborta la generación del PDF: una foto un poco más chica de lo ideal nunca es motivo para
+// que el informe entero falle) por si algún día cambian los márgenes de la página. Sin límite de
+// filas: con más de 4 fotos simplemente sigue agregando filas de a 2. No dibuja nada si no hay
+// fotos válidas (archivo borrado del disco, por ejemplo).
+const PHOTO_GRID_MIN_CELL_PT = 5 * 28.3465; // 5 cm en puntos
+function drawPhotoGrid(doc, { photos = [], contentWidth } = {}) {
+  const fs = require('fs');
+  const valid = photos.filter((p) => p && fs.existsSync(path.join(UPLOAD_ROOT, p)));
+  if (!valid.length) return;
+
+  const GUTTER = 10;
+  const cellWidth = (contentWidth - GUTTER) / 2;
+  if (cellWidth < PHOTO_GRID_MIN_CELL_PT) {
+    console.warn('[pdfService] drawPhotoGrid: el ancho de celda calculado quedó por debajo de 5x5cm');
+  }
+  const cellHeight = cellWidth;
+  const startX = doc.x;
+
+  for (let i = 0; i < valid.length; i += 2) {
+    ensureSpace(doc, cellHeight + 8);
+    const rowY = doc.y;
+    valid.slice(i, i + 2).forEach((p, col) => {
+      const cellX = startX + col * (cellWidth + GUTTER);
+      try {
+        doc.rect(cellX, rowY, cellWidth, cellHeight).stroke('#e5e7eb');
+        doc.image(path.join(UPLOAD_ROOT, p), cellX, rowY, { fit: [cellWidth, cellHeight], align: 'center', valign: 'center' });
+      } catch (e) { /* foto ilegible: se omite */ }
+    });
+    doc.y = rowY + cellHeight + 8;
+    doc.x = startX;
+  }
+}
+
+// Gráfica de líneas simple (ejes + polilíneas + leyenda), dibujada a mano con primitivas
+// vectoriales de PDFKit — mismo criterio "sin librería de gráficos externa" que el resto de este
+// archivo (ver drawProgressBar). Usada por el Resumen general del Informe para Cliente para
+// mostrar evolución en el tiempo (curva S); recharts (ya instalado en el frontend) no sirve acá
+// porque el PDF se genera 100% en el servidor. `series`: [{ name, color, values: number[] }],
+// todas comparten el mismo eje X (`categories`, ej. meses "YYYY-MM").
+function drawLineChart(doc, { categories = [], series = [], width = 460, height = 150, valueFormatter = (v) => String(v) } = {}) {
+  if (!categories.length || !series.length || categories.length < 2) {
+    doc.font('Helvetica').fontSize(9).fillColor('#888').text('Sin datos suficientes para graficar.');
+    doc.fillColor('#000');
+    return;
+  }
+  const x0 = doc.x;
+  const y0 = doc.y;
+
+  const allValues = series.flatMap((s) => s.values);
+  const maxValue = Math.max(1, ...allValues);
+  const minValue = Math.min(0, ...allValues);
+  const range = maxValue - minValue || 1;
+  const scaleY = (v) => y0 + height - ((v - minValue) / range) * height;
+
+  doc.strokeColor('#d1d5db');
+  doc.moveTo(x0, y0).lineTo(x0, y0 + height).stroke();
+  doc.moveTo(x0, y0 + height).lineTo(x0 + width, y0 + height).stroke();
+
+  doc.fontSize(7).fillColor('#6b7280');
+  doc.text(valueFormatter(maxValue), x0 - 45, y0 - 2, { width: 42, align: 'right' });
+  doc.text(valueFormatter(minValue), x0 - 45, y0 + height - 6, { width: 42, align: 'right' });
+  doc.fillColor('#000');
+
+  const stepX = width / (categories.length - 1);
+  series.forEach((s) => {
+    doc.strokeColor(s.color).lineWidth(1.5);
+    s.values.forEach((v, i) => {
+      const px = x0 + i * stepX;
+      const py = scaleY(v);
+      if (i === 0) doc.moveTo(px, py);
+      else doc.lineTo(px, py);
+    });
+    doc.stroke();
+  });
+  doc.lineWidth(1).strokeColor('#000');
+
+  // Con muchos meses, se etiqueta solo 1 de cada N (más la última) para que el texto del eje X no
+  // se encime.
+  const labelEvery = Math.max(1, Math.ceil(categories.length / 8));
+  doc.fontSize(6.5).fillColor('#6b7280');
+  categories.forEach((cat, i) => {
+    if (i % labelEvery !== 0 && i !== categories.length - 1) return;
+    doc.text(cat, x0 + i * stepX - 15, y0 + height + 4, { width: 30, align: 'center' });
+  });
+  doc.fillColor('#000');
+
+  let legendX = x0;
+  const legendY = y0 + height + 20;
+  doc.fontSize(8).font('Helvetica');
+  series.forEach((s) => {
+    doc.rect(legendX, legendY, 8, 8).fill(s.color);
+    doc.fillColor('#000').text(s.name, legendX + 12, legendY - 1);
+    legendX += 12 + doc.widthOfString(s.name) + 16;
+  });
+  doc.fillColor('#000');
+
+  doc.x = x0;
+  doc.y = legendY + 20;
+}
+
 // Encabezado de portada compartido por los dos Informes con IA (Cliente/Interno): logo + datos de
 // la empresa (igual patrón que generateProjectReportPdf), título del tipo de informe y nombre del
 // proyecto centrados debajo.
@@ -65,80 +169,205 @@ function reportCoverHeading(doc, { company, title, project, subtitle }) {
   doc.moveDown(1);
 }
 
-// Informe para Cliente (formato ejecutivo/comercial, corte a hoy): portada con lugar de
-// ejecución (mapa + foto de presentación, ambos de carga manual — ver Project.presentationPhotoPath
-// / locationMapImagePath), presupuesto total vs ejecutado, y avance por ítem con barra de % y
-// registro fotográfico. Nunca incluye costos reales de gastos, márgenes ni rentabilidad — eso es
-// exclusivo del Informe Interno (generateInternalReportPdf).
-function generateClientReportPdf({ project, snapshot, asOfDate, summaryText, company, presentationPhotoAbsPath, locationMapAbsPath }) {
+// Informe para Cliente: las 9 secciones fijas del formato definitivo (ver reportEngineService.js
+// #getClientReportDraft) — Portada, Introducción, Descripción del proyecto, Imagen de ubicación,
+// Actas, Equipo de trabajo, Presupuesto de ítems, Avance por ítem (físico/económico + registro
+// fotográfico agrupado por avance) y Resumen general (curva S). Nunca incluye costos reales de
+// gastos, márgenes ni rentabilidad — eso es exclusivo del Informe Interno (generateInternalReportPdf).
+// `draft` es el resultado (ya con los textos editables aplicados, ver applyClientReportOverrides)
+// de getClientReportDraft; presentationPhotoAbsPath/locationMapAbsPath son las únicas rutas que se
+// resuelven a absolutas ANTES de llamar acá (ver reportController.js), igual que el resto de PDFs.
+function generateClientReportPdf({ draft, presentationPhotoAbsPath, locationMapAbsPath }) {
   const fs = require('fs');
+  const { project, company, portada } = draft;
   const doc = new PDFDocument({ margin: 50 });
+  const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const left = doc.page.margins.left;
 
-  reportCoverHeading(doc, {
-    company,
-    title: 'Informe de Avance para Cliente',
-    project,
-    subtitle: `Cliente: ${project.client || '-'}  |  Fecha de corte: ${asOfDate.toISOString().slice(0, 10)}`,
+  // 1. Portada
+  reportCoverHeading(doc, { company, title: 'Informe de Avance para Cliente', project });
+  const mesAnio = new Date(portada.generatedAt).toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
+  doc.font('Helvetica').fontSize(9).fillColor('#333');
+  [
+    portada.objeto ? `Objeto del proyecto: ${portada.objeto}` : null,
+    portada.contractNumber ? `Número de contrato: ${portada.contractNumber}` : null,
+    `Contratista: ${company?.companyName || '-'}`,
+    `Cliente: ${portada.cliente || '-'}`,
+    `Informe generado en: ${mesAnio}`,
+  ].filter(Boolean).forEach((line) => doc.text(line, { align: 'center' }));
+  doc.fillColor('#000');
+  doc.moveDown(1);
+
+  // 2. Introducción
+  sectionTitle(doc, '2. Introducción');
+  doc.font('Helvetica').fontSize(10).text(draft.introduccionText, { align: 'justify' });
+
+  // 3. Descripción del proyecto (con foto de portada)
+  sectionTitle(doc, '3. Descripción del proyecto');
+  doc.font('Helvetica').fontSize(10).text(draft.descripcion || 'Sin descripción registrada.', { align: 'justify' });
+  if (presentationPhotoAbsPath && fs.existsSync(presentationPhotoAbsPath)) {
+    doc.moveDown(0.3);
+    ensureSpace(doc, 160);
+    const imgY = doc.y;
+    try {
+      doc.rect(left, imgY, 240, 150).stroke('#e5e7eb');
+      doc.image(presentationPhotoAbsPath, left, imgY, { fit: [240, 150], align: 'center', valign: 'center' });
+      doc.y = imgY + 160;
+    } catch (e) { /* imagen ilegible: se omite */ }
+  }
+
+  // 4. Imagen de ubicación
+  sectionTitle(doc, '4. Imagen de ubicación');
+  if (locationMapAbsPath && fs.existsSync(locationMapAbsPath)) {
+    ensureSpace(doc, 160);
+    const imgY = doc.y;
+    try {
+      doc.rect(left, imgY, 240, 150).stroke('#e5e7eb');
+      doc.image(locationMapAbsPath, left, imgY, { fit: [240, 150], align: 'center', valign: 'center' });
+      doc.y = imgY + 160;
+    } catch (e) { /* imagen ilegible: se omite */ }
+  } else {
+    doc.font('Helvetica').fontSize(9).fillColor('#888').text('Sin mapa de ubicación cargado.');
+    doc.fillColor('#000');
+  }
+
+  // 5. Actas del proyecto
+  sectionTitle(doc, '5. Actas del proyecto');
+  doc.font('Helvetica').fontSize(10).text(draft.descripcionActasText, { align: 'justify' });
+  doc.moveDown(0.3);
+  draft.actas.forEach((a) => {
+    ensureSpace(doc, 14);
+    doc.fontSize(9).text(`- ${a.tipo} — ${a.fecha}`);
   });
 
-  sectionTitle(doc, 'Lugar de ejecución');
-  doc.font('Helvetica').fontSize(10).text(project.address || 'Sin dirección registrada.');
-  doc.moveDown(0.3);
-  const imgY = doc.y;
-  const imgW = 230;
-  const imgH = 150;
-  let anyImage = false;
-  if (presentationPhotoAbsPath && fs.existsSync(presentationPhotoAbsPath)) {
-    try {
-      doc.rect(50, imgY, imgW, imgH).stroke('#e5e7eb');
-      doc.image(presentationPhotoAbsPath, 50, imgY, { fit: [imgW, imgH], align: 'center', valign: 'center' });
-      anyImage = true;
-    } catch (e) { /* imagen ilegible: se omite */ }
+  // 6. Equipo de trabajo
+  sectionTitle(doc, '6. Equipo de trabajo');
+  if (!draft.equipo.length) {
+    doc.font('Helvetica').fontSize(10).text('Sin personal activo registrado en este proyecto.');
+  } else {
+    const colX = { nombre: left, cedula: left + 150, eps: left + 220, fp: left + 320, arl: left + 430 };
+    ensureSpace(doc, 20);
+    const headerY = doc.y;
+    doc.font('Helvetica-Bold').fontSize(8);
+    doc.text('Nombre', colX.nombre, headerY, { width: 145 });
+    doc.text('Cédula', colX.cedula, headerY, { width: 65 });
+    doc.text('EPS', colX.eps, headerY, { width: 95 });
+    doc.text('Fondo de Pensión', colX.fp, headerY, { width: 105 });
+    doc.text('ARL', colX.arl, headerY, { width: 95 });
+    doc.moveTo(left, headerY + 12).lineTo(left + 495, headerY + 12).stroke();
+    doc.y = headerY + 16;
+    doc.font('Helvetica').fontSize(8);
+    draft.equipo.forEach((e) => {
+      const rowH = Math.max(10, doc.heightOfString(e.nombre, { width: 145 })) + 4;
+      ensureSpace(doc, rowH);
+      const rowY = doc.y;
+      doc.text(e.nombre, colX.nombre, rowY, { width: 145 });
+      doc.text(e.cedula, colX.cedula, rowY, { width: 65 });
+      doc.text(e.eps, colX.eps, rowY, { width: 95 });
+      doc.text(e.fondoPension, colX.fp, rowY, { width: 105 });
+      doc.text(e.arl, colX.arl, rowY, { width: 95 });
+      doc.y = rowY + rowH;
+    });
   }
-  if (locationMapAbsPath && fs.existsSync(locationMapAbsPath)) {
-    try {
-      doc.rect(50 + imgW + 20, imgY, imgW, imgH).stroke('#e5e7eb');
-      doc.image(locationMapAbsPath, 50 + imgW + 20, imgY, { fit: [imgW, imgH], align: 'center', valign: 'center' });
-      anyImage = true;
-    } catch (e) { /* imagen ilegible: se omite */ }
+
+  // 7. Presupuesto de ítems contratados
+  sectionTitle(doc, '7. Presupuesto de ítems contratados');
+  if (!draft.items.length) {
+    doc.font('Helvetica').fontSize(10).text('Sin ítems de presupuesto.');
+  } else {
+    const colX = { code: left, desc: left + 55, unit: left + 225, qty: left + 263, unitCost: left + 315, total: left + 410 };
+    ensureSpace(doc, 20);
+    const headerY = doc.y;
+    doc.font('Helvetica-Bold').fontSize(8);
+    doc.text('Código', colX.code, headerY, { width: 50 });
+    doc.text('Descripción', colX.desc, headerY, { width: 165 });
+    doc.text('Unidad', colX.unit, headerY, { width: 35 });
+    doc.text('Cant.', colX.qty, headerY, { width: 48 });
+    doc.text('Vr. Unit.', colX.unitCost, headerY, { width: 90 });
+    doc.text('Vr. Total', colX.total, headerY, { width: 85 });
+    doc.moveTo(left, headerY + 12).lineTo(left + 495, headerY + 12).stroke();
+    doc.y = headerY + 16;
+    doc.font('Helvetica').fontSize(8);
+    draft.items.forEach((it) => {
+      const rowH = Math.max(10, doc.heightOfString(it.descripcion, { width: 165 })) + 4;
+      ensureSpace(doc, rowH);
+      const rowY = doc.y;
+      doc.text(it.itemCode, colX.code, rowY, { width: 50 });
+      doc.text(it.descripcion, colX.desc, rowY, { width: 165 });
+      doc.text(it.unidad, colX.unit, rowY, { width: 35 });
+      doc.text(String(it.cantidad), colX.qty, rowY, { width: 48 });
+      doc.text(money(it.valorUnitario), colX.unitCost, rowY, { width: 90 });
+      doc.text(money(it.valorTotal), colX.total, rowY, { width: 85 });
+      doc.y = rowY + rowH;
+    });
+    ensureSpace(doc, 20);
+    doc.moveDown(0.3);
+    doc.font('Helvetica-Bold').fontSize(10).text(`Valor total del contrato: ${money(draft.valorTotalContrato)}`, { align: 'right' });
   }
-  doc.y = anyImage ? imgY + imgH + 10 : imgY;
-  if (!anyImage) doc.fontSize(9).fillColor('#888').text('Sin foto de presentación ni mapa de ubicación cargados.').fillColor('#000');
 
-  sectionTitle(doc, 'Resumen ejecutivo');
-  doc.font('Helvetica').fontSize(10).text(summaryText, { align: 'justify' });
-
-  sectionTitle(doc, 'Presupuesto total vs. ejecutado');
-  doc.font('Helvetica').fontSize(10).text(`Presupuesto total del proyecto: ${money(snapshot.totalBudgetedValue)}`);
-  doc.text(`Valor ejecutado a la fecha: ${money(snapshot.totalExecutedValue)}`);
-  doc.moveDown(0.3);
-  drawProgressBar(doc, { percent: snapshot.physicalProgressPercent, color: '#16a34a' });
-
-  sectionTitle(doc, 'Avance por ítem de presupuesto');
-  if (!snapshot.items.length) doc.text('Sin ítems de presupuesto.');
-  snapshot.items.forEach((item) => {
+  // 8. Avance por ítem: físico/económico + gráfica de barras + registro fotográfico agrupado por
+  // avance (fotos primero, descripción de ESE avance siempre al final del bloque de fotos).
+  sectionTitle(doc, '8. Avance por ítem');
+  if (!draft.itemsAvance.length) doc.font('Helvetica').fontSize(10).text('Sin ítems de presupuesto.');
+  draft.itemsAvance.forEach((item) => {
     ensureSpace(doc, 90);
-    doc.font('Helvetica-Bold').fontSize(10).text(item.description);
+    doc.font('Helvetica-Bold').fontSize(10).text(item.descripcion);
     doc.font('Helvetica').fontSize(9).fillColor('#555')
-      .text(`${item.accumulatedQty} / ${Number(item.quantity)} ${item.unit}`);
+      .text(`Cantidad presupuestada: ${item.cantidadPresupuestada} ${item.unidad}`);
     doc.fillColor('#000');
-    drawProgressBar(doc, { width: 250, percent: item.percent, color: item.percent >= 100 ? '#16a34a' : '#2563eb' });
+    doc.moveDown(0.2);
+    doc.fontSize(8).fillColor('#555').text('Avance físico');
+    doc.fillColor('#000');
+    drawProgressBar(doc, { width: 220, percent: item.porcentajeFisico, color: '#2563eb' });
+    doc.fontSize(8).fillColor('#555').text('Avance económico');
+    doc.fillColor('#000');
+    drawProgressBar(doc, { width: 220, percent: item.porcentajeEconomico, color: '#16a34a' });
+    doc.moveDown(0.3);
 
-    const photos = (item.photos || []).slice(0, 4);
-    if (photos.length) {
-      ensureSpace(doc, 66);
-      const thumbY = doc.y;
-      photos.forEach((p, idx) => {
-        const abs = path.join(UPLOAD_ROOT, p);
-        if (!fs.existsSync(abs)) return;
-        try {
-          doc.rect(50 + idx * 65, thumbY, 60, 60).stroke('#e5e7eb');
-          doc.image(abs, 50 + idx * 65, thumbY, { fit: [60, 60], align: 'center', valign: 'center' });
-        } catch (e) { /* foto ilegible: se omite */ }
-      });
-      doc.y = thumbY + 66;
-    }
+    item.avances.forEach((av) => {
+      ensureSpace(doc, 20);
+      doc.font('Helvetica-Bold').fontSize(9).text(`Avance del ${av.fecha} — ${av.cantidadEjecutada} ${item.unidad}`);
+      if (av.fotos.length) {
+        doc.moveDown(0.2);
+        drawPhotoGrid(doc, { photos: av.fotos, contentWidth });
+      }
+      if (av.descripcionText) {
+        doc.moveDown(0.2);
+        doc.font('Helvetica').fontSize(9).text(av.descripcionText, { align: 'justify' });
+      }
+      doc.moveDown(0.4);
+    });
     doc.moveDown(0.5);
+  });
+
+  // 9. Resumen general del proyecto: curva S de avance físico (%) y avance económico ($),
+  // con evolución mensual desde el inicio del proyecto (ver evmService.computeSCurve).
+  sectionTitle(doc, '9. Resumen general del proyecto');
+  const bac = Number(draft.valorTotalContrato) || 1;
+  const categories = draft.sCurve.map((p) => p.month);
+  doc.font('Helvetica-Bold').fontSize(9).text('Avance físico consolidado (%)');
+  doc.moveDown(0.2);
+  ensureSpace(doc, 210);
+  drawLineChart(doc, {
+    categories,
+    series: [
+      { name: 'Planeado', color: '#93c5fd', values: draft.sCurve.map((p) => Math.round((Number(p.planned) / bac) * 10000) / 100) },
+      { name: 'Real', color: '#2563eb', values: draft.sCurve.map((p) => Math.round((Number(p.actualEV) / bac) * 10000) / 100) },
+    ],
+    valueFormatter: (v) => `${v.toFixed(0)}%`,
+  });
+  doc.moveDown(0.5);
+  doc.font('Helvetica-Bold').fontSize(9).text('Avance económico consolidado');
+  doc.moveDown(0.2);
+  ensureSpace(doc, 210);
+  drawLineChart(doc, {
+    categories,
+    series: [
+      { name: 'Planeado', color: '#93c5fd', values: draft.sCurve.map((p) => Number(p.planned)) },
+      { name: 'Valor ejecutado', color: '#2563eb', values: draft.sCurve.map((p) => Number(p.actualEV)) },
+      { name: 'Costo real', color: '#f59e0b', values: draft.sCurve.map((p) => Number(p.actualAC)) },
+    ],
+    valueFormatter: (v) => money(v),
   });
 
   doc.end();

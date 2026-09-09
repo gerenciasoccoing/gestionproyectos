@@ -1349,12 +1349,64 @@
       "title": "Informes con IA",
       "subtitle": "Genera informes en PDF a partir de los datos ya cargados del proyecto (presupuesto, avance, fotos y gastos). Las cifras salen siempre del sistema; la IA solo redacta el texto.",
       "clientTitle": "Informe para el Cliente",
-      "clientDescription": "Formato ejecutivo/comercial, con corte a la fecha de hoy. No incluye costos reales ni márgenes internos.",
+      "clientDescription": "Formato ejecutivo/comercial de 9 secciones, con corte a la fecha de hoy. Pasa por una vista previa editable antes de exportarse. No incluye costos reales ni márgenes internos.",
       "internalTitle": "Informe Interno para la Empresa",
       "internalDescription": "Formato gerencial con gastos reales y desviación presupuestal, por rango de fechas.",
       "generate": "Generar informe",
+      "preview": "Ver vista previa",
       "from": "Desde",
       "to": "Hasta"
+    },
+    "clientPreview": {
+      "title": "Vista previa — Informe para el Cliente",
+      "help": "Revisa y edita los textos libres antes de exportar. Las cifras, cantidades y fechas se recalculan siempre desde el sistema al exportar y no se pueden editar aquí.",
+      "exportPdf": "Exportar a PDF",
+      "noMap": "Sin mapa de ubicación cargado.",
+      "noMinutes": "A la fecha no se han registrado actas para este proyecto.",
+      "noTeam": "Sin personal activo registrado en este proyecto.",
+      "sections": {
+        "cover": "1. Portada",
+        "introduction": "2. Introducción",
+        "description": "3. Descripción del proyecto",
+        "location": "4. Imagen de ubicación",
+        "minutes": "5. Actas del proyecto",
+        "team": "6. Equipo de trabajo",
+        "budget": "7. Presupuesto de ítems contratados",
+        "itemProgress": "8. Avance por ítem",
+        "summary": "9. Resumen general del proyecto"
+      },
+      "fields": {
+        "object": "Objeto del proyecto",
+        "contractNumber": "Número de contrato",
+        "contractor": "Contratista",
+        "client": "Cliente"
+      },
+      "team": {
+        "name": "Nombre",
+        "id": "Cédula",
+        "eps": "EPS",
+        "pension": "Fondo de Pensión",
+        "arl": "ARL"
+      },
+      "budget": {
+        "code": "Código",
+        "description": "Descripción",
+        "unit": "Unidad",
+        "qty": "Cantidad",
+        "unitValue": "Vr. Unitario",
+        "total": "Vr. Total",
+        "totalContract": "Valor total del contrato"
+      },
+      "itemProgress": {
+        "physical": "Avance físico",
+        "economic": "Avance económico",
+        "noEntries": "Sin avances registrados para este ítem."
+      },
+      "summary": {
+        "physical": "Avance físico consolidado (%)",
+        "economic": "Avance económico consolidado",
+        "real": "Real"
+      }
     }
   },
   "admin": {

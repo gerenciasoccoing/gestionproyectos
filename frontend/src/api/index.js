@@ -341,11 +341,12 @@ export const reportsApi = {
     const token = localStorage.getItem('token');
     return `${base}/projects/${pid}/reports/export-pdf?token=${encodeURIComponent(token)}`;
   },
-  clientReportPdfUrl: (pid) => {
-    const base = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api');
-    const token = localStorage.getItem('token');
-    return `${base}/projects/${pid}/reports/client-pdf?token=${encodeURIComponent(token)}`;
-  },
+  // Borrador de las 9 secciones del Informe para Cliente, para la vista previa editable (ver
+  // ClientReportPreviewPage.jsx) — la exportación final va por exportClientReportPdf (POST, con
+  // los textos editados), nunca por un link GET directo como los demás informes: este sí necesita
+  // pasar por la vista previa antes de generarse.
+  clientReportDraft: (pid) => client.get(`/projects/${pid}/reports/client-draft`).then((r) => r.data),
+  exportClientReportPdf: (pid, overrides) => postAndDownload(`/projects/${pid}/reports/client-pdf`, overrides, 'informe-cliente.pdf'),
   internalReportPdfUrl: (pid, from, to) => {
     const base = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api');
     const token = localStorage.getItem('token');
