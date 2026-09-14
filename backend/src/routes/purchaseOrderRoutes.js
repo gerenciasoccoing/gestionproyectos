@@ -1,3 +1,5 @@
+const multer = require('multer');
+const path = require('path');
 const router = require('express').Router({ mergeParams: true });
 const { authenticate } = require('../middleware/auth');
 const { requirePermission, requireProjectAccess } = require('../middleware/authorize');
@@ -7,10 +9,25 @@ const purchaseOrderController = require('../controllers/purchaseOrderController'
 
 const uploadPaymentReceipt = makeUploader('purchase-order-payments', 'any');
 
+// En memoria (no se persiste): solo se usa para leer la cotización y descartarla — mismo patrón
+// que scanUpload en marketStudyRoutes.js/budgetRoutes.js.
+const scanUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.xlsx', '.xls'].includes(ext)) {
+      return cb(new Error('El archivo debe ser PDF, imagen (jpg, png, webp) o Excel (xlsx, xls)'));
+    }
+    cb(null, true);
+  },
+});
+
 router.use(authenticate, requireProjectAccess((r) => r.params.projectId));
 
 router.get('/report', requirePermission('ordenes_compra', 'view'), purchaseOrderController.report);
 router.get('/', requirePermission('ordenes_compra', 'view'), purchaseOrderController.list);
+router.post('/scan-quotation', requirePermission('ordenes_compra', 'create'), scanUpload.single('file'), purchaseOrderController.scanQuotation);
 router.post('/', requirePermission('ordenes_compra', 'create'), preventDuplicateSubmit, purchaseOrderController.create);
 router.get('/:id', requirePermission('ordenes_compra', 'view'), purchaseOrderController.get);
 router.get('/:id/pdf', requirePermission('ordenes_compra', 'view'), purchaseOrderController.exportPdf);

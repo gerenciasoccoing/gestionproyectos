@@ -14,6 +14,11 @@ module.exports = (sequelize) => {
     dedicationHours: { type: DataTypes.DECIMAL(6, 2), allowNull: true, validate: { min: 0 } },
     salaryValue: { type: DataTypes.DECIMAL(18, 2), allowNull: false, validate: { min: 0 } },
     contractFilePath: { type: DataTypes.STRING },
+    // Necesario para poder enviarle el link de firma digital de sus contratos/otrosíes (ver
+    // contractSignatureService.js) — no existía ningún campo de correo en la ficha del trabajador
+    // hasta ahora. Nullable: no se exige al crear/editar, solo se necesita al momento de enviar un
+    // documento a firmar.
+    email: { type: DataTypes.STRING, allowNull: true },
     status: { type: DataTypes.ENUM('activo', 'retirado'), defaultValue: 'activo' },
 
     // --- Generación de minutas de contrato (ver contractTemplates.js) ---

@@ -32,6 +32,8 @@ export default function PurchaseOrdersPage() {
   const [error, setError] = useState('');
   const [form, setForm] = useState({ supplier: '', supplierId: '', date: '', cashBoxId: '', retentionPercent: 0, items: [emptyOrderLine()] });
   const [report, setReport] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState('');
   const [editingOrderId, setEditingOrderId] = useState(null);
   const [editForm, setEditForm] = useState({ date: '', cashBoxId: '', retentionPercent: 0, items: [] });
 
@@ -133,16 +135,56 @@ export default function PurchaseOrdersPage() {
 
   const loadReport = async () => setReport(await purchaseOrdersApi.report(projectId, {}));
 
+  // Lee una cotización de proveedor con IA y precarga el formulario de "Nueva orden" con lo que
+  // se logró leer — el usuario revisa/corrige antes de guardar, el guardado sigue siendo el mismo
+  // submit() de siempre (ver purchaseOrderController.scanQuotation: nunca crea la orden por sí solo).
+  const scanQuotation = async (file) => {
+    if (!file) return;
+    setScanError('');
+    setScanning(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const draft = await purchaseOrdersApi.scanQuotation(projectId, fd);
+      setForm((f) => ({
+        ...f,
+        supplier: draft.supplier || f.supplier,
+        items: draft.items.length
+          ? draft.items.map((it) => ({
+            name: it.name || '', unit: it.unit || '', quantityOrdered: it.quantityOrdered ?? '',
+            unitPrice: it.unitPrice ?? '', budgetItemId: '', vatPercent: it.vatPercent ?? 19,
+          }))
+          : f.items,
+      }));
+      setShowForm(true);
+      if (draft.extractionStatus === 'revisar') {
+        setScanError(t('execution.purchaseOrders.scanNeedsReview'));
+      }
+    } catch (err) {
+      setScanError(extractError(err));
+    } finally {
+      setScanning(false);
+    }
+  };
+
   return (
     <div>
       <Card title={t('execution.purchaseOrders.title')} actions={
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={loadReport}>{t('execution.purchaseOrders.report')}</Button>
           <Can module="ordenes_compra" action="create">
+            <label className="inline-block">
+              <span className={`inline-flex items-center px-3 py-2 rounded text-sm cursor-pointer bg-gray-200 hover:bg-gray-300 text-gray-800 ${scanning ? 'opacity-60 pointer-events-none' : ''}`}>
+                {scanning ? t('execution.purchaseOrders.scanning') : t('execution.purchaseOrders.scanQuotation')}
+              </span>
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls" className="hidden" disabled={scanning}
+                onChange={(e) => { scanQuotation(e.target.files?.[0]); e.target.value = ''; }} />
+            </label>
             <Button onClick={() => setShowForm((s) => !s)}>{showForm ? t('common.cancel') : t('execution.purchaseOrders.newOrder')}</Button>
           </Can>
         </div>
       }>
+        <ErrorText>{scanError}</ErrorText>
         {showForm && !project?.contractNumber && (
           <p className="text-xs text-yellow-700 mb-3">{t('contractual.contractNumber.warning')}</p>
         )}

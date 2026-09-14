@@ -37,5 +37,6 @@ router.get('/:id/contracts', requirePermission('personal', 'view'), employeeCont
 router.post('/:id/contracts', requirePermission('personal', 'edit'), preventDuplicateSubmit, employeeContractController.generate);
 router.post('/:id/contracts/:contractId/otrosi', requirePermission('personal', 'edit'), preventDuplicateSubmit, employeeContractController.generateOtrosi);
 router.delete('/:id/contracts/:contractId', requirePermission('personal', 'delete'), employeeContractController.removeDocument);
+router.post('/:id/contracts/:contractId/request-signature', requirePermission('personal', 'edit'), preventDuplicateSubmit, employeeContractController.sendForSignature);
 
 module.exports = router;

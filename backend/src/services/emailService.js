@@ -74,6 +74,21 @@ async function sendCompanyRequestNotification({ to, companyName, nit, contactNam
   return sendEmail({ to, subject: `Nueva solicitud de registro: ${companyName}`, html, text });
 }
 
+// Aviso al trabajador de que tiene un contrato/otrosí listo para firmar (ver
+// contractSignatureService.js#requestSignature). El link ES la autenticación (token largo y de un
+// solo uso, ver comentario en el modelo) — no se pide ninguna cuenta ni contraseña.
+async function sendContractSignatureEmail({ to, employeeName, documentLabel, projectName, signUrl }) {
+  const html = wrapHtml('Tienes un documento para firmar', `
+    <p style="color:#526082;font-size:14px;line-height:1.6;">Hola ${employeeName}, tienes un documento (${documentLabel}) del proyecto "${projectName}" listo para tu revisión y firma.</p>
+    <p style="text-align:center;margin:28px 0;">
+      <a href="${signUrl}" style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Revisar y firmar</a>
+    </p>
+    <p style="color:#8792ab;font-size:12.5px;line-height:1.6;">Este enlace vence en 7 días.</p>
+  `);
+  const text = `Hola ${employeeName}, tienes un documento (${documentLabel}) del proyecto "${projectName}" listo para tu revisión y firma.\n\nRevisar y firmar: ${signUrl}\n\nEste enlace vence en 7 días.`;
+  return sendEmail({ to, subject: `Firma tu ${documentLabel} — ${projectName}`, html, text });
+}
+
 async function sendCompanyRejectedEmail({ to, companyName, reason }) {
   const html = wrapHtml('Tu solicitud no fue aprobada', `
     <p style="color:#526082;font-size:14px;line-height:1.6;">
@@ -86,4 +101,6 @@ async function sendCompanyRejectedEmail({ to, companyName, reason }) {
   return sendEmail({ to, subject: 'Tu solicitud de registro en ERGY-PROJECT', html, text });
 }
 
-module.exports = { sendEmail, sendPasswordResetEmail, sendCompanyRequestNotification, sendCompanyRejectedEmail };
+module.exports = {
+  sendEmail, sendPasswordResetEmail, sendCompanyRequestNotification, sendCompanyRejectedEmail, sendContractSignatureEmail,
+};

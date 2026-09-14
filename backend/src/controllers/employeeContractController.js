@@ -11,6 +11,7 @@ const { generateContractDocxBuffer } = require('../services/contractDocService')
 const {
   CONTRACT_TYPE_LABELS, missingFieldsForContract, buildContractContent, formatDateEs,
 } = require('../services/contractTemplates');
+const { requestSignature } = require('../services/contractSignatureService');
 
 function pdfDocToBuffer(doc) {
   return new Promise((resolve, reject) => {
@@ -158,6 +159,22 @@ const removeDocument = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
+// Envía (o reenvía) el link de firma de un documento ya generado — ver
+// contractSignatureService.js#requestSignature. Siempre devuelve signUrl, aunque el correo falle,
+// para poder copiarlo y mandarlo a mano (mismo respaldo ya usado para "olvidé mi contraseña").
+const sendForSignature = asyncHandler(async (req, res) => {
+  const employee = await loadEmployee(req);
+  const result = await requestSignature({
+    employeeId: employee.id, contractId: req.params.contractId, projectId: req.params.projectId,
+  });
+  res.json({
+    doc: result.doc,
+    signUrl: result.signUrl,
+    emailSent: result.emailSent,
+    emailError: result.emailError,
+  });
+});
+
 module.exports = {
-  listContractTypes, list, generate, generateOtrosi, removeDocument, renderAndPersist,
+  listContractTypes, list, generate, generateOtrosi, removeDocument, renderAndPersist, sendForSignature,
 };

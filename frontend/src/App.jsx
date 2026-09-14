@@ -6,6 +6,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import RegisterCompanyPage from './pages/RegisterCompanyPage';
 import ConfirmationPage from './pages/public/ConfirmationPage';
+import SignContractPage from './pages/public/SignContractPage';
 import PlatformAdminLoginPage from './pages/platformAdmin/PlatformAdminLoginPage';
 import PlatformAdminDashboardPage from './pages/platformAdmin/PlatformAdminDashboardPage';
 import ProjectsListPage from './pages/ProjectsListPage';
@@ -63,6 +64,7 @@ export default function App() {
       <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
       <Route path="/register-company" element={<RegisterCompanyPage />} />
       <Route path="/confirm/:token" element={<ConfirmationPage />} />
+      <Route path="/sign-contract/:token" element={<SignContractPage />} />
       <Route path="/platform-admin/login" element={<PlatformAdminLoginPage />} />
       <Route path="/platform-admin" element={<PlatformAdminDashboardPage />} />
 

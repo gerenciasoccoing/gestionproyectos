@@ -12,6 +12,11 @@ const { getLetterheadForProject } = require('../services/letterheadService');
 const { assertCashBoxUsable, overdraftWarning } = require('../services/cashBoxService');
 const { nextExpenseNumber, contractPrefixForProject } = require('../services/numberingService');
 const { relativePath } = require('../middleware/upload');
+// Mismo lector de cotizaciones de proveedor que ya usa Estudio de Mercado (marketStudyScanService.js
+// / extractor "supplierQuotation" en aiDocumentExtractors.js) — se reutiliza tal cual, sin
+// duplicar el prompt ni la lógica de extracción, para generar acá un borrador de Orden de Compra
+// en vez de una cotización comparativa.
+const { scanSupplierQuotationFile } = require('../services/marketStudyScanService');
 
 // Una sola consulta de agregación (SUM ... GROUP BY) para TODAS las órdenes de un listado a la
 // vez, en vez de una consulta por orden — ver PurchaseOrderPayment (abonos). Devuelve un Map
@@ -188,6 +193,34 @@ const create = asyncHandler(async (req, res) => {
   const items2 = await getOrderItemsWithDelivery(order.id);
   const totals = computeOrderTotals(items2, order.retentionPercent);
   res.status(201).json({ ...order.toJSON(), items: items2, totals });
+});
+
+// Lee una cotización de proveedor (imagen, PDF o Excel) con IA y devuelve un borrador de Orden de
+// Compra para que el usuario lo revise/edite antes de guardar — nunca crea nada acá (mismo
+// criterio que scanBudgetItemsFile/scanItemApuFile en Presupuesto del Proyecto: "leer y sugerir"
+// queda separado de "guardar", que sigue siendo el mismo POST / de siempre, sin ningún campo ni
+// tabla nueva). Montado tanto en la ruta global (/purchase-orders/scan-quotation) como en la
+// anidada en proyecto — mismo controlador para las dos, igual que el resto de este archivo.
+const scanQuotation = asyncHandler(async (req, res) => {
+  if (!req.file) throw new ApiError(400, 'Debe adjuntar un archivo PDF, imagen o Excel');
+  const result = await scanSupplierQuotationFile({
+    buffer: req.file.buffer, mimetype: req.file.mimetype, originalname: req.file.originalname,
+  });
+  res.json({
+    supplier: result.supplierName || '',
+    items: result.items.map((it) => ({
+      name: it.name,
+      unit: it.unit || '',
+      quantityOrdered: it.quantity ?? '',
+      unitPrice: it.unitPrice ?? '',
+      vatPercent: 19,
+      needsReview: it.needsReview,
+    })),
+    deliveryTime: result.deliveryTime,
+    validUntil: result.validUntil,
+    paymentTerms: result.paymentTerms,
+    extractionStatus: result.extractionStatus,
+  });
 });
 
 // Edita un ítem existente (descripción/unidad/cantidad/valor unitario/vínculo a presupuesto).
@@ -726,5 +759,5 @@ const exportPdf = asyncHandler(async (req, res) => {
 
 module.exports = {
   list, listBySupplier, get, create, updateOrder, remove, updateItem, convertToExpense, addReceipt, updateReceipt, close, report, exportPdf,
-  approve, reject, addPayment,
+  approve, reject, addPayment, scanQuotation,
 };

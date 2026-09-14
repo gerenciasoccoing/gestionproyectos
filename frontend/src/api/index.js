@@ -179,6 +179,9 @@ export const purchaseOrdersApi = {
   approve: (pid, id) => client.post(`/projects/${pid}/purchase-orders/${id}/approve`).then((r) => r.data),
   reject: (pid, id) => client.post(`/projects/${pid}/purchase-orders/${id}/reject`).then((r) => r.data),
   addPayment: (pid, id, formData) => client.post(`/projects/${pid}/purchase-orders/${id}/payments`, formData).then((r) => r.data),
+  // Lee una cotización de proveedor con IA y devuelve un borrador (nunca crea la orden) — ver
+  // purchaseOrderController.scanQuotation.
+  scanQuotation: (pid, formData) => client.post(`/projects/${pid}/purchase-orders/scan-quotation`, formData).then((r) => r.data),
 };
 
 export const executionApi = {
@@ -215,6 +218,20 @@ export const employeeContractsApi = {
   generate: (pid, employeeId) => client.post(`/projects/${pid}/employees/${employeeId}/contracts`).then((r) => r.data),
   generateOtrosi: (pid, employeeId, contractId, data) => client.post(`/projects/${pid}/employees/${employeeId}/contracts/${contractId}/otrosi`, data).then((r) => r.data),
   remove: (pid, employeeId, contractId) => client.delete(`/projects/${pid}/employees/${employeeId}/contracts/${contractId}`).then((r) => r.data),
+  // Envía (o reenvía) el link de firma digital de un documento ya generado — ver
+  // contractSignatureService.js#requestSignature. Devuelve signUrl aunque el correo falle, para
+  // poder copiarlo y mandarlo a mano.
+  requestSignature: (pid, employeeId, contractId) => client.post(`/projects/${pid}/employees/${employeeId}/contracts/${contractId}/request-signature`).then((r) => r.data),
+};
+
+// Flujo PÚBLICO de firma digital de contratos (sin sesión, ver contractSignatureRoutes.js): el
+// token largo de la URL es la autenticación. Reutiliza el mismo cliente axios de siempre (si por
+// casualidad hay un token de sesión guardado en este navegador no estorba: estas rutas no lo
+// exigen ni lo usan).
+export const contractSignatureApi = {
+  get: (token) => client.get(`/contract-signature/${token}`).then((r) => r.data),
+  documentUrl: (token) => `${(import.meta.env.VITE_API_URL || 'http://localhost:4000/api')}/contract-signature/${token}/document`,
+  sign: (token, data) => client.post(`/contract-signature/${token}`, data).then((r) => r.data),
 };
 
 export const expensesApi = {
@@ -277,6 +294,7 @@ export const supplierPurchaseOrdersApi = {
   approve: (id) => client.post(`/purchase-orders/${id}/approve`).then((r) => r.data),
   reject: (id) => client.post(`/purchase-orders/${id}/reject`).then((r) => r.data),
   addPayment: (id, formData) => client.post(`/purchase-orders/${id}/payments`, formData).then((r) => r.data),
+  scanQuotation: (formData) => client.post('/purchase-orders/scan-quotation', formData).then((r) => r.data),
 };
 
 // Estudio de Mercado de Cotizaciones: módulo "plus" (ver Company.enabledFeatures / HasFeature),

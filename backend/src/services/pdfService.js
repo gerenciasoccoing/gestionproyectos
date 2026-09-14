@@ -1240,8 +1240,10 @@ function drawContractInfoTable(doc, infoTable) {
 // empresa), tabla de datos clave, cuerpo de párrafos justificados por cláusula, y firmas al final.
 // `content` es la estructura genérica que arma contractTemplates.js#buildContractContent — la
 // misma que consume contractDocService.js para el .docx, así que el texto legal vive en un solo
-// lugar.
-function generateContractPdf(content, company) {
+// lugar. `signature` es opcional — { dataUrl, signerName, signedAt, ip } — ver
+// contractSignatureService.js#signDocument: cuando viene, se agrega al final del MISMO documento
+// un bloque de certificación con la firma dibujada + metadatos, en vez de generar un PDF aparte.
+function generateContractPdf(content, company, signature) {
   const doc = new PDFDocument({ margin: 50 });
 
   if (company && company.logoPath && require('fs').existsSync(company.logoPath)) {
@@ -1285,6 +1287,29 @@ function generateContractPdf(content, company) {
     if (sig.idLabel) doc.text(`${sig.idLabel} ${sig.idValue || '-'}`);
     doc.moveDown(1.5);
   });
+
+  // Certificado de firma digital (ver contractSignatureService.js#signDocument): se agrega al
+  // final del MISMO documento en vez de generar un PDF aparte, para que quede una sola versión
+  // "firmada" trazable. La firma dibujada llega como data URL (PNG) desde el canvas del navegador.
+  if (signature) {
+    if (doc.y > 600) doc.addPage();
+    doc.moveDown(1);
+    sectionTitle(doc, 'Certificado de firma electrónica');
+    if (signature.dataUrl) {
+      try {
+        const base64 = signature.dataUrl.split(',')[1] || signature.dataUrl;
+        const imgBuffer = Buffer.from(base64, 'base64');
+        ensureSpace(doc, 90);
+        doc.rect(doc.x, doc.y, 200, 80).stroke('#e5e7eb');
+        doc.image(imgBuffer, doc.x, doc.y, { fit: [200, 80], align: 'center', valign: 'center' });
+        doc.y += 88;
+      } catch (e) { /* imagen de firma ilegible: se omite, el certificado de texto sigue siendo válido */ }
+    }
+    doc.font('Helvetica').fontSize(9)
+      .text(`Firmado electrónicamente por: ${signature.signerName}`)
+      .text(`Fecha y hora: ${signature.signedAt instanceof Date ? signature.signedAt.toLocaleString('es-CO') : signature.signedAt}`)
+      .text(`Dirección IP: ${signature.ip || 'No disponible'}`);
+  }
 
   doc.end();
   return doc;

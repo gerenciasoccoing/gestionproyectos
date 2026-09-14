@@ -1,3 +1,5 @@
+const multer = require('multer');
+const path = require('path');
 const router = require('express').Router();
 const { authenticate } = require('../middleware/auth');
 const { requirePermission, requireOptionalProjectAccess } = require('../middleware/authorize');
@@ -5,6 +7,20 @@ const { PurchaseOrder } = require('../models');
 const { preventDuplicateSubmit } = require('../middleware/idempotency');
 const { makeUploader } = require('../middleware/upload');
 const purchaseOrderController = require('../controllers/purchaseOrderController');
+
+// En memoria (no se persiste): solo se usa para leer la cotización y descartarla — mismo patrón
+// que scanUpload en marketStudyRoutes.js/budgetRoutes.js.
+const scanUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.xlsx', '.xls'].includes(ext)) {
+      return cb(new Error('El archivo debe ser PDF, imagen (jpg, png, webp) o Excel (xlsx, xls)'));
+    }
+    cb(null, true);
+  },
+});
 
 // Montado en /purchase-orders (sin :projectId en la URL): punto de entrada usado desde la ficha
 // de un proveedor, donde el proyecto es opcional. Es el mismo controlador que
@@ -18,6 +34,7 @@ const uploadPaymentReceipt = makeUploader('purchase-order-payments', 'any');
 const byIdParam = async (req) => PurchaseOrder.findByPk(req.params.id);
 
 router.get('/', requirePermission('ordenes_compra', 'view'), purchaseOrderController.listBySupplier);
+router.post('/scan-quotation', requirePermission('ordenes_compra', 'create'), scanUpload.single('file'), purchaseOrderController.scanQuotation);
 router.post('/', requirePermission('ordenes_compra', 'create'), preventDuplicateSubmit, purchaseOrderController.create);
 router.get('/:id', requirePermission('ordenes_compra', 'view'), requireOptionalProjectAccess(byIdParam), purchaseOrderController.get);
 router.get('/:id/pdf', requirePermission('ordenes_compra', 'view'), requireOptionalProjectAccess(byIdParam), purchaseOrderController.exportPdf);

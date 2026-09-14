@@ -322,6 +322,9 @@
       "title": "Purchase Orders",
       "report": "Purchases report",
       "newOrder": "+ New order",
+      "scanQuotation": "Upload quotation with AI",
+      "scanning": "Reading quotation...",
+      "scanNeedsReview": "The form was pre-filled with what could be read from the quotation, but carefully review the items, quantities and prices before saving — some may not have been recognized correctly.",
       "registeredSupplier": "Registered supplier (optional)",
       "supplierPlaceholder": "-- none / type manually --",
       "supplier": "Supplier",
@@ -587,6 +590,8 @@
       "address": "Address",
       "city": "City",
       "phone": "Phone",
+      "email": "Email",
+      "emailPlaceholder": "email@example.com",
       "nationality": "Nationality",
       "eps": "Health insurer (EPS)",
       "pensionFund": "Pension fund",
@@ -707,8 +712,21 @@
         "to": "To",
         "value": "Value",
         "pdf": "PDF",
-        "docx": "Word"
-      }
+        "docx": "Word",
+        "signature": "Signature"
+      },
+      "signatureStatus": {
+        "no_solicitado": "No digital signature",
+        "pendiente": "Pending signature",
+        "firmado": "Signed"
+      },
+      "sendSignature": "Send for signature",
+      "resendSignature": "Resend for signature",
+      "sendingSignature": "Sending...",
+      "signatureSent": "The signing link was sent to {{email}}.",
+      "signatureEmailFailed": "The signature email could not be sent. Share this link manually: {{link}}",
+      "copyLink": "Copy link",
+      "viewSigned": "View signed"
     }
   },
   "expenses": {
@@ -1724,6 +1742,22 @@
     "expired": "This link has expired. Contact the administrator to handle it manually.",
     "notFound": "Confirmation link not found or invalid.",
     "confirmFailed": "Could not register the confirmation."
+  },
+  "signContract": {
+    "title": "Document signature",
+    "viewDocument": "View document to sign (PDF)",
+    "viewSignedDocument": "View signed document (PDF)",
+    "fullName": "Your full name",
+    "drawHere": "Draw your signature in the box",
+    "clear": "Clear and sign again",
+    "confirmSign": "Confirm signature",
+    "legalNote": "By confirming, the date, time and IP address from which you signed will be recorded, along with your name, as evidence of your electronic signature on this document.",
+    "nameRequired": "Enter your full name.",
+    "signatureRequired": "Draw your signature in the box before confirming.",
+    "alreadySigned": "This document was already signed on {{date}}.",
+    "expired": "This link has expired. Ask the company to send you a new one.",
+    "notFound": "Signature link not found or invalid.",
+    "signFailed": "Could not register the signature. Please try again."
   },
   "marketStudy": {
     "title": "Market Study Comparison",

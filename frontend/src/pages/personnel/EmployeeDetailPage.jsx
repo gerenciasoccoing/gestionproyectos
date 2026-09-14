@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useOutletContext, useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -81,7 +81,7 @@ function BasicDataSection({ projectId, employee, onChange }) {
       name: employee.name || '', entryDate: employee.entryDate || '',
       position: employee.position || '', salaryValue: employee.salaryValue || '', dedicationHours: employee.dedicationHours || '',
       documentType: employee.documentType || '', documentNumber: employee.documentNumber || '',
-      address: employee.address || '', city: employee.city || '', phone: employee.phone || '', nationality: employee.nationality || 'Colombiana',
+      address: employee.address || '', city: employee.city || '', phone: employee.phone || '', email: employee.email || '', nationality: employee.nationality || 'Colombiana',
       contractType: employee.contractType || '', contractObject: employee.contractObject || '', contractEndDate: employee.contractEndDate || '',
       epsName: employee.epsName || '', pensionFundName: employee.pensionFundName || '', arlName: employee.arlName || '',
       subcontractorLegalName: employee.subcontractorLegalName || '', subcontractorNit: employee.subcontractorNit || '', subcontractorLegalRep: employee.subcontractorLegalRep || '',
@@ -130,6 +130,7 @@ function BasicDataSection({ projectId, employee, onChange }) {
           <div><span className="text-gray-500">{t('personnel.detail.documentType')}:</span> {employee.documentType ? `${employee.documentType} ${employee.documentNumber || ''}` : '-'}</div>
           <div><span className="text-gray-500">{t('personnel.detail.address')}:</span> {employee.address || '-'}{employee.city ? `, ${employee.city}` : ''}</div>
           <div><span className="text-gray-500">{t('personnel.detail.phone')}:</span> {employee.phone || '-'}</div>
+          <div><span className="text-gray-500">{t('personnel.detail.email')}:</span> {employee.email || '-'}</div>
           <div><span className="text-gray-500">{t('personnel.detail.nationality')}:</span> {employee.nationality || '-'}</div>
           <div><span className="text-gray-500">{t('personnel.detail.eps')}:</span> {employee.epsName || '-'}</div>
           <div><span className="text-gray-500">{t('personnel.detail.pensionFund')}:</span> {employee.pensionFundName || '-'}</div>
@@ -176,6 +177,7 @@ function BasicDataSection({ projectId, employee, onChange }) {
           <Input label={t('personnel.detail.address')} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
           <Input label={t('personnel.detail.city')} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
           <Input label={t('personnel.detail.phone')} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <Input label={t('personnel.detail.email')} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder={t('personnel.detail.emailPlaceholder')} />
           <Input label={t('personnel.detail.nationality')} value={form.nationality} onChange={(e) => setForm({ ...form, nationality: e.target.value })} />
 
           <Input label={t('personnel.contract.object')} value={form.contractObject} onChange={(e) => setForm({ ...form, contractObject: e.target.value })} className="lg:col-span-2" />
@@ -223,6 +225,8 @@ function ContractsSection({ projectId, project, employee, onChange }) {
   const [otrosiForm, setOtrosiForm] = useState({ newContractObject: '', newEndDate: '', newSalaryValue: '' });
   const [showOtrosi, setShowOtrosi] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [sendingSignatureId, setSendingSignatureId] = useState(null);
+  const [signatureNotes, setSignatureNotes] = useState({});
 
   const load = () => employeeContractsApi.list(projectId, employee.id).then(setDocs);
   useEffect(() => { load(); }, [projectId, employee.id]);
@@ -260,6 +264,25 @@ function ContractsSection({ projectId, project, employee, onChange }) {
       setError(extractError(err));
     }
   });
+
+  const sendSignature = async (doc) => {
+    setSendingSignatureId(doc.id);
+    setSignatureNotes((n) => ({ ...n, [doc.id]: null }));
+    try {
+      const res = await employeeContractsApi.requestSignature(projectId, employee.id, doc.id);
+      setSignatureNotes((n) => ({
+        ...n,
+        [doc.id]: res.emailSent
+          ? { text: t('personnel.contract.signatureSent'), isError: false }
+          : { text: t('personnel.contract.signatureEmailFailed', { link: res.signUrl }), isError: true, link: res.signUrl },
+      }));
+      load();
+    } catch (err) {
+      setSignatureNotes((n) => ({ ...n, [doc.id]: { text: extractError(err), isError: true } }));
+    } finally {
+      setSendingSignatureId(null);
+    }
+  };
 
   const removeDoc = async (doc) => {
     if (!window.confirm(t('personnel.contract.confirmDelete'))) return;
@@ -301,22 +324,61 @@ function ContractsSection({ projectId, project, employee, onChange }) {
           <Button type="submit" loading={submittingOtrosi}>{t('personnel.contract.generateOtrosi')}</Button>
         </form>
       )}
-      <Table columns={[t('personnel.contract.table.type'), t('personnel.contract.table.number'), t('personnel.contract.table.from'), t('personnel.contract.table.to'), t('personnel.contract.table.value'), t('personnel.contract.table.pdf'), t('personnel.contract.table.docx'), '']}>
+      <Table columns={[t('personnel.contract.table.type'), t('personnel.contract.table.number'), t('personnel.contract.table.from'), t('personnel.contract.table.to'), t('personnel.contract.table.value'), t('personnel.contract.table.pdf'), t('personnel.contract.table.docx'), t('personnel.contract.table.signature'), '']}>
         {docs.map((d) => (
-          <tr key={d.id} className="border-b border-gray-100">
-            <td className="py-1 pr-3">{d.kind === 'otrosi' ? `${t('personnel.contract.otrosiLabel')} ${d.sequenceNumber}` : typeLabel(d.contractType)}</td>
-            <td className="py-1 pr-3">{d.contractPrefix ? `${d.contractPrefix}-${d.sequenceNumber}` : d.sequenceNumber}</td>
-            <td className="py-1 pr-3">{formatDate(d.effectiveFrom) || '-'}</td>
-            <td className="py-1 pr-3">{formatDate(d.effectiveTo) || '-'}</td>
-            <td className="py-1 pr-3">{money(d.valueAtIssue)}</td>
-            <td className="py-1 pr-3">{d.pdfFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(d.pdfFilePath)} target="_blank" rel="noreferrer">PDF</a> : '-'}</td>
-            <td className="py-1 pr-3">{d.docxFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(d.docxFilePath)} target="_blank" rel="noreferrer">Word</a> : '-'}</td>
-            <td className="py-1 pr-3 text-right">
-              <Can module="personal" action="delete">
-                <Button variant="danger" loading={deletingId === d.id} onClick={() => removeDoc(d)}>{t('common.delete')}</Button>
-              </Can>
-            </td>
-          </tr>
+          <Fragment key={d.id}>
+            <tr className="border-b border-gray-100 align-top">
+              <td className="py-1 pr-3">{d.kind === 'otrosi' ? `${t('personnel.contract.otrosiLabel')} ${d.sequenceNumber}` : typeLabel(d.contractType)}</td>
+              <td className="py-1 pr-3">{d.contractPrefix ? `${d.contractPrefix}-${d.sequenceNumber}` : d.sequenceNumber}</td>
+              <td className="py-1 pr-3">{formatDate(d.effectiveFrom) || '-'}</td>
+              <td className="py-1 pr-3">{formatDate(d.effectiveTo) || '-'}</td>
+              <td className="py-1 pr-3">{money(d.valueAtIssue)}</td>
+              <td className="py-1 pr-3">{d.pdfFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(d.pdfFilePath)} target="_blank" rel="noreferrer">PDF</a> : '-'}</td>
+              <td className="py-1 pr-3">{d.docxFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(d.docxFilePath)} target="_blank" rel="noreferrer">Word</a> : '-'}</td>
+              <td className="py-1 pr-3">
+                {d.signatureStatus === 'firmado' ? (
+                  <div className="flex flex-col gap-1">
+                    <Badge color="green">{t('personnel.contract.signatureStatus.firmado')}</Badge>
+                    {d.signedPdfFilePath && (
+                      <a className="text-blue-600 hover:underline text-xs" href={fileUrl(d.signedPdfFilePath)} target="_blank" rel="noreferrer">{t('personnel.contract.viewSigned')}</a>
+                    )}
+                  </div>
+                ) : d.signatureStatus === 'pendiente' ? (
+                  <Badge color="yellow">{t('personnel.contract.signatureStatus.pendiente')}</Badge>
+                ) : (
+                  <Badge>{t('personnel.contract.signatureStatus.no_solicitado')}</Badge>
+                )}
+              </td>
+              <td className="py-1 pr-3 text-right whitespace-nowrap">
+                <Can module="personal" action="edit">
+                  {d.signatureStatus !== 'firmado' && d.pdfFilePath && (
+                    <Button variant="secondary" loading={sendingSignatureId === d.id} onClick={() => sendSignature(d)}>
+                      {d.signatureStatus === 'pendiente' ? t('personnel.contract.resendSignature') : t('personnel.contract.sendSignature')}
+                    </Button>
+                  )}
+                </Can>
+                <Can module="personal" action="delete">
+                  <Button variant="danger" className="ml-2" loading={deletingId === d.id} onClick={() => removeDoc(d)}>{t('common.delete')}</Button>
+                </Can>
+              </td>
+            </tr>
+            {signatureNotes[d.id] && (
+              <tr key={`${d.id}-note`} className="border-b border-gray-100 bg-gray-50">
+                <td colSpan={9} className={`py-1 px-3 text-xs ${signatureNotes[d.id].isError ? 'text-yellow-700' : 'text-green-700'}`}>
+                  {signatureNotes[d.id].text}
+                  {signatureNotes[d.id].link && (
+                    <button
+                      type="button"
+                      className="ml-2 text-blue-600 hover:underline"
+                      onClick={() => navigator.clipboard?.writeText(signatureNotes[d.id].link)}
+                    >
+                      {t('personnel.contract.copyLink')}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            )}
+          </Fragment>
         ))}
         {docs.length === 0 && <tr><td colSpan={8} className="py-2 text-center text-gray-400">{t('personnel.contract.empty')}</td></tr>}
       </Table>

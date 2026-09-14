@@ -38,6 +38,10 @@ const list = asyncHandler(async (req, res) => {
       { model: SocialSecurityDocument, as: 'socialSecurityDocuments' },
       { model: PaymentReceipt, as: 'paymentReceipts' },
       { model: Severance, as: 'severance' },
+      // Solo lo necesario para mostrar el estado de firma en la lista (ver PersonnelListPage.jsx):
+      // el más reciente por sequenceNumber es "el documento vigente" de firma, mismo criterio que
+      // ya usa la ficha del trabajador para el otrosí.
+      { model: EmployeeContractDocument, as: 'contractDocuments', attributes: ['id', 'kind', 'sequenceNumber', 'signatureStatus'] },
     ],
     order: [['entryDate', 'DESC']],
   });
@@ -61,7 +65,7 @@ const get = asyncHandler(async (req, res) => {
 // contractTemplates.js) — ninguno es obligatorio para crear/editar un trabajador; solo se exigen
 // al momento de generar un contrato según el tipo elegido (employeeContractController.js).
 const OPTIONAL_FIELDS = [
-  'documentNumber', 'address', 'city', 'phone', 'contractObject', 'contractEndDate', 'nationality',
+  'documentNumber', 'address', 'city', 'phone', 'email', 'contractObject', 'contractEndDate', 'nationality',
   'epsName', 'pensionFundName', 'arlName', 'subcontractorLegalName', 'subcontractorNit', 'subcontractorLegalRep',
 ];
 // ENUMs de Postgres: un '' del formulario no es un valor válido, hay que normalizarlo a null.

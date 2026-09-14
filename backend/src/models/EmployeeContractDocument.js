@@ -33,6 +33,27 @@ module.exports = (sequelize) => {
     // (ver numberingService.js) — null si el proyecto no tenía número de contrato asignado en ese
     // momento. No se recalcula si el número del proyecto cambia después.
     contractPrefix: { type: DataTypes.STRING(3), allowNull: true },
+
+    // --- Firma digital por link único (ver contractSignatureService.js) ---
+    // 'no_solicitado': nunca se envió a firmar (o el documento no aplica firma, ej. severance no
+    // pasa por acá). 'pendiente': se generó un link y está esperando la firma. 'firmado': ya tiene
+    // signedPdfFilePath. El link es de un solo uso en el sentido de "una sola firma posible"
+    // (signDocument rechaza volver a firmar si ya está 'firmado'), pero el mismo token se conserva
+    // después de firmar para que la persona pueda seguir viendo/descargando su copia firmada.
+    signatureStatus: { type: DataTypes.ENUM('no_solicitado', 'pendiente', 'firmado'), allowNull: false, defaultValue: 'no_solicitado' },
+    // Igual que PasswordResetToken: nunca se guarda el token en claro, solo su hash — se busca por
+    // hash cuando alguien abre el link público.
+    signatureTokenHash: { type: DataTypes.STRING, allowNull: true },
+    signatureTokenExpiresAt: { type: DataTypes.DATE, allowNull: true },
+    signedAt: { type: DataTypes.DATE, allowNull: true },
+    // Trazabilidad mínima para que la firma sea certificable: quién (nombre digitado), desde dónde
+    // (IP) y cuándo (signedAt). userAgent es best-effort (puede venir vacío si el navegador no lo
+    // manda), nunca bloquea la firma si falta.
+    signerIp: { type: DataTypes.STRING, allowNull: true },
+    signerUserAgent: { type: DataTypes.STRING, allowNull: true },
+    // PDF final CON la firma estampada — se guarda aparte de pdfFilePath (el original sin firmar
+    // que se envió a revisar) para no perder ninguna de las dos versiones.
+    signedPdfFilePath: { type: DataTypes.STRING, allowNull: true },
   });
 
   EmployeeContractDocument.associate = (models) => {

@@ -322,6 +322,9 @@
       "title": "Órdenes de Compra",
       "report": "Reporte de compras",
       "newOrder": "+ Nueva orden",
+      "scanQuotation": "Cargar cotización con IA",
+      "scanning": "Leyendo cotización...",
+      "scanNeedsReview": "Se precargó el formulario con lo que se logró leer de la cotización, pero revisa con cuidado los ítems, cantidades y precios antes de guardar — algunos pueden no haberse reconocido bien.",
       "registeredSupplier": "Proveedor registrado (opcional)",
       "supplierPlaceholder": "-- ninguno / digitar manualmente --",
       "supplier": "Proveedor",
@@ -587,6 +590,8 @@
       "address": "Dirección",
       "city": "Ciudad",
       "phone": "Teléfono",
+      "email": "Correo electrónico",
+      "emailPlaceholder": "correo@ejemplo.com",
       "nationality": "Nacionalidad",
       "eps": "EPS",
       "pensionFund": "Fondo de pensión",
@@ -707,8 +712,21 @@
         "to": "Hasta",
         "value": "Valor",
         "pdf": "PDF",
-        "docx": "Word"
-      }
+        "docx": "Word",
+        "signature": "Firma"
+      },
+      "signatureStatus": {
+        "no_solicitado": "Sin firma digital",
+        "pendiente": "Pendiente de firma",
+        "firmado": "Firmado"
+      },
+      "sendSignature": "Enviar para firma",
+      "resendSignature": "Reenviar para firma",
+      "sendingSignature": "Enviando...",
+      "signatureSent": "Se envió el enlace de firma a {{email}}.",
+      "signatureEmailFailed": "No se pudo enviar el correo de firma. Comparte este enlace manualmente: {{link}}",
+      "copyLink": "Copiar enlace",
+      "viewSigned": "Ver firmado"
     }
   },
   "expenses": {
@@ -1724,6 +1742,22 @@
     "expired": "Este enlace venció. Contacta al administrador para gestionarlo manualmente.",
     "notFound": "Enlace de confirmación no encontrado o inválido.",
     "confirmFailed": "No se pudo registrar la confirmación."
+  },
+  "signContract": {
+    "title": "Firma de documento",
+    "viewDocument": "Ver documento a firmar (PDF)",
+    "viewSignedDocument": "Ver documento firmado (PDF)",
+    "fullName": "Tu nombre completo",
+    "drawHere": "Dibuja tu firma en el recuadro",
+    "clear": "Borrar y firmar de nuevo",
+    "confirmSign": "Confirmar firma",
+    "legalNote": "Al confirmar, quedará registrada la fecha, hora y dirección IP desde la que firmaste, junto con tu nombre, como constancia de tu firma electrónica sobre este documento.",
+    "nameRequired": "Escribe tu nombre completo.",
+    "signatureRequired": "Dibuja tu firma en el recuadro antes de confirmar.",
+    "alreadySigned": "Este documento ya fue firmado el {{date}}.",
+    "expired": "Este enlace venció. Solicita a la empresa que te envíe uno nuevo.",
+    "notFound": "Enlace de firma no encontrado o inválido.",
+    "signFailed": "No se pudo registrar la firma. Intenta de nuevo."
   },
   "marketStudy": {
     "title": "Estudio de Mercado de Cotizaciones",

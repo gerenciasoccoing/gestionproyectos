@@ -234,12 +234,21 @@ const approveRegistrationRequest = asyncHandler(async (req, res) => {
     tokenHash: crypto.createHash('sha256').update(rawToken).digest('hex'),
     expiresAt: new Date(Date.now() + 60 * 60 * 1000),
   });
-  await sendPasswordResetEmail({
+  // Mismo gap que ya se corrigió en companyRegistrationController#create y ya existía corregido en
+  // authController#forgotPassword: el resultado de sendPasswordResetEmail no se miraba, así que un
+  // fallo de envío (Resend caído, dominio remitente sin verificar, API key inválida/vencida)
+  // quedaba invisible — el operador veía "aprobado" en pantalla sin ninguna pista de que el correo
+  // nunca salió. El token YA quedó creado en base de datos aunque el correo falle (sigue siendo
+  // válido para generarle el enlace a mano, ver createPlatformAdmin.js/documentación de soporte).
+  const emailResult = await sendPasswordResetEmail({
     to: admin.email,
     name: admin.name,
     resetUrl: frontendUrl(`/reset-password/${rawToken}`),
     isFirstAccess: true,
   });
+  if (!emailResult.ok) {
+    console.error(`[platformAdminController] El correo de bienvenida para "${admin.email}" (empresa "${company.companyName}") NO se pudo enviar: ${emailResult.error}`);
+  }
 
   res.json({
     company: { id: company.id, companyName: company.companyName },

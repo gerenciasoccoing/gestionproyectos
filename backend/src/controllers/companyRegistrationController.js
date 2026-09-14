@@ -32,13 +32,26 @@ const create = asyncHandler(async (req, res) => {
 
   const request = await CompanyRegistrationRequest.create({ companyName, nit, contactName, contactEmail, phone });
 
+  // Antes esto fallaba en silencio de dos formas distintas y sin ningún rastro: (a) si la variable
+  // no estaba configurada, nunca se intentaba enviar nada y no quedaba ningún log diciéndolo — un
+  // operador viendo "no me llegó el correo" no tenía cómo distinguirlo de un envío que sí se
+  // intentó pero falló; (b) si SÍ se intentaba pero Resend lo rechazaba (dominio remitente sin
+  // verificar, API key inválida/vencida), el resultado de sendCompanyRequestNotification ni
+  // siquiera se miraba. Mismo criterio que ya se aplicó en authController#forgotPassword: ambos
+  // casos quedan en el log del servidor (nunca en la respuesta al cliente, que sigue siendo
+  // genérica a propósito).
   const notifyTo = process.env.PLATFORM_ADMIN_NOTIFICATION_EMAIL;
-  if (notifyTo) {
-    await sendCompanyRequestNotification({
+  if (!notifyTo) {
+    console.error('[companyRegistrationController] PLATFORM_ADMIN_NOTIFICATION_EMAIL no está configurada — no se le notificó a nadie de esta nueva solicitud. Configúrala para que el operador de la plataforma reciba estos avisos.');
+  } else {
+    const result = await sendCompanyRequestNotification({
       to: notifyTo,
       companyName, nit, contactName, contactEmail, phone,
       reviewUrl: frontendUrl('/platform-admin'),
     });
+    if (!result.ok) {
+      console.error(`[companyRegistrationController] No se pudo notificar la nueva solicitud de "${companyName}" a ${notifyTo}: ${result.error}`);
+    }
   }
 
   res.status(201).json({ message: 'Solicitud enviada. Te avisaremos por correo en cuanto sea revisada.' });

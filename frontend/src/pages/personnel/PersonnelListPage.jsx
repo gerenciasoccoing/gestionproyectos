@@ -10,7 +10,7 @@ import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 const EMPTY_FORM = {
   name: '', position: '', entryDate: '', dedicationHours: '', salaryValue: '',
-  documentType: '', documentNumber: '', address: '', city: '', phone: '', nationality: 'Colombiana',
+  documentType: '', documentNumber: '', address: '', city: '', phone: '', email: '', nationality: 'Colombiana',
   contractType: '', contractObject: '', contractEndDate: '',
   epsName: '', pensionFundName: '', arlName: '',
   subcontractorLegalName: '', subcontractorNit: '', subcontractorLegalRep: '',
@@ -121,6 +121,7 @@ export default function PersonnelListPage() {
           <Input label={t('personnel.detail.address')} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
           <Input label={t('personnel.detail.city')} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
           <Input label={t('personnel.detail.phone')} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <Input label={t('personnel.detail.email')} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder={t('personnel.detail.emailPlaceholder')} />
           <Input label={t('personnel.detail.nationality')} value={form.nationality} onChange={(e) => setForm({ ...form, nationality: e.target.value })} />
           <Input label={t('personnel.contract.object')} value={form.contractObject} onChange={(e) => setForm({ ...form, contractObject: e.target.value })} className="lg:col-span-2" />
           {NEEDS_END_DATE.has(form.contractType) && (
@@ -152,8 +153,15 @@ export default function PersonnelListPage() {
           <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
         </form>
       )}
-      <Table columns={[t('personnel.list.table.name'), t('personnel.list.table.position'), t('personnel.list.table.entry'), t('personnel.list.table.exit'), t('personnel.list.table.salary'), t('personnel.list.table.status'), '']}>
-        {employees.map((emp) => (
+      <Table columns={[t('personnel.list.table.name'), t('personnel.list.table.position'), t('personnel.list.table.entry'), t('personnel.list.table.exit'), t('personnel.list.table.salary'), t('personnel.list.table.status'), t('personnel.contract.table.signature'), '']}>
+        {employees.map((emp) => {
+          // El "vigente" para efectos de firma es el más reciente por sequenceNumber (mismo
+          // criterio que ya usa la ficha del trabajador para el otrosí) — no todos los documentos
+          // del historial, solo el que importa mostrar de un vistazo en la lista.
+          const latestDoc = (emp.contractDocuments || []).length
+            ? [...emp.contractDocuments].sort((a, b) => b.sequenceNumber - a.sequenceNumber)[0]
+            : null;
+          return (
           <tr key={emp.id} className="border-b border-gray-100">
             <td className="py-2 pr-3">{emp.name}</td>
             <td className="py-2 pr-3">{emp.position}</td>
@@ -161,6 +169,13 @@ export default function PersonnelListPage() {
             <td className="py-2 pr-3">{formatDate(emp.exitDate) || '-'}</td>
             <td className="py-2 pr-3">{money(emp.salaryValue)}</td>
             <td className="py-2 pr-3"><Badge color={emp.status === 'activo' ? 'green' : 'gray'}>{t(`personnel.list.status.${emp.status}`, emp.status)}</Badge></td>
+            <td className="py-2 pr-3">
+              {latestDoc ? (
+                <Badge color={latestDoc.signatureStatus === 'firmado' ? 'green' : latestDoc.signatureStatus === 'pendiente' ? 'yellow' : 'gray'}>
+                  {t(`personnel.contract.signatureStatus.${latestDoc.signatureStatus}`)}
+                </Badge>
+              ) : <span className="text-gray-400 text-xs">-</span>}
+            </td>
             <td className="py-2 pr-3 text-right whitespace-nowrap">
               <Link to={`../personnel/${emp.id}`} className="text-blue-600 hover:underline text-sm">{t('personnel.list.viewDetail')}</Link>
               <Can module="personal" action="delete">
@@ -168,8 +183,9 @@ export default function PersonnelListPage() {
               </Can>
             </td>
           </tr>
-        ))}
-        {employees.length === 0 && <tr><td colSpan={7} className="py-3 text-center text-gray-400">{t('personnel.list.empty')}</td></tr>}
+          );
+        })}
+        {employees.length === 0 && <tr><td colSpan={8} className="py-3 text-center text-gray-400">{t('personnel.list.empty')}</td></tr>}
       </Table>
     </Card>
   );
