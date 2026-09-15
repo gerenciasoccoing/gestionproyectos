@@ -27,6 +27,7 @@ import PersonnelListPage from './pages/personnel/PersonnelListPage';
 import EmployeeDetailPage from './pages/personnel/EmployeeDetailPage';
 
 import ExpensesPage from './pages/expenses/ExpensesPage';
+import DeliveryFinalPage from './pages/delivery/DeliveryFinalPage';
 import ReportsPage from './pages/reports/ReportsPage';
 import ClientReportPreviewPage from './pages/reports/ClientReportPreviewPage';
 
@@ -119,6 +120,7 @@ export default function App() {
           <Route path="personnel/:employeeId" element={<EmployeeDetailPage />} />
 
           <Route path="expenses" element={<ExpensesPage />} />
+          <Route path="delivery" element={<DeliveryFinalPage />} />
           <Route path="market-study" element={<ProtectedRoute feature="estudio_mercado" module="estudio_mercado" action="view"><MarketStudiesPage /></ProtectedRoute>} />
           <Route path="market-study/:studyId" element={<ProtectedRoute feature="estudio_mercado" module="estudio_mercado" action="view"><MarketStudyDetailPage /></ProtectedRoute>} />
           <Route path="reports" element={<ReportsPage />} />

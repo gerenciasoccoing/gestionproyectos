@@ -15,6 +15,7 @@ const MODULES = [
   'terceros',
   'inventario',
   'cajas',
+  'entrega_final',
 ];
 
 const ACTIONS = ['view', 'create', 'edit', 'delete'];
@@ -44,6 +45,8 @@ const DEFAULT_ROLE_PERMISSIONS = {
     'inventario:create',
     'inventario:edit',
     'cajas:view',
+    'entrega_final:view',
+    'entrega_final:create',
   ],
   financiero: [
     'proyectos:view',
@@ -62,6 +65,9 @@ const DEFAULT_ROLE_PERMISSIONS = {
     'cajas:view',
     'cajas:create',
     'cajas:edit',
+    'entrega_final:view',
+    'entrega_final:create',
+    'entrega_final:edit',
   ],
   comercial: [
     'proyectos:view',

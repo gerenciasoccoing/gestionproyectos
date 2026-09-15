@@ -86,6 +86,12 @@ export const projectsApi = {
   uploadLocationMap: (id, formData) => client.post(`/projects/${id}/location-map`, formData).then((r) => r.data),
 };
 
+export const deliveryDocumentsApi = {
+  list: (pid) => client.get(`/projects/${pid}/delivery-documents`).then((r) => r.data),
+  create: (pid, formData) => client.post(`/projects/${pid}/delivery-documents`, formData).then((r) => r.data),
+  remove: (pid, id) => client.delete(`/projects/${pid}/delivery-documents/${id}`),
+};
+
 export const contractsApi = {
   list: (pid) => client.get(`/projects/${pid}/contracts`).then((r) => r.data),
   create: (pid, formData) => client.post(`/projects/${pid}/contracts`, formData).then((r) => r.data),

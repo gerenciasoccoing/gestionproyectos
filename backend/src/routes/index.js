@@ -38,5 +38,6 @@ router.use('/projects/:projectId/expenses', require('./expenseRoutes'));
 router.use('/projects/:projectId/risks', require('./riskRoutes'));
 router.use('/projects/:projectId/reports', require('./reportRoutes'));
 router.use('/projects/:projectId/execution', require('./executionRoutes'));
+router.use('/projects/:projectId/delivery-documents', require('./projectDeliveryDocumentRoutes'));
 
 module.exports = router;

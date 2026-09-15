@@ -98,6 +98,14 @@
   },
   "projects": {
     "title": "Proyectos",
+    "titleFinished": "Proyectos Terminados",
+    "viewFinished": "Ver Proyectos Terminados",
+    "viewActive": "Ver proyectos activos",
+    "emptyFinished": "Sin proyectos terminados.",
+    "closeProject": "Cerrar proyecto",
+    "reopenProject": "Reabrir proyecto",
+    "confirmClose": "¿Cerrar este proyecto? Pasará a \"Terminado\" y se moverá a la pestaña Proyectos Terminados. Seguirá siendo accesible para consulta y para cargar documentos de Entrega Final.",
+    "confirmReopen": "¿Reabrir este proyecto? Volverá a la lista de proyectos activos.",
     "newProject": "+ Nuevo proyecto",
     "createManual": "Crear proyecto manual",
     "name": "Nombre",
@@ -124,6 +132,7 @@
       "execution": "Ejecución",
       "personnel": "Personal",
       "expenses": "Gastos",
+      "delivery": "Entrega Final",
       "reports": "Informes",
       "marketStudy": "Estudio de Mercado"
     },
@@ -193,6 +202,30 @@
       "map": "Mapa de ubicación",
       "empty": "Sin imagen cargada"
     }
+  },
+  "delivery": {
+    "title": "Entrega Final",
+    "description": "Documentos de cierre del proyecto: factura(s), acta de entrega, liquidación, informe final y cualquier otro documento adicional. Disponible aunque el proyecto ya esté terminado.",
+    "add": "+ Agregar documento",
+    "category": "Tipo de documento",
+    "customName": "Nombre del documento",
+    "file": "Archivo",
+    "missingFile": "Debe adjuntar un archivo",
+    "categories": {
+      "factura": "Factura",
+      "acta_entrega": "Acta de entrega",
+      "liquidacion": "Liquidación",
+      "informe_final": "Informe final",
+      "otro": "Otro (nombre personalizado)"
+    },
+    "table": {
+      "name": "Documento",
+      "file": "Archivo",
+      "uploadedAt": "Fecha de carga",
+      "uploadedBy": "Cargado por"
+    },
+    "empty": "Sin documentos de entrega final todavía.",
+    "confirmDelete": "¿Eliminar este documento? Esta acción no se puede deshacer."
   },
   "execution": {
     "budget": {
@@ -1476,7 +1509,8 @@
         "gastos": "Gastos",
         "informes": "Informes",
         "cotizaciones": "Cotizaciones",
-        "terceros": "Proveedores y Clientes"
+        "terceros": "Proveedores y Clientes",
+        "entrega_final": "Entrega Final"
       }
     },
     "laborParameters": {

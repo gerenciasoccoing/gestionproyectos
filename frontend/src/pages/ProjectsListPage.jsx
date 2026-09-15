@@ -13,8 +13,11 @@ export default function ProjectsListPage() {
   const [projects, setProjects] = useState([]);
   const [clients, setClients] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [showFinished, setShowFinished] = useState(false);
   const [form, setForm] = useState({ name: '', client: '', clientId: '', description: '', consortiumId: '' });
   const [error, setError] = useState('');
+
+  const visibleProjects = projects.filter((p) => (showFinished ? p.status === 'terminado' : p.status !== 'terminado'));
 
   const load = () => projectsApi.list().then(setProjects);
   useEffect(() => {
@@ -50,11 +53,18 @@ export default function ProjectsListPage() {
     <div>
       <MotivationalBanner />
 
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-gray-900">{t('projects.title')}</h1>
-        <Can module="proyectos" action="create">
-          <Button onClick={() => setShowForm((s) => !s)}>{showForm ? t('common.cancel') : t('projects.newProject')}</Button>
-        </Can>
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <h1 className="text-xl font-bold text-gray-900">{showFinished ? t('projects.titleFinished') : t('projects.title')}</h1>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => setShowFinished((s) => !s)}>
+            {showFinished ? t('projects.viewActive') : t('projects.viewFinished')}
+          </Button>
+          {!showFinished && (
+            <Can module="proyectos" action="create">
+              <Button onClick={() => setShowForm((s) => !s)}>{showForm ? t('common.cancel') : t('projects.newProject')}</Button>
+            </Can>
+          )}
+        </div>
       </div>
 
       {showForm && (
@@ -79,7 +89,7 @@ export default function ProjectsListPage() {
 
       <Card>
         <Table columns={[t('projects.table.name'), t('projects.table.client'), t('projects.table.status'), t('projects.table.origin'), t('projects.table.users'), '']}>
-          {projects.map((p) => (
+          {visibleProjects.map((p) => (
             <tr key={p.id} className="border-b border-gray-100">
               <td className="py-2 pr-3">
                 <Link to={`/projects/${p.id}/contractual`} className="text-blue-600 hover:underline font-medium">{p.name}</Link>
@@ -95,8 +105,8 @@ export default function ProjectsListPage() {
               </td>
             </tr>
           ))}
-          {projects.length === 0 && (
-            <tr><td colSpan={6} className="py-4 text-center text-gray-400">{t('projects.empty')}</td></tr>
+          {visibleProjects.length === 0 && (
+            <tr><td colSpan={6} className="py-4 text-center text-gray-400">{showFinished ? t('projects.emptyFinished') : t('projects.empty')}</td></tr>
           )}
         </Table>
       </Card>

@@ -98,6 +98,14 @@
   },
   "projects": {
     "title": "Projects",
+    "titleFinished": "Finished Projects",
+    "viewFinished": "View Finished Projects",
+    "viewActive": "View active projects",
+    "emptyFinished": "No finished projects.",
+    "closeProject": "Close project",
+    "reopenProject": "Reopen project",
+    "confirmClose": "Close this project? It will move to \"Finished\" status and to the Finished Projects tab. It will remain accessible for viewing and for uploading Final Delivery documents.",
+    "confirmReopen": "Reopen this project? It will return to the active projects list.",
     "newProject": "+ New project",
     "createManual": "Create manual project",
     "name": "Name",
@@ -124,6 +132,7 @@
       "execution": "Execution",
       "personnel": "Personnel",
       "expenses": "Expenses",
+      "delivery": "Final Delivery",
       "reports": "Reports",
       "marketStudy": "Market Study"
     },
@@ -193,6 +202,30 @@
       "map": "Location map",
       "empty": "No image uploaded"
     }
+  },
+  "delivery": {
+    "title": "Final Delivery",
+    "description": "Project closing documents: invoice(s), delivery act, settlement, final report, and any additional document. Available even after the project is finished.",
+    "add": "+ Add document",
+    "category": "Document type",
+    "customName": "Document name",
+    "file": "File",
+    "missingFile": "You must attach a file",
+    "categories": {
+      "factura": "Invoice",
+      "acta_entrega": "Delivery act",
+      "liquidacion": "Settlement",
+      "informe_final": "Final report",
+      "otro": "Other (custom name)"
+    },
+    "table": {
+      "name": "Document",
+      "file": "File",
+      "uploadedAt": "Upload date",
+      "uploadedBy": "Uploaded by"
+    },
+    "empty": "No final delivery documents yet.",
+    "confirmDelete": "Delete this document? This action cannot be undone."
   },
   "execution": {
     "budget": {
@@ -1476,7 +1509,8 @@
         "gastos": "Expenses",
         "informes": "Reports",
         "cotizaciones": "Quotations",
-        "terceros": "Suppliers and Clients"
+        "terceros": "Suppliers and Clients",
+        "entrega_final": "Final Delivery"
       }
     },
     "laborParameters": {

@@ -47,6 +47,7 @@ const modelDefiners = [
   require('./ExpenseTax'),
   require('./ExpenseBudget'),
   require('./Risk'),
+  require('./ProjectDeliveryDocument'),
   require('./ThirdParty'),
   require('./PriceListImport'),
   require('./APUPriceHistory'),

@@ -21,6 +21,8 @@ export default function ProjectLayout() {
   const [editingConsortium, setEditingConsortium] = useState(false);
   const [consortiumDraft, setConsortiumDraft] = useState('');
   const [consortiumError, setConsortiumError] = useState('');
+  const [togglingStatus, setTogglingStatus] = useState(false);
+  const [statusError, setStatusError] = useState('');
 
   const TABS = [
     { to: 'contractual', label: t('projects.tabs.contractual') },
@@ -33,6 +35,7 @@ export default function ProjectLayout() {
     ...(hasFeature('estudio_mercado') && (isAdmin || can('estudio_mercado', 'view'))
       ? [{ to: 'market-study', label: t('projects.tabs.marketStudy') }]
       : []),
+    { to: 'delivery', label: t('projects.tabs.delivery') },
     { to: 'reports', label: t('projects.tabs.reports') },
   ];
 
@@ -81,6 +84,21 @@ export default function ProjectLayout() {
     }
   };
 
+  const toggleProjectStatus = async () => {
+    const closing = project.status !== 'terminado';
+    if (!confirm(closing ? t('projects.confirmClose') : t('projects.confirmReopen'))) return;
+    setStatusError('');
+    setTogglingStatus(true);
+    try {
+      const updated = await projectsApi.update(projectId, { status: closing ? 'terminado' : 'activo' });
+      setProject(updated);
+    } catch (err) {
+      setStatusError(extractError(err));
+    } finally {
+      setTogglingStatus(false);
+    }
+  };
+
   if (error) return <div className="text-red-600">{error}</div>;
   if (!project) return <div className="text-gray-500">{t('projects.loadingProject')}</div>;
 
@@ -103,10 +121,14 @@ export default function ProjectLayout() {
             {project.origin === 'cotizacion' && <Badge color="blue">{t('projects.fromQuotation')}</Badge>}
             <Can module="proyectos" action="edit">
               <Button variant="secondary" onClick={startEditName}>{t('common.edit')}</Button>
+              <Button variant="secondary" onClick={toggleProjectStatus} disabled={togglingStatus}>
+                {project.status !== 'terminado' ? t('projects.closeProject') : t('projects.reopenProject')}
+              </Button>
             </Can>
           </div>
         )}
         {editingName && <ErrorText>{nameError}</ErrorText>}
+        <ErrorText>{statusError}</ErrorText>
         <p className="text-sm text-gray-500">{t('projects.client')}: {project.client || '-'}</p>
 
         <div className="flex items-center flex-wrap gap-2 mt-1">
