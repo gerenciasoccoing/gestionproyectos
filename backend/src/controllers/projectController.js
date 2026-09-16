@@ -53,7 +53,16 @@ const update = asyncHandler(async (req, res) => {
   if (client !== undefined) project.client = client;
   if (clientId !== undefined) project.clientId = clientId || null;
   if (description !== undefined) project.description = description;
-  if (status !== undefined) project.status = status;
+  if (status !== undefined) {
+    // Cerrar un proyecto (cualquier estado -> 'terminado') solo exige el permiso normal de edición
+    // de Proyectos, igual que cualquier otro campo de este endpoint. Reabrirlo ('terminado' ->
+    // cualquier otro estado) queda reservado al rol 'admin' — es una decisión de negocio más
+    // sensible que un usuario con permiso de edición no debería poder tomar por su cuenta.
+    if (project.status === 'terminado' && status !== 'terminado' && !req.user.isAdmin) {
+      throw new ApiError(403, 'Solo un administrador puede reabrir un proyecto terminado');
+    }
+    project.status = status;
+  }
   if (consortiumId !== undefined) project.consortiumId = consortiumId || null;
   // Edición explícita del No. de Contrato (a diferencia del auto-llenado de contractController.js,
   // este SÍ sobreescribe): es el gesto intencional para corregirlo en cualquier momento.

@@ -121,9 +121,18 @@ export default function ProjectLayout() {
             {project.origin === 'cotizacion' && <Badge color="blue">{t('projects.fromQuotation')}</Badge>}
             <Can module="proyectos" action="edit">
               <Button variant="secondary" onClick={startEditName}>{t('common.edit')}</Button>
-              <Button variant="secondary" onClick={toggleProjectStatus} disabled={togglingStatus}>
-                {project.status !== 'terminado' ? t('projects.closeProject') : t('projects.reopenProject')}
-              </Button>
+              {/* Reabrir un proyecto terminado queda reservado al rol 'admin' (ver
+                  projectController.js#update) — un usuario con solo permiso de edición puede
+                  cerrar, pero no reabrir. */}
+              {project.status !== 'terminado' ? (
+                <Button variant="secondary" onClick={toggleProjectStatus} disabled={togglingStatus}>
+                  {t('projects.closeProject')}
+                </Button>
+              ) : isAdmin ? (
+                <Button variant="secondary" onClick={toggleProjectStatus} disabled={togglingStatus}>
+                  {t('projects.reopenProject')}
+                </Button>
+              ) : null}
             </Can>
           </div>
         )}
