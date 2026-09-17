@@ -67,4 +67,16 @@ function requireFeature(featureKey) {
   };
 }
 
-module.exports = { requirePermission, requireProjectAccess, requireOptionalProjectAccess, requireFeature };
+// Chequeo directo (no middleware) de si el usuario tiene alguno de los roles dados, POR NOMBRE —
+// para casos puntuales donde el criterio de negocio es literalmente "solo estos roles pueden ver/
+// hacer X", no una acción de un módulo del RBAC configurable (ej. reabrir un proyecto terminado,
+// ver el valor total del contrato en el listado de Proyectos). admin siempre pasa, igual que en
+// requirePermission. A diferencia de un middleware, esto se usa DENTRO de un controlador para
+// decidir qué incluir en la respuesta sin bloquear el resto del endpoint para otros roles.
+function hasAnyRole(user, roleNames) {
+  if (!user) return false;
+  if (user.isAdmin) return true;
+  return roleNames.some((r) => user.roles?.includes(r));
+}
+
+module.exports = { requirePermission, requireProjectAccess, requireOptionalProjectAccess, requireFeature, hasAnyRole };

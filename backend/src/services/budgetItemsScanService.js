@@ -25,6 +25,16 @@ function workbookToText(buffer) {
   return parts.join('\n\n').slice(0, MAX_EXCEL_TEXT_CHARS);
 }
 
+// vatIncluded es tri-estado (true/false/null) tal como lo devuelve la IA: se normaliza acá al
+// mismo vatStatus que usa budgetService.computeVatFields, para que la vista previa (y luego
+// addItemsBulk) hable el mismo lenguaje que el resto del flujo de IVA. null (sin certeza) siempre
+// cae en 'revisar' — nunca se asume 'incluido' ni 'no_incluido' por defecto.
+function vatIncludedToStatus(vatIncluded) {
+  if (vatIncluded === true) return 'incluido';
+  if (vatIncluded === false) return 'no_incluido';
+  return 'revisar';
+}
+
 function sanitizeItems(rawItems) {
   if (!Array.isArray(rawItems)) return [];
   return rawItems
@@ -35,6 +45,8 @@ function sanitizeItems(rawItems) {
       quantity: it.quantity != null ? Number(it.quantity) : null,
       unitPrice: it.unitPrice != null ? Number(it.unitPrice) : null,
       totalPrice: it.totalPrice != null ? Number(it.totalPrice) : null,
+      vatStatus: vatIncludedToStatus(it.vatIncluded),
+      vatPercent: it.vatPercent != null ? Number(it.vatPercent) : null,
     }));
 }
 

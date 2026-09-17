@@ -8,6 +8,19 @@ import useSubmitGuard from '../../hooks/useSubmitGuard';
 import ProjectApuWizard from './ProjectApuWizard';
 import ResourceConsolidationSection from './ResourceConsolidationSection';
 
+// Colores del badge de estado de IVA (ítems sin APU) — mismo criterio en la vista previa de IA y
+// en la tabla de ítems ya guardados.
+const VAT_BADGE_COLOR = { incluido: 'green', no_incluido: 'blue', revisar: 'yellow' };
+
+// Total de una fila de la vista previa de IA con el ajuste de IVA aplicado en vivo mientras el
+// usuario todavía la está revisando/corrigiendo (antes de confirmar con addItemsBulk, que hace
+// exactamente el mismo cálculo en el backend — ver budgetService.computeVatFields).
+function previewRowTotal(it) {
+  const base = Number(it.quantity || 0) * Number(it.unitCost || 0);
+  if (it.vatStatus === 'no_incluido') return base + base * (Number(it.vatPercent || 0) / 100);
+  return base;
+}
+
 // Presupuesto del Proyecto: único lugar donde se carga/edita el presupuesto en ejecución
 // (import oficial, IA sin APU, AIU, cantidades, export). "Avance por Ítem" (ProgressPage.jsx)
 // ya no tiene ninguna de estas acciones — solo registra avance sobre los ítems que este
@@ -17,9 +30,10 @@ export default function BudgetPage() {
   const { projectId } = useOutletContext();
   const [budget, setBudget] = useState(null);
   const [items, setItems] = useState([]);
+  const [budgetTotalWithVat, setBudgetTotalWithVat] = useState(0);
   const [apus, setApus] = useState([]);
   const [showItemForm, setShowItemForm] = useState(false);
-  const [itemForm, setItemForm] = useState({ apuId: '', description: '', notes: '', unit: '', quantity: '', unitCost: '' });
+  const [itemForm, setItemForm] = useState({ apuId: '', description: '', notes: '', unit: '', quantity: '', unitCost: '', vatStatus: 'revisar', vatPercent: '19' });
   const [showAiForm, setShowAiForm] = useState(false);
   const [showApuWizard, setShowApuWizard] = useState(false);
   const [aiFile, setAiFile] = useState(null);
@@ -31,6 +45,10 @@ export default function BudgetPage() {
   const [qtyDraft, setQtyDraft] = useState('');
   const [qtyError, setQtyError] = useState('');
   const [savingQty, setSavingQty] = useState(false);
+  const [editingVatId, setEditingVatId] = useState(null);
+  const [vatDraft, setVatDraft] = useState({ vatStatus: 'revisar', vatPercent: '19' });
+  const [vatError, setVatError] = useState('');
+  const [savingVat, setSavingVat] = useState(false);
   const [aiuForm, setAiuForm] = useState({ adminPercent: '0', imprevistosPercent: '0', utilidadPercent: '0' });
   const [aiuSaved, setAiuSaved] = useState(false);
   const [error, setError] = useState('');
@@ -55,6 +73,7 @@ export default function BudgetPage() {
   const load = () => budgetApi.get(projectId).then((data) => {
     setBudget(data.budget);
     setItems(data.items);
+    setBudgetTotalWithVat(data.budgetTotalWithVat || 0);
     if (data.budget) {
       setAiuForm({
         adminPercent: String(data.budget.adminPercent),
@@ -92,8 +111,10 @@ export default function BudgetPage() {
       const b = await ensureBudget();
       const payload = { ...itemForm };
       if (!payload.apuId) delete payload.apuId;
+      else { delete payload.vatStatus; delete payload.vatPercent; }
+      if (payload.vatStatus === 'revisar') delete payload.vatPercent;
       await budgetApi.addItem(projectId, b.id, payload);
-      setItemForm({ apuId: '', description: '', notes: '', unit: '', quantity: '', unitCost: '' });
+      setItemForm({ apuId: '', description: '', notes: '', unit: '', quantity: '', unitCost: '', vatStatus: 'revisar', vatPercent: '19' });
       setShowItemForm(false);
       load();
     } catch (err) {
@@ -132,6 +153,8 @@ export default function BudgetPage() {
         unit: it.unit || '',
         quantity: it.quantity != null ? String(it.quantity) : '',
         unitCost: it.unitPrice != null ? String(it.unitPrice) : '',
+        vatStatus: it.vatStatus || 'revisar',
+        vatPercent: it.vatPercent != null ? String(it.vatPercent) : '19',
       })));
     } catch (err) {
       setAiError(extractError(err));
@@ -210,6 +233,28 @@ export default function BudgetPage() {
       setQtyError(extractError(err));
     } finally {
       setSavingQty(false);
+    }
+  };
+
+  const startEditVat = (it) => {
+    setEditingVatId(it.id);
+    setVatDraft({ vatStatus: it.vatStatus || 'revisar', vatPercent: it.vatPercent != null ? String(it.vatPercent) : '19' });
+    setVatError('');
+  };
+
+  const saveVat = async (it) => {
+    setVatError('');
+    setSavingVat(true);
+    try {
+      const payload = { vatStatus: vatDraft.vatStatus };
+      if (vatDraft.vatStatus !== 'revisar') payload.vatPercent = vatDraft.vatPercent;
+      await budgetApi.updateItem(projectId, it.budgetId, it.id, payload);
+      setEditingVatId(null);
+      load();
+    } catch (err) {
+      setVatError(extractError(err));
+    } finally {
+      setSavingVat(false);
     }
   };
 
@@ -388,6 +433,7 @@ export default function BudgetPage() {
                         <th className="py-1 pr-2">{t('execution.budget.items.unit')}</th>
                         <th className="py-1 pr-2">{t('execution.budget.items.budgetedQty')}</th>
                         <th className="py-1 pr-2">{t('execution.budget.items.unitValue')}</th>
+                        <th className="py-1 pr-2">{t('execution.budget.items.vat.title')}</th>
                         <th className="py-1 pr-2 text-right">{t('execution.budget.items.table.total')}</th>
                         <th></th>
                       </tr>
@@ -407,21 +453,42 @@ export default function BudgetPage() {
                           <td className="py-1 pr-2">
                             <input className="border border-gray-300 rounded px-2 py-1 w-28 text-right" type="number" min="0" step="0.01" value={it.unitCost} onChange={(e) => updateAiPreviewField(idx, 'unitCost', e.target.value)} />
                           </td>
-                          <td className="py-1 pr-2 text-right whitespace-nowrap">{money(Number(it.quantity || 0) * Number(it.unitCost || 0))}</td>
+                          <td className="py-1 pr-2">
+                            <div className="flex items-center gap-1">
+                              <select
+                                className="border border-gray-300 rounded px-1 py-1 text-xs"
+                                value={it.vatStatus}
+                                onChange={(e) => updateAiPreviewField(idx, 'vatStatus', e.target.value)}
+                              >
+                                <option value="revisar">{t('execution.budget.items.vat.status.revisar')}</option>
+                                <option value="incluido">{t('execution.budget.items.vat.status.incluido')}</option>
+                                <option value="no_incluido">{t('execution.budget.items.vat.status.no_incluido')}</option>
+                              </select>
+                              {it.vatStatus !== 'revisar' && (
+                                <input
+                                  className="border border-gray-300 rounded px-1 py-1 w-14 text-right text-xs"
+                                  type="number" min="0" max="100" step="0.01"
+                                  value={it.vatPercent}
+                                  onChange={(e) => updateAiPreviewField(idx, 'vatPercent', e.target.value)}
+                                />
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-1 pr-2 text-right whitespace-nowrap">{money(previewRowTotal(it))}</td>
                           <td className="py-1 pl-2">
                             <button type="button" className="text-red-600 hover:underline text-xs" onClick={() => removeAiPreviewRow(idx)}>{t('common.delete')}</button>
                           </td>
                         </tr>
                       ))}
                       {aiPreviewItems.length === 0 && (
-                        <tr><td colSpan={6} className="py-3 text-center text-gray-400">{t('execution.budget.items.aiPreviewEmpty')}</td></tr>
+                        <tr><td colSpan={7} className="py-3 text-center text-gray-400">{t('execution.budget.items.aiPreviewEmpty')}</td></tr>
                       )}
                     </tbody>
                   </table>
                 </div>
                 <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
                   <p className="text-sm font-medium">
-                    {t('execution.budget.items.aiPreviewTotal', { amount: money(aiPreviewItems.reduce((s, it) => s + Number(it.quantity || 0) * Number(it.unitCost || 0), 0)) })}
+                    {t('execution.budget.items.aiPreviewTotal', { amount: money(aiPreviewItems.reduce((s, it) => s + previewRowTotal(it), 0)) })}
                   </p>
                   <div className="flex gap-2">
                     <Button variant="secondary" onClick={cancelAiForm}>{t('common.cancel')}</Button>
@@ -453,12 +520,24 @@ export default function BudgetPage() {
             <Input label={t('execution.budget.items.unit')} value={itemForm.unit} onChange={(e) => setItemForm({ ...itemForm, unit: e.target.value })} required />
             <Input label={t('execution.budget.items.budgetedQty')} type="number" min="0" step="0.01" value={itemForm.quantity} onChange={(e) => setItemForm({ ...itemForm, quantity: e.target.value })} required />
             <Input label={t('execution.budget.items.unitValue')} type="number" min="0" step="0.01" value={itemForm.unitCost} onChange={(e) => setItemForm({ ...itemForm, unitCost: e.target.value })} disabled={!!itemForm.apuId} required />
+            {!itemForm.apuId && (
+              <>
+                <Select label={t('execution.budget.items.vat.title')} value={itemForm.vatStatus} onChange={(e) => setItemForm({ ...itemForm, vatStatus: e.target.value })}>
+                  <option value="revisar">{t('execution.budget.items.vat.status.revisar')}</option>
+                  <option value="incluido">{t('execution.budget.items.vat.status.incluido')}</option>
+                  <option value="no_incluido">{t('execution.budget.items.vat.status.no_incluido')}</option>
+                </Select>
+                {itemForm.vatStatus !== 'revisar' && (
+                  <Input label={t('execution.budget.items.vat.percent')} type="number" min="0" max="100" step="0.01" value={itemForm.vatPercent} onChange={(e) => setItemForm({ ...itemForm, vatPercent: e.target.value })} />
+                )}
+              </>
+            )}
             <Button type="submit" loading={submittingItem}>{t('execution.budget.items.save')}</Button>
             <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
           </form>
         )}
 
-        <Table columns={[t('execution.budget.items.table.code'), t('execution.budget.items.table.description'), t('execution.budget.items.table.budgetedQty'), t('execution.budget.items.table.unitValue'), t('execution.budget.items.table.total'), '']}>
+        <Table columns={[t('execution.budget.items.table.code'), t('execution.budget.items.table.description'), t('execution.budget.items.table.budgetedQty'), t('execution.budget.items.table.unitValue'), t('execution.budget.items.vat.title'), t('execution.budget.items.table.total'), '']}>
           {items.map((it) => (
             <Fragment key={it.id}>
             <tr className="border-b border-gray-100">
@@ -487,7 +566,49 @@ export default function BudgetPage() {
                 )}
               </td>
               <td className="py-2 pr-3">{money(it.unitCost)}</td>
-              <td className="py-2 pr-3">{money(it.totalCost)}</td>
+              <td className="py-2 pr-3">
+                {it.apuId ? (
+                  <span className="text-xs text-gray-400">{t('execution.budget.items.vat.status.no_aplica')}</span>
+                ) : editingVatId === it.id ? (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <select
+                      className="border border-gray-300 rounded px-1 py-1 text-xs"
+                      value={vatDraft.vatStatus}
+                      onChange={(e) => setVatDraft({ ...vatDraft, vatStatus: e.target.value })}
+                    >
+                      <option value="revisar">{t('execution.budget.items.vat.status.revisar')}</option>
+                      <option value="incluido">{t('execution.budget.items.vat.status.incluido')}</option>
+                      <option value="no_incluido">{t('execution.budget.items.vat.status.no_incluido')}</option>
+                    </select>
+                    {vatDraft.vatStatus !== 'revisar' && (
+                      <input
+                        className="border border-gray-300 rounded px-1 py-1 w-14 text-right text-xs"
+                        type="number" min="0" max="100" step="0.01"
+                        value={vatDraft.vatPercent}
+                        onChange={(e) => setVatDraft({ ...vatDraft, vatPercent: e.target.value })}
+                      />
+                    )}
+                    <Button variant="secondary" disabled={savingVat} onClick={() => saveVat(it)}>{t('common.save')}</Button>
+                    <Button variant="ghost" onClick={() => setEditingVatId(null)}>{t('common.cancel')}</Button>
+                  </div>
+                ) : (
+                  <span className="inline-flex items-center gap-2">
+                    <Badge color={VAT_BADGE_COLOR[it.vatStatus] || 'gray'}>
+                      {t(`execution.budget.items.vat.badge.${it.vatStatus}`, it.vatStatus)}
+                      {it.vatStatus !== 'revisar' && it.vatPercent != null ? ` (${Number(it.vatPercent)}%)` : ''}
+                    </Badge>
+                    <Can module="ejecucion" action="edit">
+                      <button type="button" className="text-blue-600 hover:underline text-xs" onClick={() => startEditVat(it)}>{t('common.edit')}</button>
+                    </Can>
+                  </span>
+                )}
+              </td>
+              <td className="py-2 pr-3">
+                {money(it.totalWithVat != null ? it.totalWithVat : it.totalCost)}
+                {it.vatStatus === 'no_incluido' && (
+                  <div className="text-xs text-gray-400">{t('execution.budget.items.vat.includesNote', { amount: money(it.vatAmount) })}</div>
+                )}
+              </td>
               <td className="py-2 pr-3 text-right">
                 {it.apuId && (
                   <Button variant="secondary" onClick={() => toggleApuDetail(it)}>
@@ -498,16 +619,24 @@ export default function BudgetPage() {
             </tr>
             {expandedApuItemId === it.id && (
               <tr className="border-b border-gray-100 bg-gray-50">
-                <td colSpan={6} className="py-3 px-3">
+                <td colSpan={7} className="py-3 px-3">
                   <ApuDetailView loading={apuDetailLoading} error={apuDetailError} detail={apuDetail} />
                 </td>
               </tr>
             )}
             </Fragment>
           ))}
-          {items.length === 0 && <tr><td colSpan={6} className="py-3 text-center text-gray-400">{t('execution.budget.items.empty')}</td></tr>}
+          {items.length === 0 && <tr><td colSpan={7} className="py-3 text-center text-gray-400">{t('execution.budget.items.empty')}</td></tr>}
+          {items.length > 0 && (
+            <tr className="border-t-2 border-gray-300 font-semibold">
+              <td className="py-2 pr-3" colSpan={5}>{t('execution.budget.items.grandTotal')}</td>
+              <td className="py-2 pr-3">{money(budgetTotalWithVat)}</td>
+              <td></td>
+            </tr>
+          )}
         </Table>
         <ErrorText>{qtyError}</ErrorText>
+        <ErrorText>{vatError}</ErrorText>
       </Card>
 
       <ResourceConsolidationSection projectId={projectId} refreshKey={items} />

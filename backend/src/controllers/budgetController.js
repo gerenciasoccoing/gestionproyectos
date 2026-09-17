@@ -1,7 +1,7 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { sequelize, Budget, BudgetItem, Project, APU, APUComponent, PriceItem } = require('../models');
-const { getBudgetItemsWithProgress, resolveBudgetItemFields, updateBudgetItemQuantity } = require('../services/budgetService');
+const { getBudgetItemsWithProgress, resolveBudgetItemFields, updateBudgetItemQuantity, updateBudgetItemVat, sumBudgetItemsWithVat } = require('../services/budgetService');
 const { importBudgetFromWorkbook } = require('../services/budgetImportService');
 const { scanBudgetItemsFile } = require('../services/budgetItemsScanService');
 const { scanItemApu, createBudgetItemsWithProjectApu } = require('../services/projectApuService');
@@ -21,10 +21,14 @@ function parseAiuPercents(body) {
   return { adminPercent, imprevistosPercent, utilidadPercent };
 }
 
-// Presupuesto vigente del proyecto (con avance calculado por ítem).
+// Presupuesto vigente del proyecto (con avance calculado por ítem). budgetTotalWithVat es el total
+// del presupuesto con el ajuste de IVA de los ítems sin APU ya aplicado (ver
+// budgetService.sumBudgetItemsWithVat) — la misma cifra que alimenta la columna "Valor total del
+// contrato" del listado de Proyectos y el Informe para Cliente, mostrada acá para que quede
+// visible también en el detalle del presupuesto.
 const getProjectBudget = asyncHandler(async (req, res) => {
   const { budget, items } = await getBudgetItemsWithProgress(req.params.projectId);
-  res.json({ budget: budget ? budget.toJSON() : null, items });
+  res.json({ budget: budget ? budget.toJSON() : null, items, budgetTotalWithVat: sumBudgetItemsWithVat(items) });
 });
 
 // Crea una nueva versión de presupuesto directamente para un proyecto manual (sin cotización).
@@ -56,18 +60,27 @@ const addItem = asyncHandler(async (req, res) => {
   const budget = await Budget.findOne({ where: { id: req.params.budgetId, projectId: req.params.projectId } });
   if (!budget) throw new ApiError(404, 'Presupuesto no encontrado');
 
-  const { apuId, description, notes, unit, quantity, unitCost } = req.body;
-  const fields = await resolveBudgetItemFields({ budget, apuId, description, notes, unit, quantity, unitCost });
+  const { apuId, description, notes, unit, quantity, unitCost, vatStatus, vatPercent } = req.body;
+  const fields = await resolveBudgetItemFields({ budget, apuId, description, notes, unit, quantity, unitCost, vatStatus, vatPercent });
   const item = await BudgetItem.create(fields);
   res.status(201).json(item);
 });
 
-// Edita la cantidad de un ítem ya agregado al presupuesto (el valor unitario y el APU/descripción
-// quedan fijos, igual que al agregarlo); recalcula su totalCost.
+// Edita un ítem ya agregado al presupuesto: cantidad (recalcula totalCost, el valor unitario y el
+// APU/descripción quedan fijos igual que al agregarlo) y/o el estado de IVA (corrección manual de
+// la detección automática o de lo digitado al crearlo — ver updateBudgetItemVat, solo aplica a
+// ítems sin APU). Ambos son independientes: se puede mandar solo uno de los dos.
 const updateItem = asyncHandler(async (req, res) => {
   const item = await BudgetItem.findOne({ where: { id: req.params.itemId, budgetId: req.params.budgetId } });
   if (!item) throw new ApiError(404, 'Ítem de presupuesto no encontrado');
-  await updateBudgetItemQuantity(item, req.body.quantity);
+  const { quantity, vatStatus, vatPercent } = req.body;
+  if (quantity !== undefined) await updateBudgetItemQuantity(item, quantity);
+  if (vatStatus !== undefined || vatPercent !== undefined) {
+    await updateBudgetItemVat(item, {
+      vatStatus: vatStatus !== undefined ? vatStatus : item.vatStatus,
+      vatPercent: vatPercent !== undefined ? vatPercent : item.vatPercent,
+    });
+  }
   res.json(item);
 });
 
@@ -134,6 +147,8 @@ const addItemsBulk = asyncHandler(async (req, res) => {
         unit: raw.unit,
         quantity: raw.quantity,
         unitCost: raw.unitCost,
+        vatStatus: raw.vatStatus,
+        vatPercent: raw.vatPercent,
         transaction: t,
       });
       rows.push(await BudgetItem.create(fields, { transaction: t }));

@@ -118,7 +118,8 @@
       "client": "Client",
       "status": "Status",
       "origin": "Origin",
-      "users": "Users"
+      "users": "Users",
+      "contractValue": "Total contract value"
     },
     "originManual": "Manual",
     "originQuotation": "Quotation",
@@ -300,6 +301,23 @@
         "aiPreviewTotal": "Total value: {{amount}}",
         "aiConfirm": "Confirm and create items",
         "aiConfirming": "Creating items…",
+        "grandTotal": "Budget total",
+        "vat": {
+          "title": "VAT",
+          "percent": "VAT %",
+          "status": {
+            "no_aplica": "Not applicable (has cost breakdown)",
+            "incluido": "Price includes VAT",
+            "no_incluido": "Price before VAT",
+            "revisar": "Review (undetermined)"
+          },
+          "badge": {
+            "incluido": "VAT included",
+            "no_incluido": "+ VAT",
+            "revisar": "Review VAT"
+          },
+          "includesNote": "Includes VAT: {{amount}}"
+        },
         "apuWizard": {
           "toggle": "Load with AI (with cost breakdown)",
           "help": "First the item list is read; then, for each item, its unit cost breakdown (APU) is read separately — from the same file or an additional one. Nothing is created until you confirm everything at the end. This cost breakdown stays private to this project: it's never compared or matched against the global price book or another project.",

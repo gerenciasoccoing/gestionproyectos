@@ -141,13 +141,16 @@ async function getCurrentBudgetForProject(projectId) {
 }
 
 // Valor total del presupuesto vigente de un proyecto (suma de totalCost de sus ítems, que ya
-// incluye el AIU aplicado — ver resolveBudgetItemFields). 0 si el proyecto aún no tiene
-// presupuesto. Usado para mostrar "valor del proyecto" en la ficha de Clientes: se toma siempre
-// del presupuesto ya registrado, nunca de un campo manual aparte.
+// incluye el AIU aplicado — ver resolveBudgetItemFields — y el ajuste de IVA de los ítems sin APU
+// que lo requieran, ver sumBudgetItemsWithVat/budgetItemTotalWithVat más abajo). 0 si el proyecto
+// aún no tiene presupuesto. Usado para mostrar "valor del proyecto" en la ficha de Clientes y como
+// "valor total del contrato" en el listado de Proyectos (ver projectController.js#list, gateado
+// por rol) y en el Informe para Cliente: se toma siempre del presupuesto ya registrado, nunca de
+// un campo manual aparte.
 async function getProjectBudgetTotal(projectId) {
   const budget = await getCurrentBudgetForProject(projectId);
   if (!budget) return 0;
-  return budget.items.reduce((sum, item) => sum + Number(item.totalCost), 0);
+  return sumBudgetItemsWithVat(budget.items);
 }
 
 // Devuelve los ítems de presupuesto del proyecto con avance acumulado, % y valor ejecutado
@@ -189,6 +192,7 @@ async function getBudgetItemsWithProgress(projectId, { from, to } = {}) {
       accumulatedQty,
       percent: Math.round(percent * 100) / 100,
       executedValue,
+      totalWithVat: budgetItemTotalWithVat(item),
     };
   });
 
@@ -223,6 +227,63 @@ async function generateUniqueItemCode({ transaction } = {}) {
   throw new ApiError(500, 'No se pudo generar un código único para el ítem, intenta de nuevo');
 }
 
+// --- IVA de ítems sin APU (contratos de suministro) ---------------------------------------------
+// Un ítem CON APU siempre queda 'no_aplica': su costo directo es costo de construcción (materiales/
+// mano de obra/equipos/transporte a precio base), nunca lleva IVA. Para ítems SIN APU, el precio
+// leído del documento (o digitado a mano) puede venir con IVA ya incluido o antes de IVA — cuando
+// ni la IA ni el usuario lo confirman con certeza, el estado seguro es 'revisar': nunca se asume
+// 'incluido' ni 'no_incluido' en silencio.
+const DEFAULT_VAT_PERCENT = 19;
+const VAT_EDITABLE_STATUSES = ['incluido', 'no_incluido', 'revisar'];
+
+function computeVatAmount(status, totalCost, percent) {
+  if (status === 'no_incluido') return Math.round(Number(totalCost) * (Number(percent) / 100) * 100) / 100;
+  // 'incluido': IVA ya embebido en totalCost, calculado hacia atrás — solo informativo (auditoría),
+  // nunca se vuelve a sumar (ver budgetItemTotalWithVat).
+  if (status === 'incluido') return Math.round((Number(totalCost) - Number(totalCost) / (1 + Number(percent) / 100)) * 100) / 100;
+  return 0;
+}
+
+// Resuelve vatStatus/vatPercent/vatAmount al crear un ítem (manual o desde la vista previa de
+// lectura por IA — ver budgetItemsScanService.js, que ya normaliza vatIncluided/vatPercent al
+// mismo vatStatus tri-estado antes de llegar acá).
+function computeVatFields({ apuId, vatStatus, vatPercent, totalCost }) {
+  if (apuId) return { vatStatus: 'no_aplica', vatPercent: null, vatAmount: 0 };
+  const status = VAT_EDITABLE_STATUSES.includes(vatStatus) ? vatStatus : 'revisar';
+  const percent = status === 'revisar' ? null : (vatPercent != null && vatPercent !== '' ? Number(vatPercent) : DEFAULT_VAT_PERCENT);
+  return { vatStatus: status, vatPercent: percent, vatAmount: computeVatAmount(status, totalCost, percent) };
+}
+
+// Corrección manual del IVA de un ítem ya creado (ver PUT .../items/:itemId en budgetController).
+async function updateBudgetItemVat(item, { vatStatus, vatPercent }) {
+  if (item.apuId) throw new ApiError(400, 'Este ítem tiene un APU asociado: el ajuste de IVA solo aplica a ítems sin APU.');
+  if (!VAT_EDITABLE_STATUSES.includes(vatStatus)) {
+    throw new ApiError(400, "vatStatus debe ser 'incluido', 'no_incluido' o 'revisar'");
+  }
+  let percent = null;
+  if (vatStatus !== 'revisar') {
+    percent = vatPercent != null && vatPercent !== '' ? Number(vatPercent) : (item.vatPercent != null ? Number(item.vatPercent) : DEFAULT_VAT_PERCENT);
+    if (Number.isNaN(percent) || percent < 0 || percent > 100) throw new ApiError(400, 'vatPercent debe estar entre 0 y 100');
+  }
+  item.vatStatus = vatStatus;
+  item.vatPercent = percent;
+  item.vatAmount = computeVatAmount(vatStatus, item.totalCost, percent);
+  await item.save();
+  return item;
+}
+
+// Total de un ítem CON el ajuste de IVA aplicado: si el precio venía antes de IVA (no_incluido) se
+// le suma el vatAmount calculado; si ya lo incluía, no aplica, o está pendiente de revisión, el
+// total se deja tal cual (nunca se inventa ni se duplica un ajuste no confirmado).
+function budgetItemTotalWithVat(item) {
+  const base = Number(item.totalCost);
+  return item.vatStatus === 'no_incluido' ? base + Number(item.vatAmount || 0) : base;
+}
+
+function sumBudgetItemsWithVat(items) {
+  return items.reduce((sum, item) => sum + budgetItemTotalWithVat(item), 0);
+}
+
 // Valida y resuelve los campos de un ítem de presupuesto antes de crearlo. La Descripción se
 // toma siempre del APU elegido (no se pide ni se duplica a mano); solo se pide como texto libre
 // para ítems manuales, sin APU asociado — que además reciben un itemCode generado (ver
@@ -230,7 +291,7 @@ async function generateUniqueItemCode({ transaction } = {}) {
 // presupuesto de Proyectos (budgetController) y el de Cotizaciones (quotationController) para
 // que ambos flujos se comporten siempre igual y una corrección futura no tenga que aplicarse
 // dos veces.
-async function resolveBudgetItemFields({ budget, apuId, description, notes, unit, quantity, unitCost, transaction }) {
+async function resolveBudgetItemFields({ budget, apuId, description, notes, unit, quantity, unitCost, vatStatus, vatPercent, transaction }) {
   if (!unit || quantity === undefined) throw new ApiError(400, 'unit y quantity son obligatorios');
   if (Number(quantity) < 0) throw new ApiError(400, 'La cantidad no puede ser negativa');
 
@@ -248,6 +309,9 @@ async function resolveBudgetItemFields({ budget, apuId, description, notes, unit
     itemCode = await generateUniqueItemCode({ transaction });
   }
 
+  const totalCost = Number(quantity) * Number(resolvedUnitCost);
+  const vat = computeVatFields({ apuId, vatStatus, vatPercent, totalCost });
+
   return {
     budgetId: budget.id,
     apuId: apuId || null,
@@ -257,13 +321,18 @@ async function resolveBudgetItemFields({ budget, apuId, description, notes, unit
     unit,
     quantity,
     unitCost: resolvedUnitCost,
-    totalCost: Number(quantity) * Number(resolvedUnitCost),
+    totalCost,
+    vatStatus: vat.vatStatus,
+    vatPercent: vat.vatPercent,
+    vatAmount: vat.vatAmount,
   };
 }
 
 // Actualiza la cantidad de un ítem de presupuesto ya agregado (compartido por Proyectos y
 // Cotizaciones, igual que resolveBudgetItemFields). El valor unitario no se recalcula: queda fijo
 // al momento de agregar el ítem, igual que el resto del flujo (ver comentario en budgetController).
+// Si el ítem tiene un vatAmount calculado (no_incluido/incluido), se recalcula sobre el nuevo
+// totalCost para que no quede desactualizado tras el cambio de cantidad.
 async function updateBudgetItemQuantity(item, quantity) {
   if (quantity === undefined || quantity === null || quantity === '') {
     throw new ApiError(400, 'quantity es obligatorio');
@@ -271,6 +340,9 @@ async function updateBudgetItemQuantity(item, quantity) {
   if (Number(quantity) < 0) throw new ApiError(400, 'La cantidad no puede ser negativa');
   item.quantity = quantity;
   item.totalCost = Number(quantity) * Number(item.unitCost);
+  if (item.vatStatus === 'no_incluido' || item.vatStatus === 'incluido') {
+    item.vatAmount = computeVatAmount(item.vatStatus, item.totalCost, item.vatPercent);
+  }
   await item.save();
   return item;
 }
@@ -278,5 +350,5 @@ async function updateBudgetItemQuantity(item, quantity) {
 module.exports = {
   computeApuUnitCost, computeSectionCosts, laborBreakdown, recomputeAndPersistApuCost, recomputeApuCostsForPriceItems,
   applyBudgetAiu, getCurrentBudgetForProject, getProjectBudgetTotal, getBudgetItemsWithProgress, resolveBudgetItemFields, updateBudgetItemQuantity,
-  generateUniqueItemCode,
+  generateUniqueItemCode, computeVatFields, updateBudgetItemVat, budgetItemTotalWithVat, sumBudgetItemsWithVat, DEFAULT_VAT_PERCENT,
 };

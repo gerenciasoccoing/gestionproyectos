@@ -2,14 +2,20 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { projectsApi, thirdPartiesApi } from '../api';
-import { Card, Button, Input, SearchSelect, Table, Badge, ErrorText, extractError } from '../components/ui';
+import { Card, Button, Input, SearchSelect, Table, Badge, ErrorText, extractError, money } from '../components/ui';
 import Can from '../components/Can';
 import MotivationalBanner from '../components/MotivationalBanner';
 import ConsortiumSelect from '../components/ConsortiumSelect';
 import useSubmitGuard from '../hooks/useSubmitGuard';
+import { useAuth } from '../context/AuthContext';
 
 export default function ProjectsListPage() {
   const { t } = useTranslation();
+  const { isAdmin, user } = useAuth();
+  // El backend (projectController.js#list) ya OMITE contractValue del payload para cualquier rol
+  // que no sea admin/gerente_proyecto — este chequeo de rol es solo para no pintar una columna
+  // vacía para esos roles, no el control de acceso real (que vive en el backend).
+  const canSeeContractValue = isAdmin || user?.roles?.includes('gerente_proyecto');
   const [projects, setProjects] = useState([]);
   const [clients, setClients] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -88,7 +94,11 @@ export default function ProjectsListPage() {
       )}
 
       <Card>
-        <Table columns={[t('projects.table.name'), t('projects.table.client'), t('projects.table.status'), t('projects.table.origin'), t('projects.table.users'), '']}>
+        <Table columns={[
+          t('projects.table.name'), t('projects.table.client'), t('projects.table.status'), t('projects.table.origin'), t('projects.table.users'),
+          ...(canSeeContractValue ? [t('projects.table.contractValue')] : []),
+          '',
+        ]}>
           {visibleProjects.map((p) => (
             <tr key={p.id} className="border-b border-gray-100">
               <td className="py-2 pr-3">
@@ -98,6 +108,7 @@ export default function ProjectsListPage() {
               <td className="py-2 pr-3"><Badge color={p.status === 'activo' ? 'green' : 'gray'}>{t(`enums.projectStatus.${p.status}`, p.status)}</Badge></td>
               <td className="py-2 pr-3">{p.origin === 'cotizacion' ? t('projects.originQuotation') : t('projects.originManual')}</td>
               <td className="py-2 pr-3">{p.Users?.length || 0}</td>
+              {canSeeContractValue && <td className="py-2 pr-3">{p.contractValue != null ? money(p.contractValue) : '-'}</td>}
               <td className="py-2 pr-3 text-right">
                 <Can module="proyectos" action="delete">
                   <Button variant="danger" onClick={() => handleDelete(p.id)}>{t('common.delete')}</Button>
@@ -106,7 +117,7 @@ export default function ProjectsListPage() {
             </tr>
           ))}
           {visibleProjects.length === 0 && (
-            <tr><td colSpan={6} className="py-4 text-center text-gray-400">{showFinished ? t('projects.emptyFinished') : t('projects.empty')}</td></tr>
+            <tr><td colSpan={canSeeContractValue ? 7 : 6} className="py-4 text-center text-gray-400">{showFinished ? t('projects.emptyFinished') : t('projects.empty')}</td></tr>
           )}
         </Table>
       </Card>

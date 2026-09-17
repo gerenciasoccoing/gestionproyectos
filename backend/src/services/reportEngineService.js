@@ -1,7 +1,7 @@
 const { Op } = require('sequelize');
 const { Project, Expense, ExpenseBudget, ProgressEntry, ProgressPhoto, Contract, Minute, Employee, ThirdParty } = require('../models');
 const ApiError = require('../utils/ApiError');
-const { getBudgetItemsWithProgress } = require('./budgetService');
+const { getBudgetItemsWithProgress, sumBudgetItemsWithVat } = require('./budgetService');
 const { getProjectTimeframe, computeSCurve } = require('./evmService');
 const { getLetterheadForProject } = require('./letterheadService');
 const { generateText, isConfigured } = require('./aiVisionService');
@@ -219,9 +219,13 @@ async function getClientReportDraft(projectId) {
     })),
     items: snapshot.items.map((i) => ({
       itemCode: i.itemCode || i.APU?.code || '-', descripcion: i.description, unidad: i.unit,
-      cantidad: Number(i.quantity), valorUnitario: Number(i.unitCost), valorTotal: Number(i.totalCost),
+      cantidad: Number(i.quantity), valorUnitario: Number(i.unitCost), valorTotal: Number(i.totalWithVat),
     })),
-    valorTotalContrato: snapshot.totalBudgetedValue,
+    // Con el ajuste de IVA de los ítems sin APU ya aplicado (ver budgetService.sumBudgetItemsWithVat)
+    // — a propósito NO es snapshot.totalBudgetedValue: ese sigue siendo la base de costo usada para
+    // el % de avance físico/económico y el Dashboard de Ejecución (ver getExecutionSnapshot), que no
+    // debe verse afectada por IVA para no distorsionar esas comparaciones internas.
+    valorTotalContrato: sumBudgetItemsWithVat(snapshot.items),
     itemsAvance,
     sCurve,
   };

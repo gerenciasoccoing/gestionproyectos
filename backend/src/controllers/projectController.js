@@ -5,6 +5,13 @@ const { deleteProjectCascade } = require('../services/projectDeletionService');
 const { assertWithinLimit } = require('../utils/planLimits');
 const { mapSeries } = require('../utils/mapSeries');
 const { relativePath } = require('../middleware/upload');
+const { hasAnyRole } = require('../middleware/authorize');
+const { getProjectBudgetTotal } = require('../services/budgetService');
+
+// Roles que pueden ver el valor total del contrato de cada proyecto en este listado (admin siempre
+// puede, vía hasAnyRole). Para cualquier otro rol el campo contractValue directamente NO se incluye
+// en la respuesta — no es solo un ocultamiento visual del frontend.
+const CONTRACT_VALUE_ROLES = ['gerente_proyecto'];
 
 const list = asyncHandler(async (req, res) => {
   const where = req.user.isAdmin ? {} : { id: req.user.projectIds };
@@ -13,7 +20,17 @@ const list = asyncHandler(async (req, res) => {
     include: [{ model: User, attributes: ['id', 'name', 'email'] }, { model: Consortium, as: 'consortium', attributes: ['id', 'name'] }],
     order: [['createdAt', 'DESC']],
   });
-  res.json(projects);
+
+  if (!hasAnyRole(req.user, CONTRACT_VALUE_ROLES)) return res.json(projects);
+
+  // mapSeries (no Promise.all): mismo patrón ya usado por thirdPartyController#getClientProjects
+  // para el mismo cálculo por proyecto — comparten la transacción/conexión de la petición (RLS).
+  const withValue = await mapSeries(projects, async (p) => {
+    const json = p.toJSON();
+    json.contractValue = await getProjectBudgetTotal(p.id);
+    return json;
+  });
+  res.json(withValue);
 });
 
 const get = asyncHandler(async (req, res) => {

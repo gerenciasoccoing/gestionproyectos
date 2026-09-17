@@ -118,7 +118,8 @@
       "client": "Cliente",
       "status": "Estado",
       "origin": "Origen",
-      "users": "Usuarios"
+      "users": "Usuarios",
+      "contractValue": "Valor total del contrato"
     },
     "originManual": "Manual",
     "originQuotation": "Cotización",
@@ -300,6 +301,23 @@
         "aiPreviewTotal": "Valor total: {{amount}}",
         "aiConfirm": "Confirmar y crear ítems",
         "aiConfirming": "Creando ítems…",
+        "grandTotal": "Total del presupuesto",
+        "vat": {
+          "title": "IVA",
+          "percent": "% IVA",
+          "status": {
+            "no_aplica": "No aplica (con APU)",
+            "incluido": "Precio incluye IVA",
+            "no_incluido": "Precio antes de IVA",
+            "revisar": "Revisar (sin determinar)"
+          },
+          "badge": {
+            "incluido": "IVA incluido",
+            "no_incluido": "+ IVA",
+            "revisar": "Revisar IVA"
+          },
+          "includesNote": "Incluye IVA: {{amount}}"
+        },
         "apuWizard": {
           "toggle": "Cargar con IA (con APU)",
           "help": "Primero se lee la lista de ítems del presupuesto; luego, para cada ítem, se lee su análisis unitario (APU) por separado — del mismo archivo o de uno adicional. Nada se crea hasta confirmar todo al final. Este APU queda privado de este proyecto: nunca se compara ni se cruza con la Base de Precios global ni con otro proyecto.",
