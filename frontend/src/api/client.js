@@ -106,3 +106,21 @@ export async function postAndDownload(path, data, fallbackFilename) {
   a.remove();
   window.URL.revokeObjectURL(url);
 }
+
+// Igual que postAndDownload, pero por GET con query params (filtros de fecha/tipo de retención de
+// Pagos al Proyecto) en vez de un body — evita exponer el token en la URL como haría un <a href>
+// directo, y dispara el diálogo de guardado con el nombre real que manda el backend.
+export async function getAndDownload(path, params, fallbackFilename) {
+  const res = await client.get(path, { params, responseType: 'blob' });
+  const disposition = res.headers['content-disposition'] || '';
+  const match = disposition.match(/filename="([^"]+)"/);
+  const filename = match ? match[1] : fallbackFilename;
+  const url = window.URL.createObjectURL(res.data);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}

@@ -97,6 +97,7 @@ export default function ProjectsListPage() {
         <Table columns={[
           t('projects.table.name'), t('projects.table.client'), t('projects.table.status'), t('projects.table.origin'), t('projects.table.users'),
           ...(canSeeContractValue ? [t('projects.table.contractValue')] : []),
+          ...(showFinished ? [t('projects.table.closeBalance'), t('projects.table.closedBy')] : []),
           '',
         ]}>
           {visibleProjects.map((p) => (
@@ -109,6 +110,12 @@ export default function ProjectsListPage() {
               <td className="py-2 pr-3">{p.origin === 'cotizacion' ? t('projects.originQuotation') : t('projects.originManual')}</td>
               <td className="py-2 pr-3">{p.Users?.length || 0}</td>
               {canSeeContractValue && <td className="py-2 pr-3">{p.contractValue != null ? money(p.contractValue) : '-'}</td>}
+              {showFinished && (
+                <>
+                  <td className="py-2 pr-3" title={p.closeObservation || ''}>{p.closeRealBalance != null ? money(p.closeRealBalance) : '-'}</td>
+                  <td className="py-2 pr-3">{p.closedByUser?.name || '-'}</td>
+                </>
+              )}
               <td className="py-2 pr-3 text-right">
                 <Can module="proyectos" action="delete">
                   <Button variant="danger" onClick={() => handleDelete(p.id)}>{t('common.delete')}</Button>
@@ -117,7 +124,7 @@ export default function ProjectsListPage() {
             </tr>
           ))}
           {visibleProjects.length === 0 && (
-            <tr><td colSpan={canSeeContractValue ? 7 : 6} className="py-4 text-center text-gray-400">{showFinished ? t('projects.emptyFinished') : t('projects.empty')}</td></tr>
+            <tr><td colSpan={canSeeContractValue ? (showFinished ? 9 : 7) : (showFinished ? 8 : 6)} className="py-4 text-center text-gray-400">{showFinished ? t('projects.emptyFinished') : t('projects.empty')}</td></tr>
           )}
         </Table>
       </Card>

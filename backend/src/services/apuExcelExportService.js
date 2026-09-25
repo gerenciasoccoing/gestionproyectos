@@ -445,6 +445,71 @@ async function generateScheduleExcelBuffer({ project, schedule }) {
   return workbook.xlsx.writeBuffer();
 }
 
+// "Pagos al proyecto": hoja de resumen (para conciliar contra certificados tributarios del
+// cliente, ver task) + hoja de detalle con una fila por pago y una fila extra por cada retención
+// suya, para poder filtrar/sumar en Excel sin perder el desglose.
+async function generateProjectPaymentsExcelBuffer({ project, summary, movements }) {
+  const workbook = new ExcelJS.Workbook();
+
+  const summarySheet = workbook.addWorksheet('Resumen');
+  summarySheet.columns = [{ width: 36 }, { width: 20 }];
+  mergeAndStyle(summarySheet, 'A1:B1', `Pagos al Proyecto — ${project?.name || ''}`, { bold: true, size: 12, border: null, fill: null });
+  const summaryRows = [
+    ['Valor ejecutado', summary.executedValue],
+    ['Total bruto reconocido', summary.totalGross],
+    ['Total retenciones', summary.totalWithholdings],
+    ['Total neto recibido', summary.totalNet],
+    ['Retenciones recuperables pendientes', summary.recoverablePending],
+    ['Saldo real', summary.saldoReal],
+  ];
+  let row = 3;
+  summaryRows.forEach(([label, value]) => {
+    setCell(summarySheet, `A${row}`, label, { align: 'left', bold: true, border: BOX_BORDER });
+    setCell(summarySheet, `B${row}`, Number(value), { align: 'right', numFmt: CURRENCY_FMT, border: BOX_BORDER });
+    row += 1;
+  });
+  setCell(summarySheet, `A${row}`, '% pagado sobre lo ejecutado', { align: 'left', bold: true, border: BOX_BORDER });
+  setCell(summarySheet, `B${row}`, Number(summary.percentPaid) / 100, { align: 'right', numFmt: PERCENT_FMT, border: BOX_BORDER });
+  row += 2;
+  setCell(summarySheet, `A${row}`, 'Retenciones por tipo', { bold: true, border: null });
+  row += 1;
+  (summary.withholdingsByType || []).forEach((w) => {
+    setCell(summarySheet, `A${row}`, w.typeName, { align: 'left', border: BOX_BORDER });
+    setCell(summarySheet, `B${row}`, Number(w.total), { align: 'right', numFmt: CURRENCY_FMT, border: BOX_BORDER });
+    row += 1;
+  });
+
+  const detailSheet = workbook.addWorksheet('Detalle de pagos');
+  detailSheet.columns = [{ width: 12 }, { width: 30 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 20 }, { width: 20 }, { width: 26 }, { width: 14 }, { width: 12 }];
+  ['Fecha', 'Concepto', 'Bruto', 'Retenciones', 'Neto', 'Caja', 'Registró', 'Tipo de retención', 'Valor retención', 'Devuelta'].forEach((label, i) => {
+    setCell(detailSheet, `${String.fromCharCode(65 + i)}1`, label, { bold: true, fill: GRAY_FILL, border: BOX_BORDER, align: i <= 1 ? 'left' : 'center' });
+  });
+  let r = 2;
+  if (!movements.length) {
+    mergeAndStyle(detailSheet, `A${r}:J${r}`, EMPTY_ROW_LABEL, { align: 'center', border: BOX_BORDER });
+  } else {
+    movements.forEach((m) => {
+      const withholdings = m.withholdings?.length ? m.withholdings : [null];
+      withholdings.forEach((w, i) => {
+        setCell(detailSheet, `A${r}`, m.date, { align: 'center', border: BOX_BORDER });
+        setCell(detailSheet, `B${r}`, i === 0 ? `${m.concept}${m.isWithholdingReturn ? ' (devolución de retención)' : ''}` : '', { align: 'left', border: BOX_BORDER });
+        setCell(detailSheet, `C${r}`, i === 0 ? Number(m.grossAmount ?? m.amount) : null, { align: 'right', numFmt: CURRENCY_FMT, border: BOX_BORDER });
+        setCell(detailSheet, `D${r}`, i === 0 ? Number(m.grossAmount ?? m.amount) - Number(m.amount) : null, { align: 'right', numFmt: CURRENCY_FMT, border: BOX_BORDER });
+        setCell(detailSheet, `E${r}`, i === 0 ? Number(m.amount) : null, { align: 'right', numFmt: CURRENCY_FMT, border: BOX_BORDER });
+        setCell(detailSheet, `F${r}`, i === 0 ? (m.CashBox?.name || '-') : '', { align: 'left', border: BOX_BORDER });
+        setCell(detailSheet, `G${r}`, i === 0 ? (m.User?.name || '-') : '', { align: 'left', border: BOX_BORDER });
+        setCell(detailSheet, `H${r}`, w ? w.typeName : '', { align: 'left', border: BOX_BORDER });
+        setCell(detailSheet, `I${r}`, w ? Number(w.value) : null, { align: 'right', numFmt: w ? CURRENCY_FMT : null, border: BOX_BORDER });
+        setCell(detailSheet, `J${r}`, w ? (w.recoverable ? (w.returned ? 'Sí' : 'Pendiente') : '-') : '', { align: 'center', border: BOX_BORDER });
+        r += 1;
+      });
+    });
+  }
+
+  return workbook.xlsx.writeBuffer();
+}
+
 module.exports = {
   generateApuExcelBuffer, generateBudgetWithApuAnnexExcelBuffer, generateResourceConsolidationExcelBuffer, generateScheduleExcelBuffer,
+  generateProjectPaymentsExcelBuffer,
 };

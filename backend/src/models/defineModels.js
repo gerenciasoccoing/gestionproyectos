@@ -58,6 +58,8 @@ const modelDefiners = [
   require('./InventoryConfirmation'),
   require('./CashBox'),
   require('./CashBoxMovement'),
+  require('./WithholdingType'),
+  require('./CashBoxMovementWithholding'),
 ];
 
 // Company (la tabla de empresas en sí), Permission (catálogo global fijo de permisos, no datos de

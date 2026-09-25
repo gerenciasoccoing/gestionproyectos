@@ -16,6 +16,7 @@ router.use('/inventory-confirmations', require('./inventoryConfirmationRoutes'))
 router.use('/purchase-orders', require('./globalPurchaseOrderRoutes'));
 router.use('/market-studies', require('./globalMarketStudyRoutes'));
 router.use('/cash-boxes', require('./cashBoxRoutes'));
+router.use('/withholding-types', require('./withholdingTypeRoutes'));
 router.use('/expenses', require('./globalExpenseRoutes'));
 router.use('/platform-admin', require('./platformAdminRoutes'));
 router.use('/employee-contract-types', require('./employeeContractTypeRoutes'));
@@ -39,5 +40,6 @@ router.use('/projects/:projectId/risks', require('./riskRoutes'));
 router.use('/projects/:projectId/reports', require('./reportRoutes'));
 router.use('/projects/:projectId/execution', require('./executionRoutes'));
 router.use('/projects/:projectId/delivery-documents', require('./projectDeliveryDocumentRoutes'));
+router.use('/projects/:projectId/payments', require('./projectPaymentsRoutes'));
 
 module.exports = router;

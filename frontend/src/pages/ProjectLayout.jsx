@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { projectsApi } from '../api';
-import { Badge, Button, Input, ErrorText, extractError } from '../components/ui';
+import { Badge, Button, Input, ErrorText, extractError, money } from '../components/ui';
 import { fileUrl } from '../api/client';
 import Can from '../components/Can';
 import { useAuth } from '../context/AuthContext';
 import ConsortiumSelect from '../components/ConsortiumSelect';
+import CloseProjectModal from '../components/CloseProjectModal';
 
 export default function ProjectLayout() {
   const { t } = useTranslation();
@@ -23,12 +24,14 @@ export default function ProjectLayout() {
   const [consortiumError, setConsortiumError] = useState('');
   const [togglingStatus, setTogglingStatus] = useState(false);
   const [statusError, setStatusError] = useState('');
+  const [showCloseModal, setShowCloseModal] = useState(false);
 
   const TABS = [
     { to: 'contractual', label: t('projects.tabs.contractual') },
     { to: 'execution', label: t('projects.tabs.execution') },
     { to: 'personnel', label: t('projects.tabs.personnel') },
     { to: 'expenses', label: t('projects.tabs.expenses') },
+    { to: 'payments', label: t('projects.tabs.payments') },
     // Módulo "plus" (ver Company.enabledFeatures): el tab ni aparece si la empresa no lo tiene
     // activado, sin importar el permiso del usuario (isAdmin incluido) — mismo criterio que
     // requireFeature en el backend.
@@ -84,6 +87,9 @@ export default function ProjectLayout() {
     }
   };
 
+  // Usado para: cerrar con saldo real <= 0 (sin observación) y reabrir (admin). Cerrar con saldo
+  // real pendiente pasa por CloseProjectModal en su lugar (ver render de abajo), que exige la
+  // observación antes de llamar a projectsApi.update.
   const toggleProjectStatus = async () => {
     const closing = project.status !== 'terminado';
     if (!confirm(closing ? t('projects.confirmClose') : t('projects.confirmReopen'))) return;
@@ -97,6 +103,11 @@ export default function ProjectLayout() {
     } finally {
       setTogglingStatus(false);
     }
+  };
+
+  const handleClosed = (updated) => {
+    setProject(updated);
+    setShowCloseModal(false);
   };
 
   if (error) return <div className="text-red-600">{error}</div>;
@@ -123,11 +134,23 @@ export default function ProjectLayout() {
               <Button variant="secondary" onClick={startEditName}>{t('common.edit')}</Button>
               {/* Reabrir un proyecto terminado queda reservado al rol 'admin' (ver
                   projectController.js#update) — un usuario con solo permiso de edición puede
-                  cerrar, pero no reabrir. */}
+                  cerrar, pero no reabrir. Cerrar con saldo real pendiente también queda reservado
+                  al rol 'admin' (con observación obligatoria vía CloseProjectModal); con saldo
+                  real <= 0 cualquiera con este permiso cierra directo, como siempre. */}
               {project.status !== 'terminado' ? (
-                <Button variant="secondary" onClick={toggleProjectStatus} disabled={togglingStatus}>
-                  {t('projects.closeProject')}
-                </Button>
+                project.saldoReal > 0 && !isAdmin ? (
+                  <Button variant="secondary" disabled title={t('projects.pendingBalanceMessage', { amount: money(project.saldoReal) })}>
+                    {t('projects.closeProject')}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    onClick={() => (project.saldoReal > 0 ? setShowCloseModal(true) : toggleProjectStatus())}
+                    disabled={togglingStatus}
+                  >
+                    {t('projects.closeProject')}
+                  </Button>
+                )
               ) : isAdmin ? (
                 <Button variant="secondary" onClick={toggleProjectStatus} disabled={togglingStatus}>
                   {t('projects.reopenProject')}
@@ -138,6 +161,12 @@ export default function ProjectLayout() {
         )}
         {editingName && <ErrorText>{nameError}</ErrorText>}
         <ErrorText>{statusError}</ErrorText>
+        {project.status !== 'terminado' && project.saldoReal > 0 && !isAdmin && (
+          <p className="text-xs text-yellow-700 mt-1">
+            {t('projects.pendingBalanceMessage', { amount: money(project.saldoReal) })}{' '}
+            <Link to="payments" className="underline">{t('projects.tabs.payments')}</Link>
+          </p>
+        )}
         <p className="text-sm text-gray-500">{t('projects.client')}: {project.client || '-'}</p>
 
         <div className="flex items-center flex-wrap gap-2 mt-1">
@@ -177,6 +206,10 @@ export default function ProjectLayout() {
       </nav>
 
       <Outlet context={{ project, projectId }} />
+
+      {showCloseModal && (
+        <CloseProjectModal projectId={projectId} onClose={() => setShowCloseModal(false)} onClosed={handleClosed} />
+      )}
     </div>
   );
 }

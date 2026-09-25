@@ -1,4 +1,4 @@
-import client, { postAndDownload, platformAdminClient } from './client';
+import client, { postAndDownload, getAndDownload, platformAdminClient } from './client';
 
 export const authApi = {
   login: (email, password) => client.post('/auth/login', { email, password }).then((r) => r.data),
@@ -267,7 +267,25 @@ export const cashBoxesApi = {
   create: (data) => client.post('/cash-boxes', data).then((r) => r.data),
   update: (id, data) => client.put(`/cash-boxes/${id}`, data).then((r) => r.data),
   setStatus: (id, status) => client.post(`/cash-boxes/${id}/status`, { status }).then((r) => r.data),
-  addMovement: (id, data) => client.post(`/cash-boxes/${id}/movements`, data).then((r) => r.data),
+  // formData: siempre FormData (aunque no haya archivo de soporte) — el backend acepta
+  // withholdings como JSON serializado en un campo de texto dentro del multipart.
+  addMovement: (id, formData) => client.post(`/cash-boxes/${id}/movements`, formData).then((r) => r.data),
+  updateMovement: (id, movementId, formData) => client.put(`/cash-boxes/${id}/movements/${movementId}`, formData).then((r) => r.data),
+  removeMovement: (id, movementId) => client.delete(`/cash-boxes/${id}/movements/${movementId}`).then((r) => r.data),
+};
+
+export const withholdingTypesApi = {
+  list: () => client.get('/withholding-types').then((r) => r.data),
+  create: (data) => client.post('/withholding-types', data).then((r) => r.data),
+  update: (id, data) => client.put(`/withholding-types/${id}`, data).then((r) => r.data),
+  setStatus: (id, active) => client.post(`/withholding-types/${id}/status`, { active }).then((r) => r.data),
+};
+
+export const projectPaymentsApi = {
+  summary: (pid) => client.get(`/projects/${pid}/payments/summary`).then((r) => r.data),
+  list: (pid, params) => client.get(`/projects/${pid}/payments`, { params }).then((r) => r.data),
+  exportPdf: (pid, params) => getAndDownload(`/projects/${pid}/payments/export-pdf`, params, 'pagos-proyecto.pdf'),
+  exportExcel: (pid, params) => getAndDownload(`/projects/${pid}/payments/export-excel`, params, 'pagos-proyecto.xlsx'),
 };
 
 export const thirdPartiesApi = {

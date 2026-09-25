@@ -28,6 +28,7 @@ import EmployeeDetailPage from './pages/personnel/EmployeeDetailPage';
 
 import ExpensesPage from './pages/expenses/ExpensesPage';
 import DeliveryFinalPage from './pages/delivery/DeliveryFinalPage';
+import ProjectPaymentsPage from './pages/payments/ProjectPaymentsPage';
 import ReportsPage from './pages/reports/ReportsPage';
 import ClientReportPreviewPage from './pages/reports/ClientReportPreviewPage';
 
@@ -54,6 +55,7 @@ import AdminLayout from './pages/admin/AdminLayout';
 import UsersPage from './pages/admin/UsersPage';
 import RolesPage from './pages/admin/RolesPage';
 import LaborParametersPage from './pages/admin/LaborParametersPage';
+import WithholdingTypesPage from './pages/admin/WithholdingTypesPage';
 import CompanySettingsPage from './pages/admin/CompanySettingsPage';
 import ConsortiumsPage from './pages/admin/ConsortiumsPage';
 
@@ -97,6 +99,7 @@ export default function App() {
           <Route path="users" element={<UsersPage />} />
           <Route path="roles" element={<RolesPage />} />
           <Route path="labor-parameters" element={<LaborParametersPage />} />
+          <Route path="withholding-types" element={<WithholdingTypesPage />} />
           <Route path="company" element={<CompanySettingsPage />} />
           <Route path="consortiums" element={<ConsortiumsPage />} />
         </Route>
@@ -121,6 +124,7 @@ export default function App() {
 
           <Route path="expenses" element={<ExpensesPage />} />
           <Route path="delivery" element={<DeliveryFinalPage />} />
+          <Route path="payments" element={<ProjectPaymentsPage />} />
           <Route path="market-study" element={<ProtectedRoute feature="estudio_mercado" module="estudio_mercado" action="view"><MarketStudiesPage /></ProtectedRoute>} />
           <Route path="market-study/:studyId" element={<ProtectedRoute feature="estudio_mercado" module="estudio_mercado" action="view"><MarketStudyDetailPage /></ProtectedRoute>} />
           <Route path="reports" element={<ReportsPage />} />

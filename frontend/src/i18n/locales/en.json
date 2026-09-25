@@ -106,6 +106,16 @@
     "reopenProject": "Reopen project",
     "confirmClose": "Close this project? It will move to \"Finished\" status and to the Finished Projects tab. It will remain accessible for viewing and for uploading Final Delivery documents.",
     "confirmReopen": "Reopen this project? It will return to the active projects list.",
+    "pendingBalanceMessage": "Cannot close: a real balance of {{amount}} is still pending. Complete it from",
+    "closeModal": {
+      "title": "Close project with pending balance",
+      "help": "This project has a pending real balance. As an administrator you can still close it, but you must explain why.",
+      "observationLabel": "Observation (required, minimum 10 characters)",
+      "observationPlaceholder": "E.g.: the client will pay the remaining balance next week per verbal agreement.",
+      "observationTooShort": "The observation must be at least {{min}} characters long.",
+      "recoverableWarning": "There are recoverable withholdings pending return for {{amount}}. This does not block closing.",
+      "confirm": "Close project"
+    },
     "newProject": "+ New project",
     "createManual": "Create manual project",
     "name": "Name",
@@ -119,7 +129,9 @@
       "status": "Status",
       "origin": "Origin",
       "users": "Users",
-      "contractValue": "Total contract value"
+      "contractValue": "Total contract value",
+      "closeBalance": "Balance at closing",
+      "closedBy": "Closed by"
     },
     "originManual": "Manual",
     "originQuotation": "Quotation",
@@ -133,6 +145,7 @@
       "execution": "Execution",
       "personnel": "Personnel",
       "expenses": "Expenses",
+      "payments": "Project Payments",
       "delivery": "Final Delivery",
       "reports": "Reports",
       "marketStudy": "Market Study"
@@ -227,6 +240,52 @@
     },
     "empty": "No final delivery documents yet.",
     "confirmDelete": "Delete this document? This action cannot be undone."
+  },
+  "payments": {
+    "closeCard": {
+      "title": "Project closing",
+      "realBalance": "Real balance at closing",
+      "closedBy": "Closed by",
+      "closedAt": "Closing date",
+      "observation": "Observation"
+    },
+    "summary": {
+      "title": "Summary",
+      "contractValue": "Contract value (reference)",
+      "executedValue": "Executed value",
+      "totalGross": "Total gross recognized",
+      "totalWithholdings": "Total withholdings",
+      "totalNet": "Total net received",
+      "recoverablePending": "Recoverable withholdings pending",
+      "saldoReal": "Real balance",
+      "percentPaid": "% paid over executed",
+      "withholdingsByType": "Withholdings by type"
+    },
+    "list": {
+      "title": "Payments list",
+      "from": "From",
+      "to": "To",
+      "withholdingType": "Withholding type",
+      "allTypes": "All types",
+      "date": "Date",
+      "concept": "Concept",
+      "gross": "Gross",
+      "withholdings": "Withholdings",
+      "net": "Net",
+      "cashBox": "Cash box",
+      "user": "Registered by",
+      "support": "Support",
+      "returnBadge": "Return",
+      "hideDetail": "Hide detail",
+      "viewDetail": "View detail",
+      "base": "Base",
+      "percent": "%",
+      "value": "Value",
+      "status": "Status",
+      "returned": "Returned",
+      "pendingReturn": "Pending return",
+      "empty": "No payments registered."
+    }
   },
   "execution": {
     "budget": {
@@ -984,7 +1043,39 @@
     "movementsTitle": "Movements: {{name}}",
     "registerIncome": "Register income",
     "noMovements": "This cash box has no income registered yet.",
-    "empty": "No cash boxes registered."
+    "empty": "No cash boxes registered.",
+    "movement": {
+      "project": "Contract/Project",
+      "noProject": "No contract associated",
+      "noContractNumber": "N/A",
+      "isReturn": "This income is a withholding return",
+      "returnWhich": "Withholding being returned",
+      "returnAmount": "Returned amount",
+      "returnDefaultConcept": "Withholding return",
+      "returnBadge": "Return",
+      "grossAmount": "Gross payment amount",
+      "withholdings": "Withholdings",
+      "addWithholding": "+ Add withholding",
+      "withholdingType": "Type",
+      "base": "Base",
+      "percent": "%",
+      "value": "Value",
+      "noWithholdings": "No withholdings added.",
+      "totalWithholdings": "Total withholdings",
+      "netAmount": "Net amount",
+      "withholdingsExceedGross": "The total withholdings cannot be greater than the gross amount.",
+      "support": "Payment support",
+      "viewCurrentSupport": "View current support",
+      "supportHelp": "JPG, PNG or PDF, max. 10 MB.",
+      "filterByProject": "Filter by contract",
+      "allProjects": "All",
+      "confirmDelete": "Delete this income? This action cannot be undone.",
+      "hideWithholdings": "Hide withholdings",
+      "viewWithholdings": "View withholdings",
+      "recoverableStatus": "Status",
+      "returned": "Returned",
+      "pendingReturn": "Pending return"
+    }
   },
   "inventory": {
     "title": "Inventory",
@@ -1484,8 +1575,28 @@
       "users": "Users",
       "roles": "Roles and Permissions",
       "laborParameters": "Labor Parameters",
+      "withholdingTypes": "Withholdings",
       "company": "Company Data",
       "consortiums": "Consortiums / Joint Ventures"
+    },
+    "withholdingTypes": {
+      "title": "Withholding Types",
+      "help": "Catalog of withholdings available when registering a cash box payment associated with a project. A type already used in a payment cannot be deleted, only deactivated.",
+      "newType": "+ New type",
+      "name": "Name",
+      "defaultPercent": "Default %",
+      "recoverable": "Recoverable (the client returns it later)",
+      "table": {
+        "name": "Name",
+        "percent": "Default %",
+        "recoverable": "Recoverable",
+        "status": "Status"
+      },
+      "active": "Active",
+      "inactive": "Inactive",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "empty": "No withholding types registered."
     },
     "users": {
       "title": "Users",

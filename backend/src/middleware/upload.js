@@ -13,6 +13,9 @@ const ALLOWED_BY_KIND = {
   // Cotizaciones de proveedor (Estudio de Mercado): además de PDF/imagen, admite Excel (ver
   // marketStudyScanService.js, que lo convierte a texto para la IA).
   quotation: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.xlsx', '.xls'],
+  // Soporte de un pago a caja (ver cashBoxMovementRoutes en cashBoxRoutes.js): solo lo pedido
+  // explícitamente para este campo (JPG/PNG/PDF), sin webp ni Word.
+  paymentSupport: ['.pdf', '.jpg', '.jpeg', '.png'],
 };
 
 function ensureDir(dir) {
@@ -29,7 +32,7 @@ function ensureDir(dir) {
 // (app.js) exige que ese primer segmento coincida con la empresa del usuario que pide el archivo,
 // así que un archivo de otra empresa no es servible aunque se adivine el nombre. relativePath() ya
 // queda con ese prefijo sin cambios, porque solo calcula la ruta relativa a UPLOAD_ROOT.
-function makeUploader(subfolder, kind = 'any') {
+function makeUploader(subfolder, kind = 'any', maxSizeMB = 20) {
   const storage = multer.diskStorage({
     destination: (req, file, cb) => {
       const companyId = req.user?.companyId;
@@ -53,7 +56,7 @@ function makeUploader(subfolder, kind = 'any') {
     cb(null, true);
   };
 
-  const uploader = multer({ storage, fileFilter, limits: { fileSize: 20 * 1024 * 1024 } });
+  const uploader = multer({ storage, fileFilter, limits: { fileSize: maxSizeMB * 1024 * 1024 } });
 
   // El stream multipart que multer lee de `req` puede terminar de procesarse fuera del contexto
   // async que abrió runInTransactionContext (ver comentario arriba) — no solo para el destino del

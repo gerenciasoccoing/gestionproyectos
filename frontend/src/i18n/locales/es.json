@@ -106,6 +106,16 @@
     "reopenProject": "Reabrir proyecto",
     "confirmClose": "¿Cerrar este proyecto? Pasará a \"Terminado\" y se moverá a la pestaña Proyectos Terminados. Seguirá siendo accesible para consulta y para cargar documentos de Entrega Final.",
     "confirmReopen": "¿Reabrir este proyecto? Volverá a la lista de proyectos activos.",
+    "pendingBalanceMessage": "No se puede cerrar: falta un saldo real de {{amount}} por reconocer. Complétalo desde",
+    "closeModal": {
+      "title": "Cerrar proyecto con saldo pendiente",
+      "help": "Este proyecto tiene un saldo real pendiente. Como administrador puedes cerrarlo igual, pero debes explicar por qué.",
+      "observationLabel": "Observación (obligatoria, mínimo 10 caracteres)",
+      "observationPlaceholder": "Ej: el cliente pagará el saldo restante la próxima semana según acuerdo verbal.",
+      "observationTooShort": "La observación debe tener al menos {{min}} caracteres.",
+      "recoverableWarning": "Hay retenciones recuperables pendientes de devolver por {{amount}}. Esto no bloquea el cierre.",
+      "confirm": "Cerrar proyecto"
+    },
     "newProject": "+ Nuevo proyecto",
     "createManual": "Crear proyecto manual",
     "name": "Nombre",
@@ -119,7 +129,9 @@
       "status": "Estado",
       "origin": "Origen",
       "users": "Usuarios",
-      "contractValue": "Valor total del contrato"
+      "contractValue": "Valor total del contrato",
+      "closeBalance": "Saldo al cierre",
+      "closedBy": "Cerrado por"
     },
     "originManual": "Manual",
     "originQuotation": "Cotización",
@@ -133,6 +145,7 @@
       "execution": "Ejecución",
       "personnel": "Personal",
       "expenses": "Gastos",
+      "payments": "Pagos al proyecto",
       "delivery": "Entrega Final",
       "reports": "Informes",
       "marketStudy": "Estudio de Mercado"
@@ -227,6 +240,52 @@
     },
     "empty": "Sin documentos de entrega final todavía.",
     "confirmDelete": "¿Eliminar este documento? Esta acción no se puede deshacer."
+  },
+  "payments": {
+    "closeCard": {
+      "title": "Cierre del proyecto",
+      "realBalance": "Saldo real al cierre",
+      "closedBy": "Cerrado por",
+      "closedAt": "Fecha de cierre",
+      "observation": "Observación"
+    },
+    "summary": {
+      "title": "Resumen",
+      "contractValue": "Valor del contrato (referencia)",
+      "executedValue": "Valor ejecutado",
+      "totalGross": "Total bruto reconocido",
+      "totalWithholdings": "Total retenciones",
+      "totalNet": "Total neto recibido",
+      "recoverablePending": "Retenciones recuperables pendientes",
+      "saldoReal": "Saldo real",
+      "percentPaid": "% pagado sobre lo ejecutado",
+      "withholdingsByType": "Retenciones por tipo"
+    },
+    "list": {
+      "title": "Listado de pagos",
+      "from": "Desde",
+      "to": "Hasta",
+      "withholdingType": "Tipo de retención",
+      "allTypes": "Todos los tipos",
+      "date": "Fecha",
+      "concept": "Concepto",
+      "gross": "Bruto",
+      "withholdings": "Retenciones",
+      "net": "Neto",
+      "cashBox": "Caja",
+      "user": "Registró",
+      "support": "Soporte",
+      "returnBadge": "Devolución",
+      "hideDetail": "Ocultar detalle",
+      "viewDetail": "Ver detalle",
+      "base": "Base",
+      "percent": "%",
+      "value": "Valor",
+      "status": "Estado",
+      "returned": "Devuelta",
+      "pendingReturn": "Pendiente de devolver",
+      "empty": "Sin pagos registrados."
+    }
   },
   "execution": {
     "budget": {
@@ -984,7 +1043,39 @@
     "movementsTitle": "Movimientos: {{name}}",
     "registerIncome": "Registrar ingreso",
     "noMovements": "Esta caja aún no tiene ingresos registrados.",
-    "empty": "Sin cajas registradas."
+    "empty": "Sin cajas registradas.",
+    "movement": {
+      "project": "Contrato/Proyecto",
+      "noProject": "Sin contrato asociado",
+      "noContractNumber": "S/N",
+      "isReturn": "Este ingreso es una devolución de retención",
+      "returnWhich": "Retención que se está devolviendo",
+      "returnAmount": "Valor devuelto",
+      "returnDefaultConcept": "Devolución de retención",
+      "returnBadge": "Devolución",
+      "grossAmount": "Valor bruto del pago",
+      "withholdings": "Retenciones",
+      "addWithholding": "+ Agregar retención",
+      "withholdingType": "Tipo",
+      "base": "Base",
+      "percent": "%",
+      "value": "Valor",
+      "noWithholdings": "Sin retenciones agregadas.",
+      "totalWithholdings": "Total retenciones",
+      "netAmount": "Valor neto",
+      "withholdingsExceedGross": "El total de retenciones no puede ser mayor que el valor bruto.",
+      "support": "Soporte de pago",
+      "viewCurrentSupport": "Ver soporte actual",
+      "supportHelp": "JPG, PNG o PDF, máx. 10 MB.",
+      "filterByProject": "Filtrar por contrato",
+      "allProjects": "Todos",
+      "confirmDelete": "¿Eliminar este ingreso? Esta acción no se puede deshacer.",
+      "hideWithholdings": "Ocultar retenciones",
+      "viewWithholdings": "Ver retenciones",
+      "recoverableStatus": "Estado",
+      "returned": "Devuelta",
+      "pendingReturn": "Pendiente de devolver"
+    }
   },
   "inventory": {
     "title": "Inventario",
@@ -1484,8 +1575,28 @@
       "users": "Usuarios",
       "roles": "Roles y Permisos",
       "laborParameters": "Parámetros Laborales",
+      "withholdingTypes": "Retenciones",
       "company": "Datos de la Empresa",
       "consortiums": "Consorcios / Uniones Temporales"
+    },
+    "withholdingTypes": {
+      "title": "Tipos de Retención",
+      "help": "Catálogo de retenciones disponibles al registrar un pago a caja asociado a un proyecto. Un tipo ya usado en un pago no se puede eliminar, solo desactivar.",
+      "newType": "+ Nuevo tipo",
+      "name": "Nombre",
+      "defaultPercent": "% por defecto",
+      "recoverable": "Recuperable (el cliente la devuelve más adelante)",
+      "table": {
+        "name": "Nombre",
+        "percent": "% por defecto",
+        "recoverable": "Recuperable",
+        "status": "Estado"
+      },
+      "active": "Activo",
+      "inactive": "Inactivo",
+      "deactivate": "Desactivar",
+      "activate": "Activar",
+      "empty": "Sin tipos de retención registrados."
     },
     "users": {
       "title": "Usuarios",

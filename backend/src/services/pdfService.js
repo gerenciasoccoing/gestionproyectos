@@ -1366,7 +1366,60 @@ function generateLaborCalculationPdf({ title, employee, company, breakdown, meta
   return doc;
 }
 
+// "Pagos al proyecto": resumen (bruto/retenciones por tipo/neto/saldo real) + listado de ingresos,
+// para conciliar contra los certificados tributarios del cliente. Mismo criterio de layout que
+// generateResourceConsolidationPdf (portada + secciones simples, sin tabla dibujada a mano con
+// columnas fijas: con pocas filas por proyecto no se justifica esa complejidad extra).
+function generateProjectPaymentsPdf({ project, summary, movements, company }) {
+  const doc = new PDFDocument({ margin: 50 });
+
+  reportCoverHeading(doc, {
+    company,
+    title: 'Pagos al Proyecto',
+    project,
+    subtitle: `Fecha: ${new Date().toISOString().slice(0, 10)}`,
+  });
+
+  sectionTitle(doc, 'Resumen');
+  doc.text(`Valor ejecutado: ${money(summary.executedValue)}`);
+  doc.text(`Total bruto reconocido: ${money(summary.totalGross)}`);
+  doc.text(`Total retenciones: ${money(summary.totalWithholdings)}`);
+  doc.text(`Total neto recibido: ${money(summary.totalNet)}`);
+  doc.text(`Retenciones recuperables pendientes: ${money(summary.recoverablePending)}`);
+  doc.font('Helvetica-Bold').text(`Saldo real: ${money(summary.saldoReal)}`);
+  doc.font('Helvetica').text(`% pagado sobre lo ejecutado: ${summary.percentPaid}%`);
+
+  sectionTitle(doc, 'Retenciones por tipo');
+  if (!summary.withholdingsByType.length) {
+    doc.text('Sin retenciones registradas.');
+  } else {
+    summary.withholdingsByType.forEach((w) => {
+      ensureSpace(doc, 16);
+      doc.text(`- ${w.typeName}: ${money(w.total)}`);
+    });
+  }
+
+  sectionTitle(doc, 'Listado de pagos');
+  movements.forEach((m) => {
+    ensureSpace(doc, 40);
+    doc.font('Helvetica-Bold').text(`${m.date}  —  ${money(m.amount)} (neto)`, { continued: false });
+    doc.font('Helvetica').fontSize(9).fillColor('#555')
+      .text(`${m.concept}${m.isWithholdingReturn ? ' (devolución de retención)' : ''} — Bruto: ${money(m.grossAmount ?? m.amount)} — Caja: ${m.CashBox?.name || '-'} — Registró: ${m.User?.name || '-'}`);
+    if (m.withholdings?.length) {
+      m.withholdings.forEach((w) => {
+        doc.text(`    · ${w.typeName}: ${money(w.value)} (${Number(w.percent)}% sobre ${money(w.base)})${w.recoverable ? (w.returned ? ' — devuelta' : ' — pendiente de devolver') : ''}`);
+      });
+    }
+    doc.fillColor('#000').fontSize(10);
+    doc.moveDown(0.3);
+  });
+  if (!movements.length) doc.text('Sin pagos registrados en el rango seleccionado.');
+
+  doc.end();
+  return doc;
+}
+
 module.exports = {
   generateProjectReportPdf, generateQuotationPdf, generateApuPdf, generateBudgetWithApuAnnexPdf, generatePurchaseOrderPdf, generateContractPdf, generateLaborCalculationPdf,
-  generateClientReportPdf, generateInternalReportPdf, generateResourceConsolidationPdf, generateSchedulePdf, money,
+  generateClientReportPdf, generateInternalReportPdf, generateResourceConsolidationPdf, generateSchedulePdf, generateProjectPaymentsPdf, money,
 };

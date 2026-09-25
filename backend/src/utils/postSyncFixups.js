@@ -7,12 +7,13 @@ const {
   sequelize, Company, CashBox,
   Contract, Employee, Expense, ExpenseItem, ExpenseTax, InventoryItem, Minute, PaymentReceipt, Policy,
   ProgressPhoto, PurchaseReceipt, Severance, SocialSecurityDocument,
-  SocialSecurityProvider, ThirdParty,
+  SocialSecurityProvider, ThirdParty, WithholdingType,
 } = require('../models/adminModels');
 const { TENANT_SCOPING_EXCLUDED } = require('../models/defineModels');
 const { runInTransactionContext } = require('../utils/tenantContext');
 const { UPLOAD_ROOT } = require('../middleware/upload');
 const { DEFAULT_SOCIAL_SECURITY_PROVIDERS } = require('../config/socialSecurityProviders');
+const { DEFAULT_WITHHOLDING_TYPES } = require('../config/withholdingTypes');
 
 // Mismo criterio que applyTenantScoping.js: algunos modelos excluidos del aislamiento (ej.
 // SupportAccessLog) igual tienen una columna companyId como dato simple (a qué empresa se accedió),
@@ -298,6 +299,8 @@ async function applyPostSyncFixups() {
   await sequelize.query('ALTER TABLE "PaymentReceipts" ALTER COLUMN "filePath" DROP NOT NULL;');
 
   await seedSocialSecurityProvidersForExistingCompanies();
+  await seedWithholdingTypesForExistingCompanies();
+  await backfillCashBoxMovementGrossAmount();
 
   await ensureAppDbRole();
   await applyRowLevelSecurity();
@@ -364,6 +367,35 @@ async function seedSocialSecurityProvidersForExistingCompanies() {
       }
     });
   }
+}
+
+// WithholdingType (catálogo de tipos de retención) se siembra con sus valores por defecto al
+// crear una empresa nueva (companyProvisioningService.js), pero las empresas que ya existían antes
+// de esta funcionalidad nunca pasaron por ahí — mismo criterio y mismo hueco que
+// seedSocialSecurityProvidersForExistingCompanies. findOrCreate por nombre hace que sea un no-op
+// seguro una vez sembrado, incluso si el Administrador ya editó el % de algún tipo (no se
+// sobreescribe: solo se crea si no existe).
+async function seedWithholdingTypesForExistingCompanies() {
+  const companies = await Company.findAll();
+  for (const company of companies) {
+    // eslint-disable-next-line no-await-in-loop
+    await runInTransactionContext(company.id, null, async () => {
+      for (const { name, defaultPercent, recoverable } of DEFAULT_WITHHOLDING_TYPES) {
+        // eslint-disable-next-line no-await-in-loop
+        await WithholdingType.findOrCreate({ where: { name }, defaults: { defaultPercent, recoverable } });
+      }
+    });
+  }
+}
+
+// CashBoxMovement.grossAmount es nueva (ver "Pagos al proyecto"): para los ingresos que ya
+// existían, el valor bruto reconocido es, por definición, el mismo monto que ya afectaba el saldo
+// de la caja (nunca tuvieron retenciones, así que bruto = neto = amount). Se deja allowNull:true a
+// propósito en el modelo (no hace falta relajar/forzar NOT NULL como en otras migraciones de este
+// archivo): basta con que quede poblado en la práctica. Solo toca filas con grossAmount NULL, así
+// que es idempotente y seguro de correr en cada arranque.
+async function backfillCashBoxMovementGrossAmount() {
+  await sequelize.query('UPDATE "CashBoxMovements" SET "grossAmount" = "amount" WHERE "grossAmount" IS NULL;');
 }
 
 // Migración de "caja por ítem" a "caja por orden" (corrección del bug de diseño reportado: antes

@@ -1,7 +1,15 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { CashBox, CashBoxMovement } = require('../models');
+const { CashBox, CashBoxMovement, CashBoxMovementWithholding, Project, User } = require('../models');
 const { getBalance, getBalancesForCashBoxes } = require('../services/cashBoxService');
+const { createMovement, updateMovement: updateMovementService, deleteMovement } = require('../services/cashBoxMovementService');
+const { relativePath } = require('../middleware/upload');
+
+const MOVEMENT_INCLUDE = [
+  { model: CashBoxMovementWithholding, as: 'withholdings' },
+  { model: Project, attributes: ['id', 'name', 'contractNumber'] },
+  { model: User, attributes: ['id', 'name'] },
+];
 
 const list = asyncHandler(async (req, res) => {
   const cashBoxes = await CashBox.findAll({ order: [['name', 'ASC']] });
@@ -11,7 +19,7 @@ const list = asyncHandler(async (req, res) => {
 
 const get = asyncHandler(async (req, res) => {
   const cashBox = await CashBox.findByPk(req.params.id, {
-    include: [{ model: CashBoxMovement, as: 'movements', order: [['date', 'DESC']] }],
+    include: [{ model: CashBoxMovement, as: 'movements', include: MOVEMENT_INCLUDE, order: [['date', 'DESC']] }],
   });
   if (!cashBox) throw new ApiError(404, 'Caja no encontrada');
   res.json({ ...cashBox.toJSON(), balance: await getBalance(cashBox.id) });
@@ -54,25 +62,78 @@ const setStatus = asyncHandler(async (req, res) => {
   res.json({ ...cashBox.toJSON(), balance: await getBalance(cashBox.id) });
 });
 
-// Ingreso/adición de saldo (no se permite negativo: para corregir un ingreso mal digitado se
-// espera crear un registro nuevo o contactar a un admin, igual que el resto de la app no expone
-// edición de movimientos históricos de dinero).
+// El body llega como multipart/form-data (por el soporte de pago opcional): withholdings viaja
+// serializado como JSON en un campo de texto, no como array nativo.
+function parseWithholdings(body) {
+  if (!body.withholdings) return [];
+  if (Array.isArray(body.withholdings)) return body.withholdings;
+  try {
+    const parsed = JSON.parse(body.withholdings);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    throw new ApiError(400, 'withholdings debe ser un JSON válido');
+  }
+}
+
+// El proyecto asociado (opcional) solo puede ser uno al que el usuario tenga acceso — mismo
+// criterio que requireProjectAccess, pero acá el projectId viene del body (no de la URL), así que
+// se valida a mano en vez de como middleware.
+function assertProjectAccess(req, projectId) {
+  if (!projectId) return;
+  if (req.user.isAdmin) return;
+  if (!req.user.projectIds.includes(projectId)) {
+    throw new ApiError(403, 'No tiene acceso al proyecto seleccionado');
+  }
+}
+
+// Ingreso/adición de saldo a la caja. Sin proyecto: monto/fecha/concepto, igual que siempre. Con
+// proyecto: valor bruto + retenciones opcionales (ver cashBoxMovementService.js), y el saldo de la
+// caja aumenta solo en el NETO — o es una devolución de retención puntual (isWithholdingReturn).
 const addMovement = asyncHandler(async (req, res) => {
   const cashBox = await CashBox.findByPk(req.params.id);
   if (!cashBox) throw new ApiError(404, 'Caja no encontrada');
-  const { amount, date, concept } = req.body;
-  if (amount === undefined || Number(amount) <= 0) throw new ApiError(400, 'amount es obligatorio y debe ser mayor a 0');
-  if (!date) throw new ApiError(400, 'date es obligatorio');
-  if (!concept || !concept.trim()) throw new ApiError(400, 'concept es obligatorio');
+  const projectId = req.body.projectId || null;
+  assertProjectAccess(req, projectId);
 
-  await CashBoxMovement.create({
+  await createMovement({
     cashBoxId: cashBox.id,
-    amount,
-    date,
-    concept: concept.trim(),
-    createdBy: req.user.id,
+    body: {
+      ...req.body,
+      projectId,
+      withholdings: parseWithholdings(req.body),
+      isWithholdingReturn: req.body.isWithholdingReturn === true || req.body.isWithholdingReturn === 'true',
+      supportFilePath: req.file ? relativePath(req.file) : null,
+    },
+    userId: req.user.id,
   });
   res.status(201).json({ ...cashBox.toJSON(), balance: await getBalance(cashBox.id) });
 });
 
-module.exports = { list, get, create, update, setStatus, addMovement };
+const updateMovement = asyncHandler(async (req, res) => {
+  const cashBox = await CashBox.findByPk(req.params.id);
+  if (!cashBox) throw new ApiError(404, 'Caja no encontrada');
+  const movement = await CashBoxMovement.findOne({ where: { id: req.params.movementId, cashBoxId: cashBox.id } });
+  if (!movement) throw new ApiError(404, 'Ingreso no encontrado');
+  const projectId = req.body.projectId !== undefined ? (req.body.projectId || null) : movement.projectId;
+  assertProjectAccess(req, projectId);
+
+  await updateMovementService(movement, {
+    ...req.body,
+    projectId,
+    withholdings: parseWithholdings(req.body),
+    isWithholdingReturn: req.body.isWithholdingReturn === true || req.body.isWithholdingReturn === 'true',
+    supportFilePath: req.file ? relativePath(req.file) : undefined,
+  });
+  res.json({ ...cashBox.toJSON(), balance: await getBalance(cashBox.id) });
+});
+
+const removeMovement = asyncHandler(async (req, res) => {
+  const cashBox = await CashBox.findByPk(req.params.id);
+  if (!cashBox) throw new ApiError(404, 'Caja no encontrada');
+  const movement = await CashBoxMovement.findOne({ where: { id: req.params.movementId, cashBoxId: cashBox.id } });
+  if (!movement) throw new ApiError(404, 'Ingreso no encontrado');
+  await deleteMovement(movement);
+  res.json({ ...cashBox.toJSON(), balance: await getBalance(cashBox.id) });
+});
+
+module.exports = { list, get, create, update, setStatus, addMovement, updateMovement, removeMovement };

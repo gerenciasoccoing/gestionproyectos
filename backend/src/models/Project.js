@@ -36,10 +36,21 @@ module.exports = (sequelize) => {
     // Cliente. Editables desde Contractual (ContractualPage.jsx > "Presentación del proyecto").
     presentationPhotoPath: { type: DataTypes.STRING, allowNull: true },
     locationMapImagePath: { type: DataTypes.STRING, allowNull: true },
+    // Datos del cierre MÁS RECIENTE (ver projectController.js#update y
+    // services/projectPaymentsService.js#getProjectSaldoReal): se sobreescriben cada vez que el
+    // proyecto se cierra de nuevo tras una reapertura — "conservando el historial" significa que
+    // cada cierre exige su propia observación nueva cuando corresponde, no que se guarde una lista
+    // de cierres pasados. closeObservation solo es obligatoria cuando closeRealBalance quedó > 0 y
+    // quien cierra es admin (ver validación en el controlador); null en cualquier otro cierre.
+    closeObservation: { type: DataTypes.TEXT, allowNull: true },
+    closeRealBalance: { type: DataTypes.DECIMAL(18, 2), allowNull: true },
+    closedBy: { type: DataTypes.UUID, allowNull: true },
+    closedAt: { type: DataTypes.DATE, allowNull: true },
   });
 
   Project.associate = (models) => {
     Project.belongsToMany(models.User, { through: models.ProjectUser, foreignKey: 'projectId' });
+    Project.belongsTo(models.User, { foreignKey: 'closedBy', as: 'closedByUser' });
     Project.belongsTo(models.Quotation, { foreignKey: 'quotationId', as: 'quotation' });
     Project.belongsTo(models.Consortium, { foreignKey: 'consortiumId', as: 'consortium' });
     Project.belongsTo(models.ThirdParty, { foreignKey: 'clientId', as: 'clientParty' });
