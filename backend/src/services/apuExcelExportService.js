@@ -509,7 +509,75 @@ async function generateProjectPaymentsExcelBuffer({ project, summary, movements 
   return workbook.xlsx.writeBuffer();
 }
 
+// Reporte de Gastos Administrativos Generales: hoja de resumen (logo + totales por categoría y por
+// mes, para el gráfico de barras que el frontend arma con estos mismos datos) + hoja de detalle con
+// una fila por gasto. Con logo de empresa (ver embedLogo) porque el cliente lo pidió explícito para
+// esta exportación puntual.
+async function generateAdminExpenseReportExcelBuffer({ report, filters, company }) {
+  const workbook = new ExcelJS.Workbook();
+  const logoImageId = embedLogo(workbook, company);
+
+  const summarySheet = workbook.addWorksheet('Resumen');
+  summarySheet.columns = [{ width: 36 }, { width: 20 }];
+  let row = 1;
+  if (logoImageId !== null) {
+    summarySheet.getRow(row).height = 55;
+    summarySheet.mergeCells(`A${row}:B${row}`);
+    summarySheet.addImage(logoImageId, `A${row}:B${row}`);
+    row += 1;
+  }
+  const rangeLabel = filters?.from || filters?.to ? `Del ${filters.from || '...'} al ${filters.to || '...'}` : 'Todo el histórico';
+  mergeAndStyle(summarySheet, `A${row}:B${row}`, `Gastos Administrativos Generales — ${rangeLabel}`, { bold: true, size: 12, border: null, fill: null });
+  row += 2;
+
+  setCell(summarySheet, `A${row}`, 'Totales por categoría', { bold: true, border: null });
+  row += 1;
+  report.totalsByCategory.forEach((c) => {
+    setCell(summarySheet, `A${row}`, c.categoryName, { align: 'left', border: BOX_BORDER });
+    setCell(summarySheet, `B${row}`, Number(c.total), { align: 'right', numFmt: CURRENCY_FMT, border: BOX_BORDER });
+    row += 1;
+  });
+  setCell(summarySheet, `A${row}`, 'TOTAL GENERAL', { align: 'left', bold: true, border: BOX_BORDER });
+  setCell(summarySheet, `B${row}`, Number(report.totalGeneral), { align: 'right', bold: true, numFmt: CURRENCY_FMT, border: BOX_BORDER });
+  row += 2;
+
+  setCell(summarySheet, `A${row}`, 'Totales por mes', { bold: true, border: null });
+  row += 1;
+  if (!report.monthlyTotals.length) {
+    mergeAndStyle(summarySheet, `A${row}:B${row}`, EMPTY_ROW_LABEL, { align: 'center', border: BOX_BORDER });
+  } else {
+    report.monthlyTotals.forEach((m) => {
+      setCell(summarySheet, `A${row}`, m.month, { align: 'left', border: BOX_BORDER });
+      setCell(summarySheet, `B${row}`, Number(m.total), { align: 'right', numFmt: CURRENCY_FMT, border: BOX_BORDER });
+      row += 1;
+    });
+  }
+
+  const detailSheet = workbook.addWorksheet('Detalle');
+  detailSheet.columns = [{ width: 12 }, { width: 30 }, { width: 22 }, { width: 24 }, { width: 20 }, { width: 20 }, { width: 16 }];
+  ['Fecha', 'Descripción', 'Categoría', 'Proveedor', 'Caja', 'Trabajador', 'Monto'].forEach((label, i) => {
+    setCell(detailSheet, `${String.fromCharCode(65 + i)}1`, label, { bold: true, fill: GRAY_FILL, border: BOX_BORDER, align: i <= 3 ? 'left' : 'center' });
+  });
+  let r = 2;
+  if (!report.rows.length) {
+    mergeAndStyle(detailSheet, `A${r}:G${r}`, EMPTY_ROW_LABEL, { align: 'center', border: BOX_BORDER });
+  } else {
+    report.rows.forEach((e) => {
+      setCell(detailSheet, `A${r}`, e.date, { align: 'center', border: BOX_BORDER });
+      setCell(detailSheet, `B${r}`, e.description || '', { align: 'left', border: BOX_BORDER });
+      setCell(detailSheet, `C${r}`, e.adminCategory?.name || 'Sin categoría', { align: 'left', border: BOX_BORDER });
+      setCell(detailSheet, `D${r}`, e.supplierParty?.name || e.vendorName || '-', { align: 'left', border: BOX_BORDER });
+      setCell(detailSheet, `E${r}`, e.CashBox?.name || '-', { align: 'left', border: BOX_BORDER });
+      setCell(detailSheet, `F${r}`, e.Employee?.name || '-', { align: 'left', border: BOX_BORDER });
+      setCell(detailSheet, `G${r}`, Number(e.amount), { align: 'right', numFmt: CURRENCY_FMT, border: BOX_BORDER });
+      r += 1;
+    });
+  }
+
+  return workbook.xlsx.writeBuffer();
+}
+
 module.exports = {
   generateApuExcelBuffer, generateBudgetWithApuAnnexExcelBuffer, generateResourceConsolidationExcelBuffer, generateScheduleExcelBuffer,
-  generateProjectPaymentsExcelBuffer,
+  generateProjectPaymentsExcelBuffer, generateAdminExpenseReportExcelBuffer,
 };

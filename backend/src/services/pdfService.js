@@ -1419,7 +1419,56 @@ function generateProjectPaymentsPdf({ project, summary, movements, company }) {
   return doc;
 }
 
+// Reporte de Gastos Administrativos Generales: sin proyecto (reportCoverHeading exige un `project`
+// con `.name`, así que se le pasa uno vacío para reusarla tal cual, sin bifurcar esa función).
+// Mismo criterio de layout que generateProjectPaymentsPdf: portada + secciones simples.
+function generateAdminExpenseReportPdf({ report, filters, company }) {
+  const doc = new PDFDocument({ margin: 50 });
+
+  const rangeLabel = filters?.from || filters?.to
+    ? `Del ${filters.from || '...'} al ${filters.to || '...'}`
+    : 'Todo el histórico';
+  reportCoverHeading(doc, {
+    company,
+    title: 'Reporte de Gastos Administrativos Generales',
+    project: { name: '' },
+    subtitle: rangeLabel,
+  });
+
+  sectionTitle(doc, 'Totales por categoría');
+  report.totalsByCategory.forEach((c) => {
+    ensureSpace(doc, 16);
+    doc.text(`- ${c.categoryName}: ${money(c.total)}`);
+  });
+  doc.font('Helvetica-Bold').text(`TOTAL GENERAL: ${money(report.totalGeneral)}`);
+  doc.font('Helvetica');
+
+  sectionTitle(doc, 'Totales por mes');
+  if (!report.monthlyTotals.length) {
+    doc.text('Sin gastos registrados en el rango seleccionado.');
+  } else {
+    report.monthlyTotals.forEach((m) => {
+      ensureSpace(doc, 16);
+      doc.text(`- ${m.month}: ${money(m.total)}`);
+    });
+  }
+
+  sectionTitle(doc, 'Detalle de gastos');
+  report.rows.forEach((e) => {
+    ensureSpace(doc, 30);
+    doc.font('Helvetica-Bold').text(`${e.date}  —  ${money(e.amount)}  —  ${e.adminCategory?.name || 'Sin categoría'}`);
+    doc.font('Helvetica').fontSize(9).fillColor('#555')
+      .text(`${e.description || ''} — Proveedor: ${e.supplierParty?.name || e.vendorName || '-'} — Caja: ${e.CashBox?.name || '-'}${e.Employee ? ` — Trabajador: ${e.Employee.name}` : ''}`);
+    doc.fillColor('#000').fontSize(10);
+    doc.moveDown(0.3);
+  });
+  if (!report.rows.length) doc.text('Sin gastos registrados en el rango seleccionado.');
+
+  doc.end();
+  return doc;
+}
+
 module.exports = {
   generateProjectReportPdf, generateQuotationPdf, generateApuPdf, generateBudgetWithApuAnnexPdf, generatePurchaseOrderPdf, generateContractPdf, generateLaborCalculationPdf,
-  generateClientReportPdf, generateInternalReportPdf, generateResourceConsolidationPdf, generateSchedulePdf, generateProjectPaymentsPdf, money,
+  generateClientReportPdf, generateInternalReportPdf, generateResourceConsolidationPdf, generateSchedulePdf, generateProjectPaymentsPdf, generateAdminExpenseReportPdf, money,
 };

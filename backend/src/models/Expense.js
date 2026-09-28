@@ -20,10 +20,23 @@ module.exports = (sequelize) => {
     // en la vista general. vendorName se mantiene como texto libre (compatibilidad y proveedores
     // no registrados); al elegir un proveedor registrado se autocompleta.
     supplierId: { type: DataTypes.UUID, allowNull: true },
+    // 'proyecto' usa category (el catálogo fijo de siempre) y projectId (opcionalmente); 'administrativo'
+    // usa adminCategoryId (catálogo por empresa, ver AdminExpenseCategory) y nunca lleva proyecto.
+    // allowNull:true a propósito (ver comentario de la migración en postSyncFixups.js): se
+    // backfillea explícitamente ('administrativo' donde projectId ya era null, 'proyecto' donde no)
+    // y recién ahí se exige NOT NULL en la base de datos.
+    expenseType: { type: DataTypes.ENUM('proyecto', 'administrativo'), allowNull: true },
+    // Ahora opcional: solo aplica (y se exige a nivel de controlador) cuando expenseType='proyecto'.
     category: {
       type: DataTypes.ENUM('mano_obra', 'materiales', 'equipos', 'viaticos', 'imprevistos'),
-      allowNull: false,
+      allowNull: true,
     },
+    adminCategoryId: { type: DataTypes.UUID, allowNull: true },
+    // Trabajador vinculado (solo para gastos generados desde nómina/liquidación de personal
+    // ADMINISTRATIVO, ver payrollController.js/severanceController.js) — permite el filtro "por
+    // trabajador" del reporte administrativo sin tener que unir contra PaymentReceipt/Severance
+    // según el source de cada gasto.
+    employeeId: { type: DataTypes.UUID, allowNull: true },
     amount: { type: DataTypes.DECIMAL(18, 2), allowNull: false, validate: { min: 0 } },
     date: { type: DataTypes.DATEONLY, allowNull: false },
     description: { type: DataTypes.TEXT },
@@ -39,7 +52,13 @@ module.exports = (sequelize) => {
     subtotal: { type: DataTypes.DECIMAL(18, 2), allowNull: true, validate: { min: 0 } },
     // Suma de los impuestos (ver ExpenseTax para el detalle por impuesto).
     taxAmount: { type: DataTypes.DECIMAL(18, 2), allowNull: true, validate: { min: 0 } },
-    source: { type: DataTypes.ENUM('manual', 'purchase_receipt', 'liquidacion', 'purchase_order'), defaultValue: 'manual' },
+    // 'nomina': gasto administrativo generado automáticamente al confirmar el pago de nómina de un
+    // trabajador ADMINISTRATIVO (ver payrollController.js#confirm) — mismo puente que 'liquidacion'
+    // ya usaba para la liquidación de personal de proyecto, ahora también disponible para nómina.
+    source: {
+      type: DataTypes.ENUM('manual', 'purchase_receipt', 'liquidacion', 'purchase_order', 'nomina'),
+      defaultValue: 'manual',
+    },
     sourceId: { type: DataTypes.UUID, allowNull: true },
     createdBy: { type: DataTypes.UUID, allowNull: true },
     // Consecutivo propio de Gastos (no existía antes de este campo: los gastos previos quedan sin
@@ -54,6 +73,8 @@ module.exports = (sequelize) => {
     Expense.belongsTo(models.Project, { foreignKey: 'projectId' });
     Expense.belongsTo(models.CashBox, { foreignKey: 'cashBoxId' });
     Expense.belongsTo(models.ThirdParty, { foreignKey: 'supplierId', as: 'supplierParty' });
+    Expense.belongsTo(models.Employee, { foreignKey: 'employeeId' });
+    Expense.belongsTo(models.AdminExpenseCategory, { foreignKey: 'adminCategoryId', as: 'adminCategory' });
     Expense.hasMany(models.ExpenseItem, { foreignKey: 'expenseId', as: 'items', onDelete: 'CASCADE' });
     Expense.hasMany(models.ExpenseTax, { foreignKey: 'expenseId', as: 'taxes', onDelete: 'CASCADE' });
   };

@@ -6,7 +6,14 @@ module.exports = (sequelize) => {
     // Aislamiento multi-tenant (ver applyTenantScoping.js): asignado automáticamente por los
     // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
     companyId: { type: DataTypes.UUID, allowNull: true },
-    projectId: { type: DataTypes.UUID, allowNull: false },
+    // Opcional: null = personal ADMINISTRATIVO (sin proyecto, aparece solo en Personal del menú
+    // principal); con valor = personal DE PROYECTO (aparece ahí y, filtrado, dentro del proyecto).
+    // Es el mismo registro/tabla en los dos casos — no hay una "vinculación" separada que guardar,
+    // se deriva siempre de este campo (ver employeeController.js). allowNull:true a propósito:
+    // sync({alter:true}) no podría agregar una columna NOT NULL a una tabla con filas existentes
+    // (ver postSyncFixups.js, que igual no necesita backfillear nada acá: todo trabajador ya
+    // existente ya tenía un projectId real, así que queda "de proyecto" sin tocarlo).
+    projectId: { type: DataTypes.UUID, allowNull: true },
     name: { type: DataTypes.STRING, allowNull: false },
     position: { type: DataTypes.STRING, allowNull: false },
     entryDate: { type: DataTypes.DATEONLY, allowNull: false },

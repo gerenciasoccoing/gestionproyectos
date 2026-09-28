@@ -56,8 +56,11 @@ import UsersPage from './pages/admin/UsersPage';
 import RolesPage from './pages/admin/RolesPage';
 import LaborParametersPage from './pages/admin/LaborParametersPage';
 import WithholdingTypesPage from './pages/admin/WithholdingTypesPage';
+import AdminExpenseCategoriesPage from './pages/admin/AdminExpenseCategoriesPage';
 import CompanySettingsPage from './pages/admin/CompanySettingsPage';
 import ConsortiumsPage from './pages/admin/ConsortiumsPage';
+
+import AdminExpenseReportPage from './pages/expenses/AdminExpenseReportPage';
 
 export default function App() {
   return (
@@ -86,7 +89,11 @@ export default function App() {
         <Route path="market-studies" element={<ProtectedRoute feature="estudio_mercado" module="estudio_mercado" action="view"><MarketStudiesPage /></ProtectedRoute>} />
         <Route path="market-studies/:studyId" element={<ProtectedRoute feature="estudio_mercado" module="estudio_mercado" action="view"><MarketStudyDetailPage /></ProtectedRoute>} />
         <Route path="expenses" element={<ProtectedRoute module="gastos" action="view"><ExpensesPage /></ProtectedRoute>} />
+        <Route path="expenses/admin-report" element={<ProtectedRoute module="gastos_admin" action="view"><AdminExpenseReportPage /></ProtectedRoute>} />
         <Route path="cash-boxes" element={<ProtectedRoute module="cajas" action="view"><CashBoxesPage /></ProtectedRoute>} />
+
+        <Route path="personnel" element={<ProtectedRoute module="personal" action="view"><PersonnelListPage /></ProtectedRoute>} />
+        <Route path="personnel/:employeeId" element={<ProtectedRoute module="personal" action="view"><EmployeeDetailPage /></ProtectedRoute>} />
 
         <Route path="inventory" element={<ProtectedRoute module="inventario" action="view"><InventoryLayout /></ProtectedRoute>}>
           <Route index element={<Navigate to="catalog" replace />} />
@@ -100,6 +107,7 @@ export default function App() {
           <Route path="roles" element={<RolesPage />} />
           <Route path="labor-parameters" element={<LaborParametersPage />} />
           <Route path="withholding-types" element={<WithholdingTypesPage />} />
+          <Route path="admin-expense-categories" element={<AdminExpenseCategoriesPage />} />
           <Route path="company" element={<CompanySettingsPage />} />
           <Route path="consortiums" element={<ConsortiumsPage />} />
         </Route>

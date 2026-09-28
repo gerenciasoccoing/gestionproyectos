@@ -12,6 +12,7 @@ const {
   CONTRACT_TYPE_LABELS, missingFieldsForContract, buildContractContent, formatDateEs,
 } = require('../services/contractTemplates');
 const { requestSignature } = require('../services/contractSignatureService');
+const { contractPrefixForProject } = require('../services/numberingService');
 
 function pdfDocToBuffer(doc) {
   return new Promise((resolve, reject) => {
@@ -22,10 +23,26 @@ function pdfDocToBuffer(doc) {
   });
 }
 
+// Atiende tanto la ruta anidada de proyecto (/projects/:projectId/employees/:id/contracts) como la
+// global (/employees/:id/contracts, ver globalEmployeeRoutes.js) — mismo trabajador, mismo
+// controlador, ver el comentario equivalente en employeeController.js. Cuando la ruta trae
+// :projectId se usa como filtro estricto (comportamiento sin cambios); si no, el trabajador puede
+// ser administrativo (employee.projectId null) o de proyecto (se resuelve leyendo el registro, no
+// la URL).
 async function loadEmployee(req) {
-  const employee = await Employee.findOne({ where: { id: req.params.id, projectId: req.params.projectId } });
+  const where = { id: req.params.id };
+  if (req.params.projectId) where.projectId = req.params.projectId;
+  const employee = await Employee.findOne({ where });
   if (!employee) throw new ApiError(404, 'Empleado no encontrado');
   return employee;
+}
+
+// Prefijo del contrato: 'ADM' para personal administrativo (nunca depende de un proyecto/contrato
+// de cliente), o los primeros 3 dígitos de Project.contractNumber para personal de proyecto — igual
+// que en expenseController.js. A partir de employee.projectId (el dato real del trabajador), nunca
+// de req.params.projectId (no existe en la ruta global).
+async function contractPrefixForEmployee(employee) {
+  return employee.projectId ? contractPrefixForProject(employee.projectId) : 'ADM';
 }
 
 const listContractTypes = asyncHandler(async (req, res) => {
@@ -66,8 +83,8 @@ const generate = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Faltan datos obligatorios para generar este contrato.', { missingFields: missing });
   }
 
-  const project = await Project.findByPk(req.params.projectId);
-  const company = await getLetterheadForProject(req.params.projectId);
+  const project = employee.projectId ? await Project.findByPk(employee.projectId) : null;
+  const company = await getLetterheadForProject(employee.projectId);
   const sequenceNumber = await EmployeeContractDocument.count({ where: { employeeId: employee.id } });
 
   const doc = await EmployeeContractDocument.create({
@@ -80,7 +97,7 @@ const generate = asyncHandler(async (req, res) => {
     valueAtIssue: employee.salaryValue,
     objectAtIssue: employee.contractObject,
     generatedBy: req.user.id,
-    contractPrefix: project?.contractNumber ? project.contractNumber.slice(0, 3) : null,
+    contractPrefix: await contractPrefixForEmployee(employee),
   });
 
   const content = buildContractContent({ employee, company, project, doc });
@@ -108,8 +125,8 @@ const generateOtrosi = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Indica al menos un cambio: nuevo objeto, nueva fecha o nuevo valor.');
   }
 
-  const project = await Project.findByPk(req.params.projectId);
-  const company = await getLetterheadForProject(req.params.projectId);
+  const project = employee.projectId ? await Project.findByPk(employee.projectId) : null;
+  const company = await getLetterheadForProject(employee.projectId);
   const sequenceNumber = await EmployeeContractDocument.count({ where: { employeeId: employee.id } });
 
   const doc = await EmployeeContractDocument.create({
@@ -123,7 +140,7 @@ const generateOtrosi = asyncHandler(async (req, res) => {
     valueAtIssue: newSalaryValue !== undefined && newSalaryValue !== '' ? newSalaryValue : parent.valueAtIssue,
     objectAtIssue: newContractObject || parent.objectAtIssue,
     generatedBy: req.user.id,
-    contractPrefix: project?.contractNumber ? project.contractNumber.slice(0, 3) : null,
+    contractPrefix: await contractPrefixForEmployee(employee),
   });
 
   const changes = { newContractObject, newEndDate, newSalaryValue };
@@ -165,7 +182,7 @@ const removeDocument = asyncHandler(async (req, res) => {
 const sendForSignature = asyncHandler(async (req, res) => {
   const employee = await loadEmployee(req);
   const result = await requestSignature({
-    employeeId: employee.id, contractId: req.params.contractId, projectId: req.params.projectId,
+    employeeId: employee.id, contractId: req.params.contractId, projectId: employee.projectId,
   });
   res.json({
     doc: result.doc,

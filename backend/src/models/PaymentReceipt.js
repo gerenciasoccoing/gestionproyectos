@@ -24,10 +24,16 @@ module.exports = (sequelize) => {
     auxTransporte: { type: DataTypes.DECIMAL(18, 2), allowNull: true },
     breakdown: { type: DataTypes.JSONB, allowNull: true },
     pdfFilePath: { type: DataTypes.STRING, allowNull: true },
+    // Gasto administrativo generado automáticamente al confirmar esta nómina (solo para
+    // trabajadores ADMINISTRATIVOS, ver payrollController.js#confirm) — mismo patrón que
+    // Severance.expenseId para la liquidación. Null en comprobantes de personal de proyecto
+    // (su nómina no genera gasto, sigue funcionando como hoy) y en los subidos a mano.
+    expenseId: { type: DataTypes.UUID, allowNull: true },
   });
 
   PaymentReceipt.associate = (models) => {
     PaymentReceipt.belongsTo(models.Employee, { foreignKey: 'employeeId' });
+    PaymentReceipt.belongsTo(models.Expense, { foreignKey: 'expenseId' });
   };
 
   return PaymentReceipt;

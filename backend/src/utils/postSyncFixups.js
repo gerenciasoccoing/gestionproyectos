@@ -7,13 +7,14 @@ const {
   sequelize, Company, CashBox,
   Contract, Employee, Expense, ExpenseItem, ExpenseTax, InventoryItem, Minute, PaymentReceipt, Policy,
   ProgressPhoto, PurchaseReceipt, Severance, SocialSecurityDocument,
-  SocialSecurityProvider, ThirdParty, WithholdingType,
+  SocialSecurityProvider, ThirdParty, WithholdingType, AdminExpenseCategory,
 } = require('../models/adminModels');
 const { TENANT_SCOPING_EXCLUDED } = require('../models/defineModels');
 const { runInTransactionContext } = require('../utils/tenantContext');
 const { UPLOAD_ROOT } = require('../middleware/upload');
 const { DEFAULT_SOCIAL_SECURITY_PROVIDERS } = require('../config/socialSecurityProviders');
 const { DEFAULT_WITHHOLDING_TYPES } = require('../config/withholdingTypes');
+const { DEFAULT_ADMIN_EXPENSE_CATEGORIES } = require('../config/adminExpenseCategories');
 
 // Mismo criterio que applyTenantScoping.js: algunos modelos excluidos del aislamiento (ej.
 // SupportAccessLog) igual tienen una columna companyId como dato simple (a qué empresa se accedió),
@@ -259,6 +260,18 @@ async function applyPostSyncFixups() {
   // ejecutar esto en cada arranque.
   await sequelize.query('ALTER TABLE "Expenses" ALTER COLUMN "projectId" DROP NOT NULL;');
 
+  // Expense.category pasó de obligatoria a opcional (solo aplica a expenseType='proyecto'; los
+  // gastos administrativos usan adminCategoryId en su lugar, ver Expense.js). Mismo problema
+  // conocido de sync({alter:true}) con NOT NULL existentes.
+  await sequelize.query('ALTER TABLE "Expenses" ALTER COLUMN "category" DROP NOT NULL;');
+
+  // Employee.projectId pasó de obligatoria a opcional (null = personal ADMINISTRATIVO, ver
+  // Employee.js) — mismo problema conocido de sync({alter:true}) con NOT NULL existentes. No hace
+  // falta backfillear nada: todo trabajador ya existente ya tenía un projectId real, así que queda
+  // "de proyecto" sin tocarlo; DROP NOT NULL es lo único que falta para que la fila NUEVA (sin
+  // proyecto) pueda insertarse.
+  await sequelize.query('ALTER TABLE "Employees" ALTER COLUMN "projectId" DROP NOT NULL;');
+
   // Migración multi-tenant: companyId en cada tabla de negocio, backfilleado hacia la primera
   // empresa existente (ver backfillTenantColumns). Debe correr ANTES de crear la "Caja general"
   // de abajo, porque CashBox ya está protegida por los hooks de aislamiento y necesita un
@@ -300,6 +313,8 @@ async function applyPostSyncFixups() {
 
   await seedSocialSecurityProvidersForExistingCompanies();
   await seedWithholdingTypesForExistingCompanies();
+  await seedAdminExpenseCategoriesForExistingCompanies();
+  await backfillExpenseType();
   await backfillCashBoxMovementGrossAmount();
 
   await ensureAppDbRole();
@@ -386,6 +401,55 @@ async function seedWithholdingTypesForExistingCompanies() {
       }
     });
   }
+}
+
+// AdminExpenseCategory (catálogo de categorías de Gasto Administrativo General) se siembra con sus
+// valores por defecto al crear una empresa nueva (companyProvisioningService.js), pero las empresas
+// que ya existían antes de esta funcionalidad nunca pasaron por ahí — mismo criterio y mismo hueco
+// que seedWithholdingTypesForExistingCompanies. Debe correr ANTES de backfillExpenseType (necesita
+// que la categoría "Otros" ya exista para poder asignarla a los gastos administrativos preexistentes).
+async function seedAdminExpenseCategoriesForExistingCompanies() {
+  const companies = await Company.findAll();
+  for (const company of companies) {
+    // eslint-disable-next-line no-await-in-loop
+    await runInTransactionContext(company.id, null, async () => {
+      for (const name of DEFAULT_ADMIN_EXPENSE_CATEGORIES) {
+        // eslint-disable-next-line no-await-in-loop
+        await AdminExpenseCategory.findOrCreate({ where: { name } });
+      }
+    });
+  }
+}
+
+// Expense.expenseType pasó a existir junto con category (ahora opcional, solo aplica a gastos
+// 'proyecto') y adminCategoryId. Backfill determinístico y sin ambigüedad: un gasto con projectId ya
+// asignado siempre fue (y sigue siendo) un gasto de proyecto; uno sin projectId solo pudo haberse
+// creado desde la vista general de Gastos ANTES de que existiera el tipo administrativo, así que
+// pasa a 'administrativo' en la categoría "Otros" (el usuario lo reclasifica después si corresponde,
+// tal como pide la especificación). A diferencia del backfill histórico de cashBoxId más arriba
+// (escrito cuando solo existía una empresa), este recorre empresa por empresa porque adminCategoryId
+// depende de la categoría "Otros" DE CADA EMPRESA. Las UPDATE solo tocan filas con expenseType NULL
+// y el SET NOT NULL final es un no-op si ya estaba así, por lo que es idempotente y seguro en cada
+// arranque.
+async function backfillExpenseType() {
+  const companies = await Company.findAll();
+  for (const company of companies) {
+    // eslint-disable-next-line no-await-in-loop
+    await runInTransactionContext(company.id, null, async () => {
+      const [otros] = await AdminExpenseCategory.findOrCreate({ where: { name: 'Otros' } });
+      await sequelize.query(
+        `UPDATE "Expenses" SET "expenseType" = 'proyecto'
+         WHERE "expenseType" IS NULL AND "companyId" = :companyId AND "projectId" IS NOT NULL`,
+        { replacements: { companyId: company.id } }
+      );
+      await sequelize.query(
+        `UPDATE "Expenses" SET "expenseType" = 'administrativo', "adminCategoryId" = :otrosId
+         WHERE "expenseType" IS NULL AND "companyId" = :companyId AND "projectId" IS NULL`,
+        { replacements: { companyId: company.id, otrosId: otros.id } }
+      );
+    });
+  }
+  await sequelize.query('ALTER TABLE "Expenses" ALTER COLUMN "expenseType" SET NOT NULL;');
 }
 
 // CashBoxMovement.grossAmount es nueva (ver "Pagos al proyecto"): para los ingresos que ya

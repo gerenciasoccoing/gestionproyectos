@@ -8,6 +8,7 @@ export default function AdminLayout() {
     { to: 'roles', label: t('admin.tabs.roles') },
     { to: 'labor-parameters', label: t('admin.tabs.laborParameters') },
     { to: 'withholding-types', label: t('admin.tabs.withholdingTypes') },
+    { to: 'admin-expense-categories', label: t('admin.tabs.adminExpenseCategories') },
     { to: 'company', label: t('admin.tabs.company') },
     { to: 'consortiums', label: t('admin.tabs.consortiums') },
   ];

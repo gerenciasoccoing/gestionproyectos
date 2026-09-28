@@ -212,7 +212,9 @@ export const employeesApi = {
 };
 
 // Cálculo y registro de pago de nómina por período — ver payrollController.js. preview() no
-// persiste nada; confirm() persiste el PaymentReceipt calculado y genera su PDF de soporte.
+// persiste nada; confirm() persiste el PaymentReceipt calculado y genera su PDF de soporte (y, para
+// personal administrativo, el Gasto administrativo asociado — ver la especificación de Personal en
+// el menú principal / Gasto Administrativo General).
 export const payrollApi = {
   preview: (pid, id, data) => client.post(`/projects/${pid}/employees/${id}/payroll/preview`, data).then((r) => r.data),
   confirm: (pid, id, data) => client.post(`/projects/${pid}/employees/${id}/payroll/confirm`, data).then((r) => r.data),
@@ -228,6 +230,39 @@ export const employeeContractsApi = {
   // contractSignatureService.js#requestSignature. Devuelve signUrl aunque el correo falle, para
   // poder copiarlo y mandarlo a mano.
   requestSignature: (pid, employeeId, contractId) => client.post(`/projects/${pid}/employees/${employeeId}/contracts/${contractId}/request-signature`).then((r) => r.data),
+};
+
+// Personal del menú principal (sin proyecto fijo, ver backend/globalEmployeeRoutes.js) — mismo
+// modelo/tabla y misma lógica de negocio que employeesApi/payrollApi/employeeContractsApi (ver el
+// comentario equivalente en generalExpensesApi): solo cambia el punto de entrada. Un trabajador
+// administrativo (Employee.projectId null) solo aparece/se gestiona por acá; uno de proyecto
+// aparece en los dos lados (mismo registro).
+export const generalEmployeesApi = {
+  list: (params) => client.get('/employees', { params }).then((r) => r.data),
+  get: (id) => client.get(`/employees/${id}`).then((r) => r.data),
+  create: (formData) => client.post('/employees', formData).then((r) => r.data),
+  update: (id, formData) => client.put(`/employees/${id}`, formData).then((r) => r.data),
+  remove: (id) => client.delete(`/employees/${id}`),
+  addSocialSecurity: (id, formData) => client.post(`/employees/${id}/social-security`, formData).then((r) => r.data),
+  addPayment: (id, formData) => client.post(`/employees/${id}/payments`, formData).then((r) => r.data),
+  severancePreview: (id, data) => client.post(`/employees/${id}/severance/preview`, data).then((r) => r.data),
+  severanceConfirm: (id, data) => client.post(`/employees/${id}/severance`, data).then((r) => r.data),
+  uploadPazYSalvo: (id, formData) => client.post(`/employees/${id}/severance/paz-y-salvo`, formData).then((r) => r.data),
+  uploadCedula: (id, formData) => client.post(`/employees/${id}/cedula`, formData).then((r) => r.data),
+  previewContractValue: (data) => client.post('/employees/preview-contract-value', data).then((r) => r.data),
+};
+
+export const generalPayrollApi = {
+  preview: (id, data) => client.post(`/employees/${id}/payroll/preview`, data).then((r) => r.data),
+  confirm: (id, data) => client.post(`/employees/${id}/payroll/confirm`, data).then((r) => r.data),
+};
+
+export const generalEmployeeContractsApi = {
+  list: (employeeId) => client.get(`/employees/${employeeId}/contracts`).then((r) => r.data),
+  generate: (employeeId) => client.post(`/employees/${employeeId}/contracts`).then((r) => r.data),
+  generateOtrosi: (employeeId, contractId, data) => client.post(`/employees/${employeeId}/contracts/${contractId}/otrosi`, data).then((r) => r.data),
+  remove: (employeeId, contractId) => client.delete(`/employees/${employeeId}/contracts/${contractId}`).then((r) => r.data),
+  requestSignature: (employeeId, contractId) => client.post(`/employees/${employeeId}/contracts/${contractId}/request-signature`).then((r) => r.data),
 };
 
 // Flujo PÚBLICO de firma digital de contratos (sin sesión, ver contractSignatureRoutes.js): el
@@ -279,6 +314,24 @@ export const withholdingTypesApi = {
   create: (data) => client.post('/withholding-types', data).then((r) => r.data),
   update: (id, data) => client.put(`/withholding-types/${id}`, data).then((r) => r.data),
   setStatus: (id, active) => client.post(`/withholding-types/${id}/status`, { active }).then((r) => r.data),
+};
+
+// Catálogo de categorías de Gasto Administrativo General por empresa (Administración > Parámetros)
+// — mismo patrón que withholdingTypesApi.
+export const adminExpenseCategoriesApi = {
+  list: () => client.get('/admin-expense-categories').then((r) => r.data),
+  create: (data) => client.post('/admin-expense-categories', data).then((r) => r.data),
+  update: (id, data) => client.put(`/admin-expense-categories/${id}`, data).then((r) => r.data),
+  setStatus: (id, active) => client.post(`/admin-expense-categories/${id}/status`, { active }).then((r) => r.data),
+};
+
+// Reporte de Gastos Administrativos Generales — ver adminExpenseReportService.js. "Comparación
+// entre periodos" no es un endpoint aparte: el frontend llama get() dos veces con distinto
+// from/to y compara los resultados en pantalla.
+export const adminExpenseReportApi = {
+  get: (params) => client.get('/admin-expenses/report', { params }).then((r) => r.data),
+  exportPdf: (params) => getAndDownload('/admin-expenses/report/export-pdf', params, 'reporte-gastos-administrativos.pdf'),
+  exportExcel: (params) => getAndDownload('/admin-expenses/report/export-excel', params, 'reporte-gastos-administrativos.xlsx'),
 };
 
 export const projectPaymentsApi = {

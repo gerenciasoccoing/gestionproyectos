@@ -16,6 +16,14 @@ const MODULES = [
   'inventario',
   'cajas',
   'entrega_final',
+  // Gasto Administrativo General (crear/editar gastos sin proyecto y ver su reporte) — módulo
+  // aparte de 'gastos' porque el cliente pidió que sea configurable con roles propios, distintos de
+  // quién puede registrar gastos de proyecto. Al estar en MODULES, admin y gerente_proyecto lo
+  // reciben automáticamente (ver DEFAULT_ROLE_PERMISSIONS.admin/gerente_proyecto abajo) — el resto
+  // de roles NO lo tiene por defecto (ninguno lo lista a mano más abajo), cumpliendo exactamente
+  // "por defecto: Administrador y Gerente" sin impedir que se le dé a otro rol después desde
+  // Administración > Roles.
+  'gastos_admin',
 ];
 
 const ACTIONS = ['view', 'create', 'edit', 'delete'];

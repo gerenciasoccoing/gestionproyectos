@@ -43,6 +43,7 @@
     "clients": "Clients",
     "inventory": "Inventory",
     "purchaseOrders": "Purchase Orders",
+    "personnel": "Personnel",
     "expenses": "Expenses",
     "cashBoxes": "Cash Boxes",
     "admin": "Administration",
@@ -676,6 +677,16 @@
       "status": {
         "activo": "Active",
         "retirado": "Former"
+      },
+      "vinculacion": {
+        "administrativo": "Administrative",
+        "proyecto": "Project"
+      },
+      "filters": {
+        "vinculacion": "Vinculation",
+        "project": "Project",
+        "all": "All",
+        "allProjects": "All projects"
       }
     },
     "detail": {
@@ -766,7 +777,8 @@
           "paymentDate": "Payment date",
           "calculate": "Calculate",
           "processing": "Processing...",
-          "confirmButton": "Confirm and generate PDF"
+          "confirmButton": "Confirm and generate PDF",
+          "cashBoxRequired": "Select the source cash box to register this payroll's administrative expense"
         }
       },
       "breakdown": {
@@ -849,6 +861,30 @@
     },
     "totalLine": "Total: {{budgeted}} budgeted / {{spent}} spent",
     "category": "Category",
+    "adminCategory": "Administrative expense category",
+    "expenseType": {
+      "label": "Expense type",
+      "proyecto": "Project expense",
+      "administrativo": "General administrative expense"
+    },
+    "adminReport": {
+      "link": "Administrative expenses report",
+      "title": "General Administrative Expenses Report",
+      "help": "Filter by date range, category, supplier, cash box or worker. Never includes project expenses.",
+      "employee": "Worker",
+      "thisMonth": "This month",
+      "thisQuarter": "This quarter",
+      "thisYear": "This year",
+      "comparePrevious": "Compare with the same period last year",
+      "exportPdf": "Export PDF",
+      "exportExcel": "Export Excel",
+      "totalsByCategory": "Totals by category",
+      "previousPeriod": "Previous period",
+      "variation": "Variation",
+      "monthlyChart": "Monthly totals",
+      "monthlyTotal": "Month total",
+      "detailTitle": "Expense detail"
+    },
     "budgetedValue": "Budgeted value",
     "setBudget": "Set budget",
     "registeredTitle": "Recorded expenses",
@@ -914,7 +950,8 @@
       "manual": "Manual",
       "purchase_receipt": "Purchase",
       "purchase_order": "Purchase order",
-      "liquidacion": "Settlement"
+      "liquidacion": "Settlement",
+      "nomina": "Payroll"
     },
     "nit": "Tax ID",
     "phone": "Phone",
@@ -931,6 +968,7 @@
       "allProjects": "-- all projects --",
       "allSuppliers": "-- all suppliers --",
       "allCashBoxes": "-- all cash boxes --",
+      "allTypes": "-- all types --",
       "noProject": "No project",
       "clear": "Clear filters"
     },
@@ -1576,6 +1614,7 @@
       "roles": "Roles and Permissions",
       "laborParameters": "Labor Parameters",
       "withholdingTypes": "Withholdings",
+      "adminExpenseCategories": "Admin. Expense Categories",
       "company": "Company Data",
       "consortiums": "Consortiums / Joint Ventures"
     },
@@ -1597,6 +1636,21 @@
       "deactivate": "Deactivate",
       "activate": "Activate",
       "empty": "No withholding types registered."
+    },
+    "adminExpenseCategories": {
+      "title": "Administrative Expense Categories",
+      "help": "Catalog of categories available when registering a General Administrative Expense (no project). A category already used in an expense cannot be deleted, only deactivated.",
+      "newCategory": "+ New category",
+      "name": "Name",
+      "table": {
+        "name": "Name",
+        "status": "Status"
+      },
+      "active": "Active",
+      "inactive": "Inactive",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "empty": "No categories registered."
     },
     "users": {
       "title": "Users",

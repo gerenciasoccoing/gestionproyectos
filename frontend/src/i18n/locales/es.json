@@ -43,6 +43,7 @@
     "clients": "Clientes",
     "inventory": "Inventario",
     "purchaseOrders": "Órdenes de Compra",
+    "personnel": "Personal",
     "expenses": "Gastos",
     "cashBoxes": "Cajas",
     "admin": "Administración",
@@ -676,6 +677,16 @@
       "status": {
         "activo": "Activo",
         "retirado": "Retirado"
+      },
+      "vinculacion": {
+        "administrativo": "Administrativo",
+        "proyecto": "De proyecto"
+      },
+      "filters": {
+        "vinculacion": "Vinculación",
+        "project": "Proyecto",
+        "all": "Todos",
+        "allProjects": "Todos los proyectos"
       }
     },
     "detail": {
@@ -766,7 +777,8 @@
           "paymentDate": "Fecha de pago",
           "calculate": "Calcular",
           "processing": "Procesando...",
-          "confirmButton": "Confirmar y generar PDF"
+          "confirmButton": "Confirmar y generar PDF",
+          "cashBoxRequired": "Debe seleccionar la caja de origen para registrar el gasto administrativo de esta nómina"
         }
       },
       "breakdown": {
@@ -849,6 +861,30 @@
     },
     "totalLine": "Total: {{budgeted}} presupuestado / {{spent}} gastado",
     "category": "Categoría",
+    "adminCategory": "Categoría de gasto administrativo",
+    "expenseType": {
+      "label": "Tipo de gasto",
+      "proyecto": "Gasto de proyecto",
+      "administrativo": "Gasto administrativo general"
+    },
+    "adminReport": {
+      "link": "Reporte de gastos administrativos",
+      "title": "Reporte de Gastos Administrativos Generales",
+      "help": "Filtra por rango de fechas, categoría, proveedor, caja o trabajador. Nunca incluye gastos de proyecto.",
+      "employee": "Trabajador",
+      "thisMonth": "Este mes",
+      "thisQuarter": "Este trimestre",
+      "thisYear": "Este año",
+      "comparePrevious": "Comparar con el mismo periodo del año anterior",
+      "exportPdf": "Exportar PDF",
+      "exportExcel": "Exportar Excel",
+      "totalsByCategory": "Totales por categoría",
+      "previousPeriod": "Periodo anterior",
+      "variation": "Variación",
+      "monthlyChart": "Totales por mes",
+      "monthlyTotal": "Total del mes",
+      "detailTitle": "Detalle de gastos"
+    },
     "budgetedValue": "Valor presupuestado",
     "setBudget": "Fijar presupuesto",
     "registeredTitle": "Gastos registrados",
@@ -914,7 +950,8 @@
       "manual": "Manual",
       "purchase_receipt": "Compra",
       "purchase_order": "Orden de compra",
-      "liquidacion": "Liquidación"
+      "liquidacion": "Liquidación",
+      "nomina": "Nómina"
     },
     "nit": "NIT",
     "phone": "Tel",
@@ -938,6 +975,7 @@
       "allProjects": "-- todos los proyectos --",
       "allSuppliers": "-- todos los proveedores --",
       "allCashBoxes": "-- todas las cajas --",
+      "allTypes": "-- todos los tipos --",
       "noProject": "Sin proyecto",
       "clear": "Limpiar filtros"
     },
@@ -1576,6 +1614,7 @@
       "roles": "Roles y Permisos",
       "laborParameters": "Parámetros Laborales",
       "withholdingTypes": "Retenciones",
+      "adminExpenseCategories": "Categorías de Gastos Admin.",
       "company": "Datos de la Empresa",
       "consortiums": "Consorcios / Uniones Temporales"
     },
@@ -1597,6 +1636,21 @@
       "deactivate": "Desactivar",
       "activate": "Activar",
       "empty": "Sin tipos de retención registrados."
+    },
+    "adminExpenseCategories": {
+      "title": "Categorías de Gastos Administrativos",
+      "help": "Catálogo de categorías disponibles al registrar un Gasto Administrativo General (sin proyecto). Una categoría ya usada en un gasto no se puede eliminar, solo desactivar.",
+      "newCategory": "+ Nueva categoría",
+      "name": "Nombre",
+      "table": {
+        "name": "Nombre",
+        "status": "Estado"
+      },
+      "active": "Activa",
+      "inactive": "Inactiva",
+      "deactivate": "Desactivar",
+      "activate": "Activar",
+      "empty": "Sin categorías registradas."
     },
     "users": {
       "title": "Usuarios",

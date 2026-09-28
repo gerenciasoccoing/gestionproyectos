@@ -60,6 +60,7 @@ const modelDefiners = [
   require('./CashBoxMovement'),
   require('./WithholdingType'),
   require('./CashBoxMovementWithholding'),
+  require('./AdminExpenseCategory'),
 ];
 
 // Company (la tabla de empresas en sí), Permission (catálogo global fijo de permisos, no datos de

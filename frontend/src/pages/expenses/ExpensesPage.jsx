@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { expensesApi, generalExpensesApi, projectsApi, thirdPartiesApi, cashBoxesApi } from '../../api';
+import { expensesApi, generalExpensesApi, projectsApi, thirdPartiesApi, cashBoxesApi, adminExpenseCategoriesApi } from '../../api';
 import { Card, Button, Input, Select, SearchSelect, TextArea, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
@@ -9,13 +9,13 @@ import useSubmitGuard from '../../hooks/useSubmitGuard';
 
 const CATEGORIES = ['mano_obra', 'materiales', 'equipos', 'viaticos', 'imprevistos'];
 const emptyForm = {
-  category: 'materiales', amount: '', date: '', description: '',
+  expenseType: 'proyecto', category: 'materiales', adminCategoryId: '', amount: '', date: '', description: '',
   vendorName: '', vendorNit: '', vendorPhone: '', vendorEmail: '',
   cashBoxId: '', supplierId: '', projectId: '',
 };
 const emptyItem = { description: '', quantity: '1', unitPrice: '', totalPrice: '' };
 const emptyTax = { name: '', rate: '', amount: '' };
-const emptyFilters = { projectId: '', supplierId: '', cashBoxId: '', from: '', to: '' };
+const emptyFilters = { expenseType: '', projectId: '', supplierId: '', cashBoxId: '', from: '', to: '' };
 const TAX_CODE_SUGGESTIONS = ['IVA', 'ReteIVA', 'ReteICA', 'ICA', 'Impoconsumo'];
 
 function sum(list, field) {
@@ -70,14 +70,18 @@ export default function ExpensesPage() {
   const [cashBoxes, setCashBoxes] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [adminCategories, setAdminCategories] = useState([]);
   const [filters, setFilters] = useState(emptyFilters);
 
   const LABELS = Object.fromEntries(CATEGORIES.map((c) => [c, t(`expenses.categories.${c}`)]));
   const cashBoxOptions = cashBoxes.filter((cb) => cb.status === 'activa' || cb.id === form.cashBoxId);
+  const adminCategoryOptions = adminCategories.filter((c) => c.active || c.id === form.adminCategoryId);
+  const isAdminExpenseForm = isGeneral && form.expenseType === 'administrativo';
 
   const load = () => {
     const params = isGeneral
       ? {
+        ...(filters.expenseType ? { expenseType: filters.expenseType } : {}),
         ...(filters.projectId ? { projectId: filters.projectId } : {}),
         ...(filters.supplierId ? { supplierId: filters.supplierId } : {}),
         ...(filters.cashBoxId ? { cashBoxId: filters.cashBoxId } : {}),
@@ -92,7 +96,10 @@ export default function ExpensesPage() {
   useEffect(() => {
     cashBoxesApi.list().then(setCashBoxes);
     thirdPartiesApi.list({ type: 'proveedor' }).then(setSuppliers);
-    if (isGeneral) projectsApi.list().then(setProjects);
+    if (isGeneral) {
+      projectsApi.list().then(setProjects);
+      adminExpenseCategoriesApi.list().then(setAdminCategories);
+    }
   }, [isGeneral]);
 
   const itemsSubtotal = sum(items, 'totalPrice');
@@ -116,10 +123,14 @@ export default function ExpensesPage() {
     e.preventDefault();
     setError('');
     setWarning('');
+    const isAdminExpense = isGeneral && form.expenseType === 'administrativo';
     try {
       const fd = new FormData();
       Object.entries(form).forEach(([k, v]) => {
-        if (k === 'projectId' && !isGeneral) return; // en modo proyecto el projectId lo fija la URL, no se envía
+        if (k === 'expenseType' && !isGeneral) return; // en modo proyecto siempre es 'proyecto' (lo fuerza el backend)
+        if (k === 'projectId' && (!isGeneral || isAdminExpense)) return; // en modo proyecto lo fija la URL; administrativo nunca lleva proyecto
+        if (k === 'category' && isAdminExpense) return; // administrativo usa adminCategoryId, no category
+        if (k === 'adminCategoryId' && !isAdminExpense) return;
         fd.append(k, v);
       });
       fd.append('subtotal', itemsSubtotal || '');
@@ -241,7 +252,12 @@ export default function ExpensesPage() {
     <div>
       {isGeneral && (
         <Card title={t('expenses.filters.title')}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+            <Select label={t('expenses.expenseType.label')} value={filters.expenseType} onChange={(e) => setFilters((f) => ({ ...f, expenseType: e.target.value }))}>
+              <option value="">{t('expenses.filters.allTypes')}</option>
+              <option value="proyecto">{t('expenses.expenseType.proyecto')}</option>
+              <option value="administrativo">{t('expenses.expenseType.administrativo')}</option>
+            </Select>
             <SearchSelect
               label={t('expenses.filters.project')}
               options={[{ value: 'none', label: t('expenses.filters.noProject') }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
@@ -263,7 +279,7 @@ export default function ExpensesPage() {
             <Input label={t('expenses.filters.from')} type="date" value={filters.from} onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value }))} />
             <Input label={t('expenses.filters.to')} type="date" value={filters.to} onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value }))} />
           </div>
-          {(filters.projectId || filters.supplierId || filters.cashBoxId || filters.from || filters.to) && (
+          {(filters.expenseType || filters.projectId || filters.supplierId || filters.cashBoxId || filters.from || filters.to) && (
             <Button variant="secondary" className="mt-3" onClick={() => setFilters(emptyFilters)}>{t('expenses.filters.clear')}</Button>
           )}
         </Card>
@@ -295,9 +311,18 @@ export default function ExpensesPage() {
       )}
 
       <Card title={t('expenses.registeredTitle')} actions={
-        <Can module="gastos" action="create">
-          <Button onClick={() => { setShowForm((s) => !s); if (showForm) resetForm(); }}>{showForm ? t('common.cancel') : t('expenses.add')}</Button>
-        </Can>
+        <div className="flex gap-2">
+          {isGeneral && (
+            <Can module="gastos_admin" action="view">
+              <Link to="/expenses/admin-report">
+                <Button variant="secondary">{t('expenses.adminReport.link')}</Button>
+              </Link>
+            </Can>
+          )}
+          <Can module="gastos" action="create">
+            <Button onClick={() => { setShowForm((s) => !s); if (showForm) resetForm(); }}>{showForm ? t('common.cancel') : t('expenses.add')}</Button>
+          </Can>
+        </div>
       }>
         {showForm && !isGeneral && !project?.contractNumber && (
           <p className="text-xs text-yellow-700 mb-3">{t('contractual.contractNumber.warning')}</p>
@@ -325,16 +350,35 @@ export default function ExpensesPage() {
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-              <Select label={t('expenses.category')} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                {CATEGORIES.map((c) => <option key={c} value={c}>{LABELS[c]}</option>)}
-              </Select>
+              {isGeneral && (
+                <Select
+                  label={t('expenses.expenseType.label')}
+                  value={form.expenseType}
+                  onChange={(e) => setForm({ ...form, expenseType: e.target.value, projectId: e.target.value === 'administrativo' ? '' : form.projectId })}
+                >
+                  <option value="proyecto">{t('expenses.expenseType.proyecto')}</option>
+                  <Can module="gastos_admin" action="create">
+                    <option value="administrativo">{t('expenses.expenseType.administrativo')}</option>
+                  </Can>
+                </Select>
+              )}
+              {isAdminExpenseForm ? (
+                <Select label={t('expenses.adminCategory')} value={form.adminCategoryId} onChange={(e) => setForm({ ...form, adminCategoryId: e.target.value })} required>
+                  <option value="">{t('common.selectPlaceholder')}</option>
+                  {adminCategoryOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </Select>
+              ) : (
+                <Select label={t('expenses.category')} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{LABELS[c]}</option>)}
+                </Select>
+              )}
               <Input label={t('expenses.totalValue')} type="number" min="0" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
               <Input label={t('expenses.date')} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
               <Select label={t('expenses.cashBox')} value={form.cashBoxId} onChange={(e) => setForm({ ...form, cashBoxId: e.target.value })} required>
                 <option value="">{t('common.selectPlaceholder')}</option>
                 {cashBoxOptions.map((cb) => <option key={cb.id} value={cb.id}>{cb.name} ({money(cb.balance)})</option>)}
               </Select>
-              {isGeneral && (
+              {isGeneral && !isAdminExpenseForm && (
                 <SearchSelect
                   label={t('expenses.assignProject')}
                   options={projects.map((p) => ({ value: p.id, label: p.name }))}
@@ -417,11 +461,15 @@ export default function ExpensesPage() {
               <tr className="border-b border-gray-100">
                 <td className="py-1 pr-3 text-gray-400 font-mono text-xs">{e.expenseNumber ? `${e.contractPrefix ? `${e.contractPrefix}-` : ''}${e.expenseNumber}` : '-'}</td>
                 <td className="py-1 pr-3">{formatDate(e.date)}</td>
-                <td className="py-1 pr-3">{LABELS[e.category]}</td>
+                <td className="py-1 pr-3">{e.expenseType === 'administrativo' ? (e.adminCategory?.name || '-') : LABELS[e.category]}</td>
                 <td className="py-1 pr-3">{e.vendorName || '-'}</td>
                 {isGeneral && (
                   <>
-                    <td className="py-1 pr-3">{e.Project?.name || <span className="text-gray-400">{t('expenses.filters.noProject')}</span>}</td>
+                    <td className="py-1 pr-3">
+                      {e.expenseType === 'administrativo'
+                        ? <Badge color="blue">{t('expenses.expenseType.administrativo')}</Badge>
+                        : (e.Project?.name || <span className="text-gray-400">{t('expenses.filters.noProject')}</span>)}
+                    </td>
                     <td className="py-1 pr-3">{e.CashBox?.name || '-'}</td>
                   </>
                 )}
@@ -438,7 +486,7 @@ export default function ExpensesPage() {
                 </td>
                 <td className="py-1 pr-3">
                   {e.supportFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(e.supportFilePath)} target="_blank" rel="noreferrer">{t('common.view')}</a> : '-'}
-                  <Can module="gastos" action="edit">
+                  <Can module={e.expenseType === 'administrativo' ? 'gastos_admin' : 'gastos'} action="edit">
                     <label className="block mt-1 text-xs text-blue-600 hover:underline cursor-pointer">
                       {uploadingDoc === `${e.id}:invoiceFile` ? t('expenses.uploading') : (e.supportFilePath ? t('expenses.replace') : t('expenses.attach'))}
                       <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" disabled={uploadingDoc === `${e.id}:invoiceFile`} onChange={(ev) => { uploadDoc(e.id, 'invoiceFile', ev.target.files?.[0]); ev.target.value = ''; }} />
@@ -447,7 +495,7 @@ export default function ExpensesPage() {
                 </td>
                 <td className="py-1 pr-3">
                   {e.paymentReceiptFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(e.paymentReceiptFilePath)} target="_blank" rel="noreferrer">{t('common.view')}</a> : '-'}
-                  <Can module="gastos" action="edit">
+                  <Can module={e.expenseType === 'administrativo' ? 'gastos_admin' : 'gastos'} action="edit">
                     <label className="block mt-1 text-xs text-blue-600 hover:underline cursor-pointer">
                       {uploadingDoc === `${e.id}:paymentReceiptFile` ? t('expenses.uploading') : (e.paymentReceiptFilePath ? t('expenses.replace') : t('expenses.attach'))}
                       <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" disabled={uploadingDoc === `${e.id}:paymentReceiptFile`} onChange={(ev) => { uploadDoc(e.id, 'paymentReceiptFile', ev.target.files?.[0]); ev.target.value = ''; }} />
@@ -456,7 +504,7 @@ export default function ExpensesPage() {
                 </td>
                 <td className="py-1 pr-3 text-right">
                   {e.source === 'manual' && (
-                    <Can module="gastos" action="delete"><Button variant="danger" onClick={() => remove(e.id)}>{t('common.delete')}</Button></Can>
+                    <Can module={e.expenseType === 'administrativo' ? 'gastos_admin' : 'gastos'} action="delete"><Button variant="danger" onClick={() => remove(e.id)}>{t('common.delete')}</Button></Can>
                   )}
                 </td>
               </tr>

@@ -10,7 +10,7 @@ import Logo from './Logo';
 import LanguageSwitcher from './LanguageSwitcher';
 import {
   ProjectsIcon, QuotationsIcon, PriceBookIcon, ApuIcon, SuppliersIcon, ThirdPartiesIcon, InventoryIcon, AdminIcon,
-  ExpensesIcon, CashBoxIcon, PurchaseOrdersIcon, MarketStudyIcon, MenuIcon, LogoutIcon,
+  ExpensesIcon, CashBoxIcon, PurchaseOrdersIcon, MarketStudyIcon, PersonnelIcon, MenuIcon, LogoutIcon,
 } from './NavIcons';
 
 // Ancho del sidebar expandido/colapsado (a íconos). Se comparte entre el <aside> y el spacer del
@@ -115,6 +115,9 @@ export default function Layout() {
                 <SidebarLink to="/market-studies" label={t('nav.marketStudy')} icon={<MarketStudyIcon />} collapsed={collapsed} />
               </Can>
             </HasFeature>
+            <Can module="personal" action="view">
+              <SidebarLink to="/personnel" label={t('nav.personnel')} icon={<PersonnelIcon />} collapsed={collapsed} />
+            </Can>
             <Can module="gastos" action="view">
               <SidebarLink to="/expenses" label={t('nav.expenses')} icon={<ExpensesIcon />} collapsed={collapsed} />
             </Can>

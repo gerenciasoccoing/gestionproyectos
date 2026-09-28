@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { employeesApi } from '../api';
 import { money, extractError } from './ui';
 
 // Ayuda visible bajo el campo de salario del trabajador (Personal): muestra el SMLV y el auxilio
@@ -8,7 +7,9 @@ import { money, extractError } from './ui';
 // salario capturado es el BÁSICO, antes de sumar el auxilio de transporte. Cuando el tipo de
 // contrato usa fecha de fin (showRange), también calcula en vivo (sin persistir nada, ver
 // employeeController.js#previewContractValue) el valor total del contrato para ese rango de días.
-export default function ContractValueHelper({ laborParams, projectId, salaryValue, entryDate, contractEndDate, showRange }) {
+// previewFn (en vez de projectId directo) para que funcione igual sea que el formulario esté dentro
+// de un proyecto o en Personal del menú principal — ver employeeApiFactory.js.
+export default function ContractValueHelper({ laborParams, previewFn, salaryValue, entryDate, contractEndDate, showRange }) {
   const { t } = useTranslation();
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
@@ -16,14 +17,14 @@ export default function ContractValueHelper({ laborParams, projectId, salaryValu
   useEffect(() => {
     setPreview(null);
     setError('');
-    if (!showRange || !projectId || !salaryValue || !entryDate || !contractEndDate) return undefined;
+    if (!showRange || !previewFn || !salaryValue || !entryDate || !contractEndDate) return undefined;
     const handle = setTimeout(() => {
-      employeesApi.previewContractValue(projectId, { salaryValue, entryDate, contractEndDate })
+      previewFn({ salaryValue, entryDate, contractEndDate })
         .then(setPreview)
         .catch((err) => setError(extractError(err)));
     }, 500);
     return () => clearTimeout(handle);
-  }, [showRange, projectId, salaryValue, entryDate, contractEndDate]);
+  }, [showRange, previewFn, salaryValue, entryDate, contractEndDate]);
 
   if (!laborParams) return null;
 

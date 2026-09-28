@@ -1,6 +1,6 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { sequelize, Employee, Severance, Expense } = require('../models');
+const { sequelize, Employee, Severance, Expense, AdminExpenseCategory } = require('../models');
 const { calculateSeverance } = require('../services/severanceService');
 const { relativePath, saveGeneratedFile } = require('../middleware/upload');
 const { assertCashBoxUsable, overdraftWarning } = require('../services/cashBoxService');
@@ -17,8 +17,14 @@ function pdfDocToBuffer(doc) {
   });
 }
 
+function scopeWhere(req) {
+  const where = { id: req.params.id };
+  if (req.params.projectId) where.projectId = req.params.projectId;
+  return where;
+}
+
 async function loadActiveEmployee(req) {
-  const employee = await Employee.findOne({ where: { id: req.params.id, projectId: req.params.projectId } });
+  const employee = await Employee.findOne({ where: scopeWhere(req) });
   if (!employee) throw new ApiError(404, 'Empleado no encontrado');
   if (employee.status === 'retirado') throw new ApiError(400, 'El empleado ya fue retirado');
   return employee;
@@ -58,22 +64,49 @@ const confirmRetirement = asyncHandler(async (req, res) => {
     cause,
   });
 
+  // Puente liquidación -> Gasto: de proyecto para personal de proyecto (comportamiento sin
+  // cambios), administrativo (categoría "Personal administrativo de planta", sin proyecto, prefijo
+  // ADM) para personal administrativo — ver la especificación del cliente para Gasto Administrativo
+  // General. Se decide a partir de employee.projectId (el dato real del trabajador), nunca de
+  // req.params.projectId (no existe cuando se confirma desde Personal del menú principal).
+  const isAdministrative = !employee.projectId;
   const { severance, warning } = await sequelize.transaction(async (t) => {
     await assertCashBoxUsable(cashBoxId, { transaction: t });
     const expenseNumber = await nextExpenseNumber(t);
-    const contractPrefix = await contractPrefixForProject(req.params.projectId, t);
-    const expense = await Expense.create({
-      projectId: req.params.projectId,
-      cashBoxId,
-      category: 'mano_obra',
-      amount: result.total,
-      date: exitDate,
-      description: `Liquidación de prestaciones sociales - ${employee.name}`,
-      source: 'liquidacion',
-      createdBy: req.user.id,
-      expenseNumber,
-      contractPrefix,
-    }, { transaction: t });
+    let expense;
+    if (isAdministrative) {
+      const adminCategory = await AdminExpenseCategory.findOne({ where: { name: 'Personal administrativo de planta' }, transaction: t });
+      if (!adminCategory) throw new ApiError(500, 'No se encontró la categoría "Personal administrativo de planta" en el catálogo de gastos administrativos.');
+      expense = await Expense.create({
+        expenseType: 'administrativo',
+        projectId: null,
+        cashBoxId,
+        adminCategoryId: adminCategory.id,
+        employeeId: employee.id,
+        amount: result.total,
+        date: exitDate,
+        description: `Liquidación de prestaciones sociales - ${employee.name}`,
+        source: 'liquidacion',
+        createdBy: req.user.id,
+        expenseNumber,
+        contractPrefix: 'ADM',
+      }, { transaction: t });
+    } else {
+      const contractPrefix = await contractPrefixForProject(employee.projectId, t);
+      expense = await Expense.create({
+        expenseType: 'proyecto',
+        projectId: employee.projectId,
+        cashBoxId,
+        category: 'mano_obra',
+        amount: result.total,
+        date: exitDate,
+        description: `Liquidación de prestaciones sociales - ${employee.name}`,
+        source: 'liquidacion',
+        createdBy: req.user.id,
+        expenseNumber,
+        contractPrefix,
+      }, { transaction: t });
+    }
 
     const created = await Severance.create({
       employeeId: employee.id,
@@ -102,7 +135,7 @@ const confirmRetirement = asyncHandler(async (req, res) => {
     return { severance: created, warning: w };
   });
 
-  const company = await getLetterheadForProject(req.params.projectId);
+  const company = await getLetterheadForProject(employee.projectId);
   const pdfBuffer = await pdfDocToBuffer(generateLaborCalculationPdf({
     title: 'Liquidación de prestaciones sociales',
     employee,
@@ -121,7 +154,7 @@ const confirmRetirement = asyncHandler(async (req, res) => {
 });
 
 const uploadPazYSalvo = asyncHandler(async (req, res) => {
-  const employee = await Employee.findOne({ where: { id: req.params.id, projectId: req.params.projectId } });
+  const employee = await Employee.findOne({ where: scopeWhere(req) });
   if (!employee) throw new ApiError(404, 'Empleado no encontrado');
   const severance = await Severance.findOne({ where: { employeeId: employee.id } });
   if (!severance) throw new ApiError(400, 'El empleado aún no tiene liquidación registrada');

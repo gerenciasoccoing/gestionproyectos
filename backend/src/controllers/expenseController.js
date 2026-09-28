@@ -3,6 +3,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const {
   sequelize, Expense, ExpenseItem, ExpenseTax, ExpenseBudget, Project, CashBox, ThirdParty, PurchaseOrderPayment,
+  AdminExpenseCategory, Employee,
 } = require('../models');
 const { relativePath } = require('../middleware/upload');
 const { scanInvoice } = require('../services/invoiceScanService');
@@ -26,12 +27,25 @@ const EXPENSE_INCLUDE = [
   { model: Project, attributes: ['id', 'name'] },
   { model: CashBox, attributes: ['id', 'name'] },
   { model: ThirdParty, as: 'supplierParty', attributes: ['id', 'name'] },
+  { model: AdminExpenseCategory, as: 'adminCategory', attributes: ['id', 'name'] },
+  { model: Employee, attributes: ['id', 'name'] },
 ];
 
 function scopeWhere(req) {
   const where = { id: req.params.id };
   if (req.params.projectId) where.projectId = req.params.projectId;
   return where;
+}
+
+// Crear/editar un gasto administrativo (sin proyecto) es una acción del módulo 'gastos_admin',
+// aparte de 'gastos' (que sigue gobernando los gastos de proyecto, ver rutas) — el tipo solo se
+// conoce leyendo el body, no se puede resolver a nivel de middleware de ruta como con los demás
+// permisos, así que se valida acá dentro. admin siempre pasa, igual que requirePermission.
+function assertCanManageAdminExpense(req, action) {
+  if (req.user.isAdmin) return;
+  if (!req.user.permissions.has(`gastos_admin:${action}`)) {
+    throw new ApiError(403, `No tiene permiso para ${action} en gastos_admin`);
+  }
 }
 
 // items/taxes llegan como JSON string (el formulario es multipart/form-data por el archivo
@@ -82,7 +96,7 @@ function filesFromRequest(req) {
 // proyecto"), proveedor, caja y rango de fechas, combinables entre sí. En la ruta anidada el
 // proyecto queda fijo por la URL y estos filtros de proyecto no aplican.
 const list = asyncHandler(async (req, res) => {
-  const { from, to, category, supplierId, cashBoxId } = req.query;
+  const { from, to, category, supplierId, cashBoxId, expenseType, adminCategoryId, employeeId } = req.query;
   const where = {};
   if (req.params.projectId) {
     where.projectId = req.params.projectId;
@@ -92,6 +106,12 @@ const list = asyncHandler(async (req, res) => {
   if (category) where.category = category;
   if (supplierId) where.supplierId = supplierId;
   if (cashBoxId) where.cashBoxId = cashBoxId;
+  // Filtro de tipo (solo tiene sentido en la vista general): 'proyecto'/'administrativo'. La ruta
+  // anidada de proyecto ya excluye por construcción los gastos administrativos (siempre tienen
+  // projectId null), así que no necesita este filtro.
+  if (!req.params.projectId && expenseType) where.expenseType = expenseType;
+  if (adminCategoryId) where.adminCategoryId = adminCategoryId;
+  if (employeeId) where.employeeId = employeeId;
   if (from || to) {
     where.date = {};
     if (from) where.date[Op.gte] = from;
@@ -122,19 +142,31 @@ const list = asyncHandler(async (req, res) => {
 const create = asyncHandler(async (req, res) => {
   const {
     category, amount, date, description, vendorName, vendorNit, vendorPhone, vendorEmail,
-    subtotal, taxAmount, cashBoxId, supplierId,
+    subtotal, taxAmount, cashBoxId, supplierId, adminCategoryId, employeeId,
   } = req.body;
-  // Ruta anidada: projectId siempre viene en la URL. Ruta global: opcional, en el body (el gasto
-  // puede quedar sin proyecto).
-  const projectId = req.params.projectId || req.body.projectId || null;
+  // Ruta anidada: siempre es un gasto DE PROYECTO (projectId viene de la URL, expenseType se fuerza
+  // a 'proyecto' sin importar qué mande el body). Ruta global: el body elige el tipo; 'proyecto' por
+  // defecto si no se manda nada, para no cambiar el comportamiento de un formulario que aún no
+  // envíe expenseType.
+  const expenseType = req.params.projectId
+    ? 'proyecto'
+    : (req.body.expenseType === 'administrativo' ? 'administrativo' : 'proyecto');
+  const projectId = expenseType === 'administrativo' ? null : (req.params.projectId || req.body.projectId || null);
 
-  if (!category || !CATEGORIES.includes(category)) throw new ApiError(400, `category debe ser uno de: ${CATEGORIES.join(', ')}`);
   if (amount === undefined || Number(amount) < 0) throw new ApiError(400, 'amount es obligatorio y no puede ser negativo');
   if (!date) throw new ApiError(400, 'date es obligatorio');
   if (!cashBoxId) throw new ApiError(400, 'cashBoxId es obligatorio');
 
-  if (projectId && !req.user.isAdmin && !req.user.projectIds.includes(projectId)) {
-    throw new ApiError(403, 'No tiene acceso a este proyecto');
+  if (expenseType === 'proyecto') {
+    if (!category || !CATEGORIES.includes(category)) throw new ApiError(400, `category debe ser uno de: ${CATEGORIES.join(', ')}`);
+    if (projectId && !req.user.isAdmin && !req.user.projectIds.includes(projectId)) {
+      throw new ApiError(403, 'No tiene acceso a este proyecto');
+    }
+  } else {
+    assertCanManageAdminExpense(req, 'create');
+    if (!adminCategoryId) throw new ApiError(400, 'adminCategoryId es obligatorio para un gasto administrativo');
+    const cat = await AdminExpenseCategory.findByPk(adminCategoryId);
+    if (!cat || !cat.active) throw new ApiError(400, 'Categoría de gasto administrativo inválida o inactiva');
   }
 
   const items = sanitizeItems(req.body.items);
@@ -144,12 +176,18 @@ const create = asyncHandler(async (req, res) => {
   const { expense, warning } = await sequelize.transaction(async (t) => {
     await assertCashBoxUsable(cashBoxId, { transaction: t });
     const expenseNumber = await nextExpenseNumber(t);
-    const contractPrefix = await contractPrefixForProject(projectId, t);
+    // Prefijo: 'ADM' para gastos administrativos (nunca dependen de un proyecto/contrato); igual
+    // que siempre para los de proyecto (primeros 3 dígitos de Project.contractNumber, o null si el
+    // proyecto no tiene número de contrato asignado).
+    const contractPrefix = expenseType === 'administrativo' ? 'ADM' : await contractPrefixForProject(projectId, t);
     const created = await Expense.create({
+      expenseType,
       projectId,
       cashBoxId,
       supplierId: supplierId || null,
-      category,
+      category: expenseType === 'proyecto' ? category : null,
+      adminCategoryId: expenseType === 'administrativo' ? adminCategoryId : null,
+      employeeId: expenseType === 'administrativo' ? (employeeId || null) : null,
       amount,
       date,
       description,
@@ -223,13 +261,23 @@ const update = asyncHandler(async (req, res) => {
     return res.json(full);
   }
 
+  if (expense.expenseType === 'administrativo') assertCanManageAdminExpense(req, 'edit');
+
   const {
     category, amount, date, description, vendorName, vendorNit, vendorPhone, vendorEmail,
-    subtotal, taxAmount, cashBoxId, supplierId,
+    subtotal, taxAmount, cashBoxId, supplierId, adminCategoryId, employeeId,
   } = req.body;
-  if (category !== undefined) {
+  if (expense.expenseType === 'proyecto' && category !== undefined) {
     if (!CATEGORIES.includes(category)) throw new ApiError(400, `category debe ser uno de: ${CATEGORIES.join(', ')}`);
     expense.category = category;
+  }
+  if (expense.expenseType === 'administrativo' && adminCategoryId !== undefined) {
+    const cat = await AdminExpenseCategory.findByPk(adminCategoryId);
+    if (!cat || !cat.active) throw new ApiError(400, 'Categoría de gasto administrativo inválida o inactiva');
+    expense.adminCategoryId = adminCategoryId;
+  }
+  if (expense.expenseType === 'administrativo' && employeeId !== undefined) {
+    expense.employeeId = employeeId || null;
   }
   if (amount !== undefined) {
     if (Number(amount) < 0) throw new ApiError(400, 'amount no puede ser negativo');
@@ -244,9 +292,9 @@ const update = asyncHandler(async (req, res) => {
   if (subtotal !== undefined) expense.subtotal = subtotal || null;
   if (taxAmount !== undefined) expense.taxAmount = taxAmount || null;
   if (supplierId !== undefined) expense.supplierId = supplierId || null;
-  // El proyecto solo es editable desde la ruta general: en la ruta anidada queda fijo por la URL,
-  // igual que siempre.
-  if (!req.params.projectId && req.body.projectId !== undefined) {
+  // El proyecto solo es editable desde la ruta general en gastos DE PROYECTO: en la ruta anidada
+  // queda fijo por la URL, igual que siempre; un gasto administrativo nunca lleva proyecto.
+  if (expense.expenseType === 'proyecto' && !req.params.projectId && req.body.projectId !== undefined) {
     const newProjectId = req.body.projectId || null;
     if (newProjectId && !req.user.isAdmin && !req.user.projectIds.includes(newProjectId)) {
       throw new ApiError(403, 'No tiene acceso a este proyecto');

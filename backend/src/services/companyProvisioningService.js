@@ -1,9 +1,10 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const ApiError = require('../utils/ApiError');
-const { Company, User, Role, Permission, LaborParameters, CashBox, SocialSecurityProvider, WithholdingType } = require('../models');
+const { Company, User, Role, Permission, LaborParameters, CashBox, SocialSecurityProvider, WithholdingType, AdminExpenseCategory } = require('../models');
 const { DEFAULT_SOCIAL_SECURITY_PROVIDERS } = require('../config/socialSecurityProviders');
 const { DEFAULT_WITHHOLDING_TYPES } = require('../config/withholdingTypes');
+const { DEFAULT_ADMIN_EXPENSE_CATEGORIES } = require('../config/adminExpenseCategories');
 // Chequeo de correo duplicado ANTES de tener companyId de contexto (ver provisionCompany): con la
 // Capa 2 (RLS) activa, la conexión restringida no ve NINGUNA fila sin ese contexto — un
 // User.findOne de la conexión normal acá siempre devolvería null, sin importar si el correo ya
@@ -75,6 +76,11 @@ async function seedDefaultsForCompany(company, { adminName, adminEmail, adminPas
     for (const { name, defaultPercent, recoverable } of DEFAULT_WITHHOLDING_TYPES) {
       // eslint-disable-next-line no-await-in-loop
       await WithholdingType.findOrCreate({ where: { name }, defaults: { defaultPercent, recoverable } });
+    }
+
+    for (const name of DEFAULT_ADMIN_EXPENSE_CATEGORIES) {
+      // eslint-disable-next-line no-await-in-loop
+      await AdminExpenseCategory.findOrCreate({ where: { name } });
     }
 
     return admin;

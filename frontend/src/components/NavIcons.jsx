@@ -89,6 +89,17 @@ export function AdminIcon(props) {
   );
 }
 
+export function PersonnelIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" {...common} {...props}>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3.5 20c0-3.3 2.5-5.7 5.5-5.7s5.5 2.4 5.5 5.7" />
+      <circle cx="17" cy="9" r="2.4" />
+      <path d="M15.2 14.6c2.6.1 4.8 2.3 4.8 5.4" />
+    </svg>
+  );
+}
+
 export function ExpensesIcon(props) {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" {...common} {...props}>

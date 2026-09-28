@@ -1,9 +1,8 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useOutletContext, useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import {
-  employeesApi, employeeContractsApi, cashBoxesApi, laborParamsApi, payrollApi,
-} from '../../api';
+import { employeeContractsApi, cashBoxesApi, laborParamsApi } from '../../api';
+import { buildEmployeeApi } from './employeeApiFactory';
 import { Card, Button, Input, Select, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
@@ -11,23 +10,31 @@ import ProviderSelect from '../../components/ProviderSelect';
 import ContractValueHelper from '../../components/ContractValueHelper';
 import useSubmitGuard from '../../hooks/useSubmitGuard';
 
+// Atiende tanto /projects/:projectId/personnel/:employeeId (useOutletContext trae projectId/project)
+// como /personnel/:employeeId (menú principal, sin ese contexto) — mismo registro, misma ficha, ver
+// el comentario al inicio de employeeController.js en el backend. api (buildEmployeeApi) reemplaza
+// projectId como lo que se pasa hacia las secciones: ya resuelve sola la ruta correcta.
 export default function EmployeeDetailPage() {
   const { t } = useTranslation();
-  const { projectId, project } = useOutletContext();
+  const outletCtx = useOutletContext();
+  const projectId = outletCtx?.projectId;
+  const project = outletCtx?.project;
+  const isGeneral = !projectId;
+  const api = buildEmployeeApi(projectId);
   const { employeeId } = useParams();
   const navigate = useNavigate();
   const [employee, setEmployee] = useState(null);
   const [deleteError, setDeleteError] = useState('');
 
-  const load = () => employeesApi.get(projectId, employeeId).then(setEmployee);
+  const load = () => api.employees.get(employeeId).then(setEmployee);
   useEffect(() => { load(); }, [projectId, employeeId]);
 
   const remove = async () => {
     if (!window.confirm(t('personnel.detail.deleteConfirm', { name: employee.name }))) return;
     setDeleteError('');
     try {
-      await employeesApi.remove(projectId, employee.id);
-      navigate('../personnel');
+      await api.employees.remove(employee.id);
+      navigate(isGeneral ? '/personnel' : '../personnel');
     } catch (err) {
       setDeleteError(extractError(err));
     }
@@ -37,24 +44,29 @@ export default function EmployeeDetailPage() {
 
   return (
     <div>
-      <Link to="../personnel" className="text-sm text-blue-600 hover:underline">{t('personnel.detail.back')}</Link>
+      <Link to={isGeneral ? '/personnel' : '../personnel'} className="text-sm text-blue-600 hover:underline">{t('personnel.detail.back')}</Link>
       <div className="flex items-center gap-3 mt-2 mb-4">
         <h2 className="text-lg font-bold">{employee.name}</h2>
         <Badge color={employee.status === 'activo' ? 'green' : 'gray'}>{t(`personnel.list.status.${employee.status}`, employee.status)}</Badge>
+        {isGeneral && (
+          <Badge color={employee.projectId ? 'gray' : 'blue'}>
+            {employee.projectId ? `${t('personnel.list.vinculacion.proyecto')}${employee.Project ? ` — ${employee.Project.name}` : ''}` : t('personnel.list.vinculacion.administrativo')}
+          </Badge>
+        )}
         <Can module="personal" action="delete">
           <Button variant="danger" className="ml-auto" onClick={remove}>{t('personnel.detail.delete')}</Button>
         </Can>
       </div>
       <ErrorText>{deleteError}</ErrorText>
 
-      <BasicDataSection projectId={projectId} employee={employee} onChange={load} />
-      <ContractsSection projectId={projectId} project={project} employee={employee} onChange={load} />
-      <SocialSecuritySection projectId={projectId} employee={employee} onChange={load} />
-      <PaymentsSection projectId={projectId} employee={employee} onChange={load} />
+      <BasicDataSection api={api} employee={employee} onChange={load} />
+      <ContractsSection api={api} project={project} employee={employee} onChange={load} />
+      <SocialSecuritySection api={api} employee={employee} onChange={load} />
+      <PaymentsSection api={api} employee={employee} onChange={load} />
       {employee.status === 'activo' ? (
-        <SeveranceSection projectId={projectId} employee={employee} onChange={load} />
+        <SeveranceSection api={api} employee={employee} onChange={load} />
       ) : (
-        <SeveranceSummary employee={employee} projectId={projectId} onChange={load} />
+        <SeveranceSummary api={api} employee={employee} onChange={load} />
       )}
     </div>
   );
@@ -64,7 +76,7 @@ const NEEDS_END_DATE = new Set(['termino_fijo', 'aprendizaje', 'prestacion_servi
 const IS_SUBCONTRATISTA_JURIDICA = (t) => t === 'subcontratista_juridica';
 const IS_LABORAL = (t) => ['obra_labor', 'termino_fijo', 'termino_indefinido'].includes(t);
 
-function BasicDataSection({ projectId, employee, onChange }) {
+function BasicDataSection({ api, employee, onChange }) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(null);
@@ -94,11 +106,11 @@ function BasicDataSection({ projectId, employee, onChange }) {
     e.preventDefault();
     setError('');
     try {
-      await employeesApi.update(projectId, employee.id, form);
+      await api.employees.update(employee.id, form);
       if (cedulaFile) {
         const fd = new FormData();
         fd.append('file', cedulaFile);
-        await employeesApi.uploadCedula(projectId, employee.id, fd);
+        await api.employees.uploadCedula(employee.id, fd);
         setCedulaFile(null);
       }
       setEditing(false);
@@ -154,7 +166,7 @@ function BasicDataSection({ projectId, employee, onChange }) {
           <Input label={t('personnel.detail.dedication')} type="number" min="0" step="0.01" value={form.dedicationHours} onChange={(e) => setForm({ ...form, dedicationHours: e.target.value })} />
           <ContractValueHelper
             laborParams={laborParams}
-            projectId={projectId}
+            previewFn={(data) => api.employees.previewContractValue(data)}
             salaryValue={form.salaryValue}
             entryDate={form.entryDate}
             contractEndDate={form.contractEndDate}
@@ -216,7 +228,7 @@ function BasicDataSection({ projectId, employee, onChange }) {
   );
 }
 
-function ContractsSection({ projectId, project, employee, onChange }) {
+function ContractsSection({ api, project, employee, onChange }) {
   const { t } = useTranslation();
   const [docs, setDocs] = useState([]);
   const [contractTypes, setContractTypes] = useState([]);
@@ -228,8 +240,8 @@ function ContractsSection({ projectId, project, employee, onChange }) {
   const [sendingSignatureId, setSendingSignatureId] = useState(null);
   const [signatureNotes, setSignatureNotes] = useState({});
 
-  const load = () => employeeContractsApi.list(projectId, employee.id).then(setDocs);
-  useEffect(() => { load(); }, [projectId, employee.id]);
+  const load = () => api.contracts.list(employee.id).then(setDocs);
+  useEffect(() => { load(); }, [employee.id]);
   useEffect(() => { employeeContractsApi.contractTypes().then(setContractTypes); }, []);
 
   const typeLabel = (value) => contractTypes.find((ct) => ct.value === value)?.label || value;
@@ -237,7 +249,7 @@ function ContractsSection({ projectId, project, employee, onChange }) {
   const [generate, generating] = useSubmitGuard(async () => {
     setError(''); setMissingFields([]);
     try {
-      await employeeContractsApi.generate(projectId, employee.id);
+      await api.contracts.generate(employee.id);
       load();
     } catch (err) {
       setError(extractError(err));
@@ -255,7 +267,7 @@ function ContractsSection({ projectId, project, employee, onChange }) {
       if (otrosiForm.newContractObject) payload.newContractObject = otrosiForm.newContractObject;
       if (otrosiForm.newEndDate) payload.newEndDate = otrosiForm.newEndDate;
       if (otrosiForm.newSalaryValue) payload.newSalaryValue = otrosiForm.newSalaryValue;
-      await employeeContractsApi.generateOtrosi(projectId, employee.id, last.id, payload);
+      await api.contracts.generateOtrosi(employee.id, last.id, payload);
       setOtrosiForm({ newContractObject: '', newEndDate: '', newSalaryValue: '' });
       setShowOtrosi(false);
       load();
@@ -269,7 +281,7 @@ function ContractsSection({ projectId, project, employee, onChange }) {
     setSendingSignatureId(doc.id);
     setSignatureNotes((n) => ({ ...n, [doc.id]: null }));
     try {
-      const res = await employeeContractsApi.requestSignature(projectId, employee.id, doc.id);
+      const res = await api.contracts.requestSignature(employee.id, doc.id);
       setSignatureNotes((n) => ({
         ...n,
         [doc.id]: res.emailSent
@@ -289,7 +301,7 @@ function ContractsSection({ projectId, project, employee, onChange }) {
     setError('');
     setDeletingId(doc.id);
     try {
-      await employeeContractsApi.remove(projectId, employee.id, doc.id);
+      await api.contracts.remove(employee.id, doc.id);
       load();
     } catch (err) {
       setError(extractError(err));
@@ -313,7 +325,7 @@ function ContractsSection({ projectId, project, employee, onChange }) {
       {missingFields.length > 0 && (
         <p className="text-sm text-yellow-700 mb-2">{t('personnel.contract.missingFields')}: {missingFields.join(', ')}</p>
       )}
-      {!project?.contractNumber && (
+      {employee.projectId && !project?.contractNumber && (
         <p className="text-xs text-yellow-700 mb-2">{t('contractual.contractNumber.warning')}</p>
       )}
       {showOtrosi && (
@@ -386,7 +398,7 @@ function ContractsSection({ projectId, project, employee, onChange }) {
   );
 }
 
-function SocialSecuritySection({ projectId, employee, onChange }) {
+function SocialSecuritySection({ api, employee, onChange }) {
   const { t } = useTranslation();
   const [form, setForm] = useState({ type: 'salud', uploadDate: '' });
   const [file, setFile] = useState(null);
@@ -401,7 +413,7 @@ function SocialSecuritySection({ projectId, employee, onChange }) {
       fd.append('type', form.type);
       fd.append('uploadDate', form.uploadDate || new Date().toISOString().slice(0, 10));
       fd.append('file', file);
-      await employeesApi.addSocialSecurity(projectId, employee.id, fd);
+      await api.employees.addSocialSecurity(employee.id, fd);
       setFile(null);
       onChange();
     } catch (err) {
@@ -440,18 +452,27 @@ function SocialSecuritySection({ projectId, employee, onChange }) {
   );
 }
 
-function PayrollCalculator({ projectId, employee, onChange }) {
+// Personal ADMINISTRATIVO (employee.projectId null) exige caja de origen: confirmar su nómina
+// genera automáticamente el Gasto administrativo correspondiente (ver payrollController.js#confirm)
+// — personal de proyecto sigue funcionando exactamente igual que antes (sin caja, sin Gasto).
+function PayrollCalculator({ api, employee, onChange }) {
   const { t } = useTranslation();
-  const [form, setForm] = useState({ periodStart: '', periodEnd: '', paymentDate: '' });
+  const isAdministrative = !employee.projectId;
+  const [form, setForm] = useState({ periodStart: '', periodEnd: '', paymentDate: '', cashBoxId: '' });
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
+  const [cashBoxes, setCashBoxes] = useState([]);
+
+  useEffect(() => { if (isAdministrative) cashBoxesApi.list().then(setCashBoxes); }, [isAdministrative]);
+  const cashBoxOptions = cashBoxes.filter((cb) => cb.status === 'activa');
 
   const doPreview = async (e) => {
     e.preventDefault();
     setError('');
     setPreview(null);
     try {
-      const result = await payrollApi.preview(projectId, employee.id, form);
+      const result = await api.payroll.preview(employee.id, form);
       setPreview(result);
     } catch (err) {
       setError(extractError(err));
@@ -459,11 +480,14 @@ function PayrollCalculator({ projectId, employee, onChange }) {
   };
 
   const [confirm, confirming] = useSubmitGuard(async () => {
+    if (isAdministrative && !form.cashBoxId) { setError(t('personnel.detail.payments.payroll.cashBoxRequired')); return; }
     setError('');
+    setWarning('');
     try {
-      await payrollApi.confirm(projectId, employee.id, form);
+      const result = await api.payroll.confirm(employee.id, form);
+      if (result.warning) setWarning(result.warning);
       setPreview(null);
-      setForm({ periodStart: '', periodEnd: '', paymentDate: '' });
+      setForm({ periodStart: '', periodEnd: '', paymentDate: '', cashBoxId: '' });
       onChange();
     } catch (err) {
       setError(extractError(err));
@@ -477,9 +501,16 @@ function PayrollCalculator({ projectId, employee, onChange }) {
         <Input label={t('personnel.detail.payments.payroll.periodStart')} type="date" value={form.periodStart} onChange={(e) => setForm({ ...form, periodStart: e.target.value })} required />
         <Input label={t('personnel.detail.payments.payroll.periodEnd')} type="date" value={form.periodEnd} onChange={(e) => setForm({ ...form, periodEnd: e.target.value })} required />
         <Input label={t('personnel.detail.payments.payroll.paymentDate')} type="date" value={form.paymentDate} onChange={(e) => setForm({ ...form, paymentDate: e.target.value })} required />
+        {isAdministrative && (
+          <Select label={t('expenses.cashBox')} value={form.cashBoxId} onChange={(e) => setForm({ ...form, cashBoxId: e.target.value })} required>
+            <option value="">{t('common.selectPlaceholder')}</option>
+            {cashBoxOptions.map((cb) => <option key={cb.id} value={cb.id}>{cb.name} ({money(cb.balance)})</option>)}
+          </Select>
+        )}
         <Button type="submit">{t('personnel.detail.payments.payroll.calculate')}</Button>
       </form>
       <ErrorText>{error}</ErrorText>
+      {warning && <p className="text-sm text-yellow-600 mb-2">⚠ {warning}</p>}
       {preview && (
         <div className="mt-2">
           <BreakdownTable breakdown={preview.breakdown} />
@@ -495,7 +526,7 @@ function PayrollCalculator({ projectId, employee, onChange }) {
   );
 }
 
-function PaymentsSection({ projectId, employee, onChange }) {
+function PaymentsSection({ api, employee, onChange }) {
   const { t } = useTranslation();
   const [form, setForm] = useState({ date: '', periodLabel: '', amount: '' });
   const [file, setFile] = useState(null);
@@ -509,7 +540,7 @@ function PaymentsSection({ projectId, employee, onChange }) {
       const fd = new FormData();
       Object.entries(form).forEach(([k, v]) => fd.append(k, v));
       fd.append('file', file);
-      await employeesApi.addPayment(projectId, employee.id, fd);
+      await api.employees.addPayment(employee.id, fd);
       setForm({ date: '', periodLabel: '', amount: '' });
       setFile(null);
       onChange();
@@ -521,7 +552,7 @@ function PaymentsSection({ projectId, employee, onChange }) {
   return (
     <Card title={t('personnel.detail.payments.title')}>
       <Can module="personal" action="edit">
-        <PayrollCalculator projectId={projectId} employee={employee} onChange={onChange} />
+        <PayrollCalculator api={api} employee={employee} onChange={onChange} />
         <h4 className="font-medium text-sm text-gray-700 mb-2">{t('personnel.detail.payments.manualTitle')}</h4>
         <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3 items-end">
           <Input label={t('personnel.detail.payments.date')} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
@@ -565,7 +596,7 @@ function BreakdownTable({ breakdown }) {
   );
 }
 
-function SeveranceSection({ projectId, employee, onChange }) {
+function SeveranceSection({ api, employee, onChange }) {
   const { t } = useTranslation();
   const [form, setForm] = useState({ exitDate: '', cause: 'renuncia', cashBoxId: '' });
   const [preview, setPreview] = useState(null);
@@ -580,7 +611,7 @@ function SeveranceSection({ projectId, employee, onChange }) {
     e.preventDefault();
     setError('');
     try {
-      const result = await employeesApi.severancePreview(projectId, employee.id, form);
+      const result = await api.employees.severancePreview(employee.id, form);
       setPreview(result);
     } catch (err) {
       setError(extractError(err));
@@ -593,7 +624,7 @@ function SeveranceSection({ projectId, employee, onChange }) {
     setError('');
     setWarning('');
     try {
-      const result = await employeesApi.severanceConfirm(projectId, employee.id, form);
+      const result = await api.employees.severanceConfirm(employee.id, form);
       if (result.warning) setWarning(result.warning);
       onChange();
     } catch (err) {
@@ -639,7 +670,7 @@ function SeveranceSection({ projectId, employee, onChange }) {
   );
 }
 
-function SeveranceSummary({ employee, projectId, onChange }) {
+function SeveranceSummary({ api, employee, onChange }) {
   const { t } = useTranslation();
   const [file, setFile] = useState(null);
   const [error, setError] = useState('');
@@ -652,7 +683,7 @@ function SeveranceSummary({ employee, projectId, onChange }) {
     try {
       const fd = new FormData();
       fd.append('file', file);
-      await employeesApi.uploadPazYSalvo(projectId, employee.id, fd);
+      await api.employees.uploadPazYSalvo(employee.id, fd);
       setFile(null);
       onChange();
     } catch (err) {
