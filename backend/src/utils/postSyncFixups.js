@@ -7,7 +7,7 @@ const {
   sequelize, Company, CashBox,
   Contract, Employee, Expense, ExpenseItem, ExpenseTax, InventoryItem, Minute, PaymentReceipt, Policy,
   ProgressPhoto, PurchaseReceipt, Severance, SocialSecurityDocument,
-  SocialSecurityProvider, ThirdParty, WithholdingType, AdminExpenseCategory,
+  SocialSecurityProvider, ThirdParty, WithholdingType, AdminExpenseCategory, PublicHoliday, LeaveType,
 } = require('../models/adminModels');
 const { TENANT_SCOPING_EXCLUDED } = require('../models/defineModels');
 const { runInTransactionContext } = require('../utils/tenantContext');
@@ -15,6 +15,8 @@ const { UPLOAD_ROOT } = require('../middleware/upload');
 const { DEFAULT_SOCIAL_SECURITY_PROVIDERS } = require('../config/socialSecurityProviders');
 const { DEFAULT_WITHHOLDING_TYPES } = require('../config/withholdingTypes');
 const { DEFAULT_ADMIN_EXPENSE_CATEGORIES } = require('../config/adminExpenseCategories');
+const { DEFAULT_LEAVE_TYPES } = require('../config/leaveTypes');
+const { computeColombianHolidays } = require('../config/colombianHolidays');
 
 // Mismo criterio que applyTenantScoping.js: algunos modelos excluidos del aislamiento (ej.
 // SupportAccessLog) igual tienen una columna companyId como dato simple (a qué empresa se accedió),
@@ -315,6 +317,8 @@ async function applyPostSyncFixups() {
   await seedWithholdingTypesForExistingCompanies();
   await seedAdminExpenseCategoriesForExistingCompanies();
   await backfillExpenseType();
+  await seedLeaveTypesForExistingCompanies();
+  await seedPublicHolidaysForExistingCompanies();
   await backfillCashBoxMovementGrossAmount();
 
   await ensureAppDbRole();
@@ -416,6 +420,45 @@ async function seedAdminExpenseCategoriesForExistingCompanies() {
       for (const name of DEFAULT_ADMIN_EXPENSE_CATEGORIES) {
         // eslint-disable-next-line no-await-in-loop
         await AdminExpenseCategory.findOrCreate({ where: { name } });
+      }
+    });
+  }
+}
+
+// LeaveType (catálogo de licencias remuneradas) se siembra con sus valores por defecto al crear una
+// empresa nueva, pero las empresas que ya existían antes de esta funcionalidad nunca pasaron por
+// ahí — mismo criterio que seedAdminExpenseCategoriesForExistingCompanies.
+async function seedLeaveTypesForExistingCompanies() {
+  const companies = await Company.findAll();
+  for (const company of companies) {
+    // eslint-disable-next-line no-await-in-loop
+    await runInTransactionContext(company.id, null, async () => {
+      for (const { name, defaultDurationDays, paidBy } of DEFAULT_LEAVE_TYPES) {
+        // eslint-disable-next-line no-await-in-loop
+        await LeaveType.findOrCreate({ where: { name }, defaults: { defaultDurationDays, paidBy } });
+      }
+    });
+  }
+}
+
+// PublicHoliday (calendario de festivos de Colombia) se siembra para un rango amplio de años (el
+// anterior al actual hasta 3 adelante) — mismo criterio: las empresas que ya existían nunca
+// pasaron por companyProvisioningService.js. findOrCreate por fecha hace que sea un no-op seguro
+// una vez sembrado (y permite que un festivo ya editado a mano por el administrador no se
+// sobrescriba). Se re-ejecuta en cada arranque para ir cubriendo años futuros a medida que pasan
+// (ej. en 2028 este rango ya alcanza hasta 2031 sin que nadie tenga que acordarse de sembrarlo).
+async function seedPublicHolidaysForExistingCompanies() {
+  const companies = await Company.findAll();
+  const currentYear = new Date().getUTCFullYear();
+  for (const company of companies) {
+    // eslint-disable-next-line no-await-in-loop
+    await runInTransactionContext(company.id, null, async () => {
+      for (let year = currentYear - 1; year <= currentYear + 3; year += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        for (const { date, name } of computeColombianHolidays(year)) {
+          // eslint-disable-next-line no-await-in-loop
+          await PublicHoliday.findOrCreate({ where: { date }, defaults: { name } });
+        }
       }
     });
   }

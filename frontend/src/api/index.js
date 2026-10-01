@@ -220,6 +220,23 @@ export const payrollApi = {
   confirm: (pid, id, data) => client.post(`/projects/${pid}/employees/${id}/payroll/confirm`, data).then((r) => r.data),
 };
 
+// Novedades de nómina (incapacidades, vacaciones, licencias) de un trabajador — ver
+// employeeLeaveController.js. create() siempre manda FormData (el archivo de soporte es opcional
+// pero el campo 'file' puede o no venir).
+export const employeeLeavesApi = {
+  list: (pid, employeeId) => client.get(`/projects/${pid}/employees/${employeeId}/leaves`).then((r) => r.data),
+  create: (pid, employeeId, formData) => client.post(`/projects/${pid}/employees/${employeeId}/leaves`, formData).then((r) => r.data),
+  remove: (pid, employeeId, leaveId) => client.delete(`/projects/${pid}/employees/${employeeId}/leaves/${leaveId}`).then((r) => r.data),
+  vacationBalance: (pid, employeeId) => client.get(`/projects/${pid}/employees/${employeeId}/vacation-balance`).then((r) => r.data),
+};
+
+export const generalEmployeeLeavesApi = {
+  list: (employeeId) => client.get(`/employees/${employeeId}/leaves`).then((r) => r.data),
+  create: (employeeId, formData) => client.post(`/employees/${employeeId}/leaves`, formData).then((r) => r.data),
+  remove: (employeeId, leaveId) => client.delete(`/employees/${employeeId}/leaves/${leaveId}`).then((r) => r.data),
+  vacationBalance: (employeeId) => client.get(`/employees/${employeeId}/vacation-balance`).then((r) => r.data),
+};
+
 export const employeeContractsApi = {
   contractTypes: () => client.get('/employee-contract-types').then((r) => r.data),
   list: (pid, employeeId) => client.get(`/projects/${pid}/employees/${employeeId}/contracts`).then((r) => r.data),
@@ -323,6 +340,24 @@ export const adminExpenseCategoriesApi = {
   create: (data) => client.post('/admin-expense-categories', data).then((r) => r.data),
   update: (id, data) => client.put(`/admin-expense-categories/${id}`, data).then((r) => r.data),
   setStatus: (id, active) => client.post(`/admin-expense-categories/${id}/status`, { active }).then((r) => r.data),
+};
+
+// Catálogo de tipos de licencia remunerada (Administración > Parámetros) — mismo patrón que
+// withholdingTypesApi. No tiene remove: un tipo ya usado en una novedad no se puede eliminar.
+export const leaveTypesApi = {
+  list: () => client.get('/leave-types').then((r) => r.data),
+  create: (data) => client.post('/leave-types', data).then((r) => r.data),
+  update: (id, data) => client.put(`/leave-types/${id}`, data).then((r) => r.data),
+  setStatus: (id, active) => client.post(`/leave-types/${id}/status`, { active }).then((r) => r.data),
+};
+
+// Calendario de festivos de Colombia (Administración > Parámetros) — sembrado automáticamente pero
+// editable, ver publicHolidayController.js.
+export const publicHolidaysApi = {
+  list: (year) => client.get('/public-holidays', { params: year ? { year } : {} }).then((r) => r.data),
+  create: (data) => client.post('/public-holidays', data).then((r) => r.data),
+  update: (id, data) => client.put(`/public-holidays/${id}`, data).then((r) => r.data),
+  remove: (id) => client.delete(`/public-holidays/${id}`).then((r) => r.data),
 };
 
 // Reporte de Gastos Administrativos Generales — ver adminExpenseReportService.js. "Comparación

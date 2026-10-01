@@ -1,10 +1,12 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const ApiError = require('../utils/ApiError');
-const { Company, User, Role, Permission, LaborParameters, CashBox, SocialSecurityProvider, WithholdingType, AdminExpenseCategory } = require('../models');
+const { Company, User, Role, Permission, LaborParameters, CashBox, SocialSecurityProvider, WithholdingType, AdminExpenseCategory, PublicHoliday, LeaveType } = require('../models');
 const { DEFAULT_SOCIAL_SECURITY_PROVIDERS } = require('../config/socialSecurityProviders');
 const { DEFAULT_WITHHOLDING_TYPES } = require('../config/withholdingTypes');
 const { DEFAULT_ADMIN_EXPENSE_CATEGORIES } = require('../config/adminExpenseCategories');
+const { DEFAULT_LEAVE_TYPES } = require('../config/leaveTypes');
+const { computeColombianHolidays } = require('../config/colombianHolidays');
 // Chequeo de correo duplicado ANTES de tener companyId de contexto (ver provisionCompany): con la
 // Capa 2 (RLS) activa, la conexión restringida no ve NINGUNA fila sin ese contexto — un
 // User.findOne de la conexión normal acá siempre devolvería null, sin importar si el correo ya
@@ -81,6 +83,23 @@ async function seedDefaultsForCompany(company, { adminName, adminEmail, adminPas
     for (const name of DEFAULT_ADMIN_EXPENSE_CATEGORIES) {
       // eslint-disable-next-line no-await-in-loop
       await AdminExpenseCategory.findOrCreate({ where: { name } });
+    }
+
+    for (const { name, defaultDurationDays, paidBy } of DEFAULT_LEAVE_TYPES) {
+      // eslint-disable-next-line no-await-in-loop
+      await LeaveType.findOrCreate({ where: { name }, defaults: { defaultDurationDays, paidBy } });
+    }
+
+    // Festivos de un rango amplio de años (el año anterior al actual hasta 3 años adelante) — así
+    // una nómina o liquidación con fecha pasada o futura cercana ya tiene su calendario disponible
+    // sin depender de que alguien vuelva a sembrar después.
+    const currentYear = new Date().getUTCFullYear();
+    for (let year = currentYear - 1; year <= currentYear + 3; year += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      for (const { date, name } of computeColombianHolidays(year)) {
+        // eslint-disable-next-line no-await-in-loop
+        await PublicHoliday.findOrCreate({ where: { date }, defaults: { name } });
+      }
     }
 
     return admin;

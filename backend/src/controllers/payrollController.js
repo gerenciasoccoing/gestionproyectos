@@ -58,6 +58,7 @@ const preview = asyncHandler(async (req, res) => {
   validatePeriod(periodStart, periodEnd, paymentDate);
 
   const result = await calculatePayroll({
+    employeeId: employee.id,
     salaryValue: employee.salaryValue,
     periodStart,
     periodEnd,
@@ -83,6 +84,7 @@ const confirm = asyncHandler(async (req, res) => {
   }
 
   const result = await calculatePayroll({
+    employeeId: employee.id,
     salaryValue: employee.salaryValue,
     periodStart,
     periodEnd,

@@ -825,6 +825,39 @@
         "viewPdf": "Ver reporte PDF de liquidación",
         "viewSigned": "Ver paz y salvo firmado",
         "uploadSigned": "Subir paz y salvo firmado"
+      },
+      "leaves": {
+        "title": "Novedades (Incapacidades, Vacaciones, Licencias)",
+        "newLeave": "+ Nueva novedad",
+        "type": "Tipo",
+        "types": {
+          "incapacidad_general": "Incapacidad general (EPS)",
+          "incapacidad_laboral": "Incapacidad laboral (ARL)",
+          "vacaciones": "Vacaciones",
+          "licencia_remunerada": "Licencia remunerada",
+          "licencia_no_remunerada": "Licencia no remunerada"
+        },
+        "startDate": "Fecha inicio",
+        "endDate": "Fecha fin",
+        "leaveType": "Tipo de licencia",
+        "parentLeave": "Prórroga de",
+        "parentLeaveNone": "No es prórroga",
+        "support": "Soporte (PDF o imagen)",
+        "notes": "Notas",
+        "table": {
+          "type": "Tipo",
+          "startDate": "Inicio",
+          "endDate": "Fin",
+          "leaveType": "Tipo de licencia",
+          "support": "Soporte"
+        },
+        "empty": "Sin novedades registradas.",
+        "confirmDelete": "¿Eliminar esta novedad? Si tiene una prórroga registrada encima, elimínala primero.",
+        "balance": {
+          "accrued": "Días causados",
+          "taken": "Días tomados",
+          "pending": "Saldo pendiente"
+        }
       }
     },
     "contract": {
@@ -1636,7 +1669,9 @@
       "withholdingTypes": "Retenciones",
       "adminExpenseCategories": "Categorías de Gastos Admin.",
       "company": "Datos de la Empresa",
-      "consortiums": "Consorcios / Uniones Temporales"
+      "consortiums": "Consorcios / Uniones Temporales",
+      "leaveTypes": "Licencias",
+      "publicHolidays": "Festivos"
     },
     "withholdingTypes": {
       "title": "Tipos de Retención",
@@ -1736,7 +1771,29 @@
         "auxTransporte": "Aux. Transporte",
         "interesesPercent": "% Interés Cesantías",
         "notes": "Notas"
-      }
+      },
+      "sections": {
+        "overtime": "Horas extra y recargos",
+        "deductions": "Deducciones de ley",
+        "leaves": "Novedades"
+      },
+      "horasMensuales": "Jornada mensual (horas)",
+      "horaExtraDiurnaPercent": "% Hora extra diurna",
+      "horaExtraNocturnaPercent": "% Hora extra nocturna",
+      "recargoNocturnoPercent": "% Recargo nocturno",
+      "recargoDominicalPercent": "% Recargo dominical/festivo",
+      "recargoNocturnoDominicalPercent": "% Recargo nocturno dominical/festivo",
+      "horaExtraDiurnaDominicalPercent": "% Hora extra diurna dominical/festiva",
+      "horaExtraNocturnaDominicalPercent": "% Hora extra nocturna dominical/festiva",
+      "horarioNocturnoInicio": "Inicio horario nocturno",
+      "horarioNocturnoFin": "Fin horario nocturno",
+      "topeHorasExtraDiarias": "Tope horas extra diarias",
+      "topeHorasExtraSemanales": "Tope horas extra semanales",
+      "saludPercent": "% Salud (empleado)",
+      "pensionPercent": "% Pensión (empleado)",
+      "solidarityFundBrackets": "Tramos Fondo de Solidaridad Pensional (JSON)",
+      "incapacidadGeneralTramos": "Tramos de incapacidad general (JSON)",
+      "invalidJson": "Los tramos deben ser un JSON válido."
     },
     "company": {
       "title": "Datos de la Empresa (branding para PDF de cotización)",
@@ -1775,6 +1832,44 @@
         "nit": "NIT",
         "legalRepName": "Representante legal"
       }
+    },
+    "leaveTypes": {
+      "title": "Tipos de Licencia",
+      "help": "Catálogo de licencias remuneradas disponibles al registrar una novedad en la ficha de un trabajador. Un tipo ya usado en una novedad no se puede eliminar, solo desactivar.",
+      "newType": "+ Nuevo tipo",
+      "name": "Nombre",
+      "defaultDurationDays": "Duración por defecto (días)",
+      "paidBy": "Quién la paga",
+      "paidByOptions": {
+        "empleador": "Empleador",
+        "eps": "EPS",
+        "arl": "ARL"
+      },
+      "table": {
+        "name": "Nombre",
+        "defaultDurationDays": "Duración (días)",
+        "paidBy": "Quién paga",
+        "status": "Estado"
+      },
+      "active": "Activo",
+      "inactive": "Inactivo",
+      "deactivate": "Desactivar",
+      "activate": "Activar",
+      "empty": "Sin tipos de licencia registrados."
+    },
+    "publicHolidays": {
+      "title": "Festivos",
+      "help": "Calendario de festivos de Colombia, sembrado automáticamente (Ley Emiliani) y editable. Usado para calcular el saldo de vacaciones en días hábiles.",
+      "newHoliday": "+ Nuevo festivo",
+      "filterYear": "Año",
+      "date": "Fecha",
+      "name": "Nombre",
+      "table": {
+        "date": "Fecha",
+        "name": "Nombre"
+      },
+      "empty": "Sin festivos registrados para este año.",
+      "confirmDelete": "¿Eliminar este festivo?"
     }
   },
   "auth": {

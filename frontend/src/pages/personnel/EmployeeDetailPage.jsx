@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useOutletContext, useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { employeeContractsApi, cashBoxesApi, laborParamsApi } from '../../api';
+import { employeeContractsApi, cashBoxesApi, laborParamsApi, leaveTypesApi } from '../../api';
 import { buildEmployeeApi } from './employeeApiFactory';
 import { Card, Button, Input, Select, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { fileUrl } from '../../api/client';
@@ -62,6 +62,13 @@ export default function EmployeeDetailPage() {
       <BasicDataSection api={api} employee={employee} onChange={load} />
       <ContractsSection api={api} project={project} employee={employee} onChange={load} />
       <SocialSecuritySection api={api} employee={employee} onChange={load} />
+      {IS_NOMINA_ELIGIBLE(employee.contractType) ? (
+        <LeavesSection api={api} employee={employee} />
+      ) : (
+        <Card title={t('personnel.detail.leaves.title')}>
+          <p className="text-sm text-gray-500">{t('personnel.detail.payments.notEligible')}</p>
+        </Card>
+      )}
       {IS_NOMINA_ELIGIBLE(employee.contractType) ? (
         <PaymentsSection api={api} employee={employee} onChange={load} />
       ) : (
@@ -470,6 +477,140 @@ function SocialSecuritySection({ api, employee, onChange }) {
         {(!employee.socialSecurityDocuments || employee.socialSecurityDocuments.length === 0) && (
           <tr><td colSpan={3} className="py-2 text-center text-gray-400">{t('personnel.detail.socialSecurity.empty')}</td></tr>
         )}
+      </Table>
+    </Card>
+  );
+}
+
+const LEAVE_TYPES = ['incapacidad_general', 'incapacidad_laboral', 'vacaciones', 'licencia_remunerada', 'licencia_no_remunerada'];
+const IS_INCAPACIDAD = (type) => type === 'incapacidad_general' || type === 'incapacidad_laboral';
+
+const emptyLeaveForm = { type: '', startDate: '', endDate: '', leaveTypeId: '', parentLeaveId: '', notes: '' };
+
+// Novedades de nómina (incapacidades, vacaciones, licencias) — ver EmployeeLeave.js y
+// laborCalculations.js en el backend para cómo afectan el cálculo de un período (días no
+// trabajados, split empleador/EPS/ARL de una incapacidad, etc.). Solo se muestra para contratos con
+// nómina (mismo gate que PaymentsSection): un contrato civil no tiene incapacidades/vacaciones de
+// Ley que registrar acá.
+function LeavesSection({ api, employee }) {
+  const { t } = useTranslation();
+  const [leaves, setLeaves] = useState([]);
+  const [leaveTypes, setLeaveTypes] = useState([]);
+  const [balance, setBalance] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(emptyLeaveForm);
+  const [file, setFile] = useState(null);
+  const [error, setError] = useState('');
+  const [deletingId, setDeletingId] = useState(null);
+
+  const load = () => {
+    api.leaves.list(employee.id).then(setLeaves);
+    api.leaves.vacationBalance(employee.id).then(setBalance);
+  };
+  useEffect(() => { load(); }, [employee.id]);
+  useEffect(() => { leaveTypesApi.list().then(setLeaveTypes); }, []);
+
+  const activeLeaveTypes = leaveTypes.filter((lt) => lt.active);
+  const incapacidadOptions = leaves.filter((l) => IS_INCAPACIDAD(l.type));
+
+  const startCreate = () => { setForm(emptyLeaveForm); setFile(null); setError(''); setShowForm(true); };
+
+  const [submit, submitting] = useSubmitGuard(async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      const fd = new FormData();
+      fd.append('type', form.type);
+      fd.append('startDate', form.startDate);
+      fd.append('endDate', form.endDate);
+      if (form.type === 'licencia_remunerada' && form.leaveTypeId) fd.append('leaveTypeId', form.leaveTypeId);
+      if (IS_INCAPACIDAD(form.type) && form.parentLeaveId) fd.append('parentLeaveId', form.parentLeaveId);
+      if (form.notes) fd.append('notes', form.notes);
+      if (file) fd.append('file', file);
+      await api.leaves.create(employee.id, fd);
+      setForm(emptyLeaveForm);
+      setFile(null);
+      setShowForm(false);
+      load();
+    } catch (err) {
+      setError(extractError(err));
+    }
+  });
+
+  const remove = async (leave) => {
+    if (!window.confirm(t('personnel.detail.leaves.confirmDelete'))) return;
+    setError('');
+    setDeletingId(leave.id);
+    try {
+      await api.leaves.remove(employee.id, leave.id);
+      load();
+    } catch (err) {
+      setError(extractError(err));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  return (
+    <Card title={t('personnel.detail.leaves.title')} actions={
+      <Can module="personal" action="edit">
+        <Button onClick={() => (showForm ? setShowForm(false) : startCreate())}>
+          {showForm ? t('common.cancel') : t('personnel.detail.leaves.newLeave')}
+        </Button>
+      </Can>
+    }>
+      {balance && (
+        <div className="flex flex-wrap gap-4 text-sm mb-3 bg-gray-50 border border-gray-200 rounded px-3 py-2">
+          <span>{t('personnel.detail.leaves.balance.accrued')}: <strong>{balance.accruedDays}</strong></span>
+          <span>{t('personnel.detail.leaves.balance.taken')}: <strong>{balance.takenDays}</strong></span>
+          <span>{t('personnel.detail.leaves.balance.pending')}: <strong>{balance.pendingDays}</strong></span>
+        </div>
+      )}
+      {showForm && (
+        <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4 items-end">
+          <Select label={t('personnel.detail.leaves.type')} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value, leaveTypeId: '', parentLeaveId: '' })} required>
+            <option value="">{t('common.selectPlaceholder')}</option>
+            {LEAVE_TYPES.map((lt) => <option key={lt} value={lt}>{t(`personnel.detail.leaves.types.${lt}`)}</option>)}
+          </Select>
+          <Input label={t('personnel.detail.leaves.startDate')} type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} required />
+          <Input label={t('personnel.detail.leaves.endDate')} type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} required />
+          {form.type === 'licencia_remunerada' && (
+            <Select label={t('personnel.detail.leaves.leaveType')} value={form.leaveTypeId} onChange={(e) => setForm({ ...form, leaveTypeId: e.target.value })} required>
+              <option value="">{t('common.selectPlaceholder')}</option>
+              {activeLeaveTypes.map((lt) => <option key={lt.id} value={lt.id}>{lt.name}</option>)}
+            </Select>
+          )}
+          {IS_INCAPACIDAD(form.type) && (
+            <Select label={t('personnel.detail.leaves.parentLeave')} value={form.parentLeaveId} onChange={(e) => setForm({ ...form, parentLeaveId: e.target.value })}>
+              <option value="">{t('personnel.detail.leaves.parentLeaveNone')}</option>
+              {incapacidadOptions.map((l) => (
+                <option key={l.id} value={l.id}>{t(`personnel.detail.leaves.types.${l.type}`)} {formatDate(l.startDate)} - {formatDate(l.endDate)}</option>
+              ))}
+            </Select>
+          )}
+          <Input label={t('personnel.detail.leaves.support')} type="file" onChange={(e) => setFile(e.target.files[0])} />
+          <Input label={t('personnel.detail.leaves.notes')} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="lg:col-span-2" />
+          <Button type="submit" className="col-span-full" loading={submitting}>{t('common.save')}</Button>
+          <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
+        </form>
+      )}
+      {!showForm && <ErrorText>{error}</ErrorText>}
+      <Table columns={[t('personnel.detail.leaves.table.type'), t('personnel.detail.leaves.table.startDate'), t('personnel.detail.leaves.table.endDate'), t('personnel.detail.leaves.table.leaveType'), t('personnel.detail.leaves.table.support'), '']}>
+        {leaves.map((l) => (
+          <tr key={l.id} className="border-b border-gray-100">
+            <td className="py-1 pr-3">{t(`personnel.detail.leaves.types.${l.type}`)}</td>
+            <td className="py-1 pr-3">{formatDate(l.startDate)}</td>
+            <td className="py-1 pr-3">{formatDate(l.endDate)}</td>
+            <td className="py-1 pr-3">{l.LeaveType?.name || '-'}</td>
+            <td className="py-1 pr-3">{l.supportFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(l.supportFilePath)} target="_blank" rel="noreferrer">{t('common.view')}</a> : '-'}</td>
+            <td className="py-1 pr-3 text-right whitespace-nowrap">
+              <Can module="personal" action="delete">
+                <Button variant="danger" loading={deletingId === l.id} onClick={() => remove(l)}>{t('common.delete')}</Button>
+              </Can>
+            </td>
+          </tr>
+        ))}
+        {leaves.length === 0 && <tr><td colSpan={6} className="py-2 text-center text-gray-400">{t('personnel.detail.leaves.empty')}</td></tr>}
       </Table>
     </Card>
   );

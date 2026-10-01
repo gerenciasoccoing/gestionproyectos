@@ -7,12 +7,15 @@ const employeeController = require('../controllers/employeeController');
 const severanceController = require('../controllers/severanceController');
 const employeeContractController = require('../controllers/employeeContractController');
 const payrollController = require('../controllers/payrollController');
+const employeeLeaveController = require('../controllers/employeeLeaveController');
 
 const uploadContract = makeUploader('employee-contracts', 'document');
 const uploadSocialSecurity = makeUploader('social-security', 'document');
 const uploadPayment = makeUploader('payment-receipts', 'document');
 const uploadPazYSalvo = makeUploader('paz-y-salvo', 'document');
 const uploadCedula = makeUploader('employee-id-documents', 'any');
+// 'paymentSupport' = PDF/JPG/PNG, exactamente lo pedido para el soporte de una novedad.
+const uploadLeaveSupport = makeUploader('employee-leaves', 'paymentSupport');
 
 router.use(authenticate, requireProjectAccess((r) => r.params.projectId));
 
@@ -38,5 +41,10 @@ router.post('/:id/contracts', requirePermission('personal', 'edit'), preventDupl
 router.post('/:id/contracts/:contractId/otrosi', requirePermission('personal', 'edit'), preventDuplicateSubmit, employeeContractController.generateOtrosi);
 router.delete('/:id/contracts/:contractId', requirePermission('personal', 'delete'), employeeContractController.removeDocument);
 router.post('/:id/contracts/:contractId/request-signature', requirePermission('personal', 'edit'), preventDuplicateSubmit, employeeContractController.sendForSignature);
+
+router.get('/:id/leaves', requirePermission('personal', 'view'), employeeLeaveController.list);
+router.post('/:id/leaves', requirePermission('personal', 'edit'), uploadLeaveSupport.single('file'), preventDuplicateSubmit, employeeLeaveController.create);
+router.delete('/:id/leaves/:leaveId', requirePermission('personal', 'delete'), employeeLeaveController.remove);
+router.get('/:id/vacation-balance', requirePermission('personal', 'view'), employeeLeaveController.vacationBalance);
 
 module.exports = router;

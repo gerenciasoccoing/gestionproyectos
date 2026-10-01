@@ -60,6 +60,24 @@ module.exports = (sequelize) => {
         { minSmlv: 20, maxSmlv: null, percent: 2 },
       ],
     },
+
+    // --- Novedades (ver laborCalculations.js#incapacidadGeneralDailySplit y EmployeeLeave.js) ---
+    // Tramos de incapacidad general (enfermedad común): día de inicio/fin de cada tramo (1-based,
+    // acumulado sobre la cadena de prórrogas) y el % del salario diario que reconoce. Array en vez
+    // de columnas fijas para poder agregar/ajustar tramos sin migrar el esquema.
+    incapacidadGeneralTramos: {
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: [
+        { desde: 1, hasta: 2, percent: 66.67, pagador: 'empleador' },
+        { desde: 3, hasta: 90, percent: 66.67, pagador: 'eps' },
+        { desde: 91, hasta: 180, percent: 50, pagador: 'eps' },
+      ],
+    },
+    // Si durante una licencia no remunerada se mantienen o no los aportes a seguridad social (y
+    // quién los asume) — no afecta el cálculo de nómina en sí (no hay devengado del que descontar
+    // en esos días), es solo la nota/regla que se muestra al registrar la novedad.
+    licenciaNoRemuneradaMantieneSeguridadSocial: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     notes: { type: DataTypes.TEXT },
   });
 

@@ -18,6 +18,8 @@ router.use('/market-studies', require('./globalMarketStudyRoutes'));
 router.use('/cash-boxes', require('./cashBoxRoutes'));
 router.use('/withholding-types', require('./withholdingTypeRoutes'));
 router.use('/admin-expense-categories', require('./adminExpenseCategoryRoutes'));
+router.use('/leave-types', require('./leaveTypeRoutes'));
+router.use('/public-holidays', require('./publicHolidayRoutes'));
 router.use('/expenses', require('./globalExpenseRoutes'));
 router.use('/admin-expenses/report', require('./adminExpenseReportRoutes'));
 router.use('/employees', require('./globalEmployeeRoutes'));

@@ -9,6 +9,8 @@ export default function AdminLayout() {
     { to: 'labor-parameters', label: t('admin.tabs.laborParameters') },
     { to: 'withholding-types', label: t('admin.tabs.withholdingTypes') },
     { to: 'admin-expense-categories', label: t('admin.tabs.adminExpenseCategories') },
+    { to: 'leave-types', label: t('admin.tabs.leaveTypes') },
+    { to: 'public-holidays', label: t('admin.tabs.publicHolidays') },
     { to: 'company', label: t('admin.tabs.company') },
     { to: 'consortiums', label: t('admin.tabs.consortiums') },
   ];

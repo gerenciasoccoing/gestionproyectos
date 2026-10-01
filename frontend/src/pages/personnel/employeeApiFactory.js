@@ -1,6 +1,7 @@
 import {
   employeesApi, generalEmployeesApi, payrollApi, generalPayrollApi,
   employeeContractsApi, generalEmployeeContractsApi,
+  employeeLeavesApi, generalEmployeeLeavesApi,
 } from '../../api';
 
 // Une los tres módulos de API de Personal (fichas/nómina/contratos) en un solo objeto, sin que cada
@@ -59,6 +60,17 @@ export function buildEmployeeApi(projectId) {
       generateOtrosi: (employeeId, contractId, data) => employeeContractsApi.generateOtrosi(projectId, employeeId, contractId, data),
       remove: (employeeId, contractId) => employeeContractsApi.remove(projectId, employeeId, contractId),
       requestSignature: (employeeId, contractId) => employeeContractsApi.requestSignature(projectId, employeeId, contractId),
+    },
+    leaves: isGeneral ? {
+      list: (employeeId) => generalEmployeeLeavesApi.list(employeeId),
+      create: (employeeId, formData) => generalEmployeeLeavesApi.create(employeeId, formData),
+      remove: (employeeId, leaveId) => generalEmployeeLeavesApi.remove(employeeId, leaveId),
+      vacationBalance: (employeeId) => generalEmployeeLeavesApi.vacationBalance(employeeId),
+    } : {
+      list: (employeeId) => employeeLeavesApi.list(projectId, employeeId),
+      create: (employeeId, formData) => employeeLeavesApi.create(projectId, employeeId, formData),
+      remove: (employeeId, leaveId) => employeeLeavesApi.remove(projectId, employeeId, leaveId),
+      vacationBalance: (employeeId) => employeeLeavesApi.vacationBalance(projectId, employeeId),
     },
   };
 }

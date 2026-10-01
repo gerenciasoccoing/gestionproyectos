@@ -57,6 +57,8 @@ import RolesPage from './pages/admin/RolesPage';
 import LaborParametersPage from './pages/admin/LaborParametersPage';
 import WithholdingTypesPage from './pages/admin/WithholdingTypesPage';
 import AdminExpenseCategoriesPage from './pages/admin/AdminExpenseCategoriesPage';
+import LeaveTypesPage from './pages/admin/LeaveTypesPage';
+import PublicHolidaysPage from './pages/admin/PublicHolidaysPage';
 import CompanySettingsPage from './pages/admin/CompanySettingsPage';
 import ConsortiumsPage from './pages/admin/ConsortiumsPage';
 
@@ -108,6 +110,8 @@ export default function App() {
           <Route path="labor-parameters" element={<LaborParametersPage />} />
           <Route path="withholding-types" element={<WithholdingTypesPage />} />
           <Route path="admin-expense-categories" element={<AdminExpenseCategoriesPage />} />
+          <Route path="leave-types" element={<LeaveTypesPage />} />
+          <Route path="public-holidays" element={<PublicHolidaysPage />} />
           <Route path="company" element={<CompanySettingsPage />} />
           <Route path="consortiums" element={<ConsortiumsPage />} />
         </Route>

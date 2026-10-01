@@ -825,6 +825,39 @@
         "viewPdf": "View settlement PDF report",
         "viewSigned": "View signed clearance",
         "uploadSigned": "Upload signed clearance"
+      },
+      "leaves": {
+        "title": "Leave Records (Sick Leave, Vacation, Other Leave)",
+        "newLeave": "+ New leave record",
+        "type": "Type",
+        "types": {
+          "incapacidad_general": "General sick leave (EPS)",
+          "incapacidad_laboral": "Work-related sick leave (ARL)",
+          "vacaciones": "Vacation",
+          "licencia_remunerada": "Paid leave",
+          "licencia_no_remunerada": "Unpaid leave"
+        },
+        "startDate": "Start date",
+        "endDate": "End date",
+        "leaveType": "Leave type",
+        "parentLeave": "Extension of",
+        "parentLeaveNone": "Not an extension",
+        "support": "Support document (PDF or image)",
+        "notes": "Notes",
+        "table": {
+          "type": "Type",
+          "startDate": "Start",
+          "endDate": "End",
+          "leaveType": "Leave type",
+          "support": "Support"
+        },
+        "empty": "No leave records registered.",
+        "confirmDelete": "Delete this leave record? If it has an extension recorded on top, delete that first.",
+        "balance": {
+          "accrued": "Accrued days",
+          "taken": "Taken days",
+          "pending": "Pending balance"
+        }
       }
     },
     "contract": {
@@ -1636,7 +1669,9 @@
       "withholdingTypes": "Withholdings",
       "adminExpenseCategories": "Admin. Expense Categories",
       "company": "Company Data",
-      "consortiums": "Consortiums / Joint Ventures"
+      "consortiums": "Consortiums / Joint Ventures",
+      "leaveTypes": "Leave Types",
+      "publicHolidays": "Holidays"
     },
     "withholdingTypes": {
       "title": "Withholding Types",
@@ -1736,7 +1771,29 @@
         "auxTransporte": "Transport Subsidy",
         "interesesPercent": "% Severance Interest",
         "notes": "Notes"
-      }
+      },
+      "sections": {
+        "overtime": "Overtime and premiums",
+        "deductions": "Legal deductions",
+        "leaves": "Leave rules"
+      },
+      "horasMensuales": "Monthly working hours",
+      "horaExtraDiurnaPercent": "% Daytime overtime",
+      "horaExtraNocturnaPercent": "% Night overtime",
+      "recargoNocturnoPercent": "% Night premium",
+      "recargoDominicalPercent": "% Sunday/holiday premium",
+      "recargoNocturnoDominicalPercent": "% Night Sunday/holiday premium",
+      "horaExtraDiurnaDominicalPercent": "% Daytime Sunday/holiday overtime",
+      "horaExtraNocturnaDominicalPercent": "% Night Sunday/holiday overtime",
+      "horarioNocturnoInicio": "Night shift start",
+      "horarioNocturnoFin": "Night shift end",
+      "topeHorasExtraDiarias": "Daily overtime cap",
+      "topeHorasExtraSemanales": "Weekly overtime cap",
+      "saludPercent": "% Health (employee)",
+      "pensionPercent": "% Pension (employee)",
+      "solidarityFundBrackets": "Solidarity Pension Fund brackets (JSON)",
+      "incapacidadGeneralTramos": "General sick-leave brackets (JSON)",
+      "invalidJson": "Brackets must be valid JSON."
     },
     "company": {
       "title": "Company Data (branding for quotation PDF)",
@@ -1775,6 +1832,44 @@
         "nit": "Tax ID",
         "legalRepName": "Legal representative"
       }
+    },
+    "leaveTypes": {
+      "title": "Leave Types",
+      "help": "Catalog of paid leave types available when registering a leave record on an employee's profile. A type already used in a leave record cannot be deleted, only deactivated.",
+      "newType": "+ New type",
+      "name": "Name",
+      "defaultDurationDays": "Default duration (days)",
+      "paidBy": "Paid by",
+      "paidByOptions": {
+        "empleador": "Employer",
+        "eps": "Health insurer (EPS)",
+        "arl": "Workers' comp (ARL)"
+      },
+      "table": {
+        "name": "Name",
+        "defaultDurationDays": "Duration (days)",
+        "paidBy": "Paid by",
+        "status": "Status"
+      },
+      "active": "Active",
+      "inactive": "Inactive",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "empty": "No leave types registered."
+    },
+    "publicHolidays": {
+      "title": "Public Holidays",
+      "help": "Colombian holiday calendar, auto-seeded (Ley Emiliani) and editable. Used to calculate the vacation balance in business days.",
+      "newHoliday": "+ New holiday",
+      "filterYear": "Year",
+      "date": "Date",
+      "name": "Name",
+      "table": {
+        "date": "Date",
+        "name": "Name"
+      },
+      "empty": "No holidays registered for this year.",
+      "confirmDelete": "Delete this holiday?"
     }
   },
   "auth": {

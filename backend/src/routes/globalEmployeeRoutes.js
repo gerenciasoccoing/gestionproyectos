@@ -8,6 +8,7 @@ const employeeController = require('../controllers/employeeController');
 const severanceController = require('../controllers/severanceController');
 const employeeContractController = require('../controllers/employeeContractController');
 const payrollController = require('../controllers/payrollController');
+const employeeLeaveController = require('../controllers/employeeLeaveController');
 
 // Montado en /employees (sin :projectId en la URL): Personal del menú principal, donde se ve TODO
 // el personal de la empresa (administrativo + de proyecto) con sus propios filtros. Es el mismo
@@ -21,6 +22,7 @@ const uploadSocialSecurity = makeUploader('social-security', 'document');
 const uploadPayment = makeUploader('payment-receipts', 'document');
 const uploadPazYSalvo = makeUploader('paz-y-salvo', 'document');
 const uploadCedula = makeUploader('employee-id-documents', 'any');
+const uploadLeaveSupport = makeUploader('employee-leaves', 'paymentSupport');
 
 router.use(authenticate);
 
@@ -48,5 +50,10 @@ router.post('/:id/contracts', requirePermission('personal', 'edit'), requireOpti
 router.post('/:id/contracts/:contractId/otrosi', requirePermission('personal', 'edit'), requireOptionalProjectAccess(byIdParam), preventDuplicateSubmit, employeeContractController.generateOtrosi);
 router.delete('/:id/contracts/:contractId', requirePermission('personal', 'delete'), requireOptionalProjectAccess(byIdParam), employeeContractController.removeDocument);
 router.post('/:id/contracts/:contractId/request-signature', requirePermission('personal', 'edit'), requireOptionalProjectAccess(byIdParam), preventDuplicateSubmit, employeeContractController.sendForSignature);
+
+router.get('/:id/leaves', requirePermission('personal', 'view'), requireOptionalProjectAccess(byIdParam), employeeLeaveController.list);
+router.post('/:id/leaves', requirePermission('personal', 'edit'), requireOptionalProjectAccess(byIdParam), uploadLeaveSupport.single('file'), preventDuplicateSubmit, employeeLeaveController.create);
+router.delete('/:id/leaves/:leaveId', requirePermission('personal', 'delete'), requireOptionalProjectAccess(byIdParam), employeeLeaveController.remove);
+router.get('/:id/vacation-balance', requirePermission('personal', 'view'), requireOptionalProjectAccess(byIdParam), employeeLeaveController.vacationBalance);
 
 module.exports = router;

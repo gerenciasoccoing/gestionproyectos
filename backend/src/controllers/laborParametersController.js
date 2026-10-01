@@ -27,6 +27,7 @@ const create = asyncHandler(async (req, res) => {
     recargoDominicalPercent, recargoNocturnoDominicalPercent, horaExtraDiurnaDominicalPercent,
     horaExtraNocturnaDominicalPercent, horarioNocturnoInicio, horarioNocturnoFin,
     topeHorasExtraDiarias, topeHorasExtraSemanales, saludPercent, pensionPercent, solidarityFundBrackets,
+    incapacidadGeneralTramos, licenciaNoRemuneradaMantieneSeguridadSocial,
   } = req.body;
   if (!effectiveDate || smlv === undefined || smlv === '') throw new ApiError(400, 'effectiveDate y smlv son obligatorios');
   if (Number(smlv) < 0) throw new ApiError(400, 'smlv no puede ser negativo');
@@ -59,6 +60,9 @@ const create = asyncHandler(async (req, res) => {
     saludPercent: orDefault(saludPercent, 4),
     pensionPercent: orDefault(pensionPercent, 4),
     solidarityFundBrackets: solidarityFundBrackets ?? undefined, // undefined => usa el defaultValue del modelo
+    // Novedades (ver LaborParameters.js).
+    incapacidadGeneralTramos: incapacidadGeneralTramos ?? undefined,
+    licenciaNoRemuneradaMantieneSeguridadSocial: orDefault(licenciaNoRemuneradaMantieneSeguridadSocial, false),
     notes,
   });
   res.status(201).json(params);
