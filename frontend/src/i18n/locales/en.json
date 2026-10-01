@@ -663,6 +663,7 @@
       "dedicationHours": "Dedication (hours)",
       "salary": "Monthly salary",
       "salaryBase": "Base monthly salary",
+      "totalContractValue": "Total contract value / fees",
       "contractFile": "Employment contract (file)",
       "table": {
         "name": "Name",
@@ -754,6 +755,7 @@
       },
       "payments": {
         "title": "Payment Receipts (Payroll)",
+        "notEligible": "This contract type does not generate payroll or transportation allowance (it's a civil/commercial contract). Payment is handled as fees through Expenses.",
         "manualTitle": "Upload manual receipt",
         "date": "Date",
         "period": "Period",
@@ -788,6 +790,7 @@
       },
       "severance": {
         "title": "Termination and Severance Settlement",
+        "notEligible": "This contract type does not generate severance settlement (cesantías, prima, vacation pay).",
         "exitDate": "Exit date",
         "cause": "Cause",
         "causes": {

@@ -22,6 +22,11 @@ const EMPTY_FILTERS = { vinculacion: '', projectId: '', contractType: '' };
 const NEEDS_END_DATE = new Set(['termino_fijo', 'aprendizaje', 'prestacion_servicios', 'subcontratista_natural', 'subcontratista_juridica']);
 const IS_SUBCONTRATISTA_JURIDICA = (t) => t === 'subcontratista_juridica';
 const IS_LABORAL = (t) => ['obra_labor', 'termino_fijo', 'termino_indefinido'].includes(t);
+// Nómina (salario mensual) aplica a contratos laborales + aprendizaje (apoyo de sostenimiento
+// mensual) — nunca a prestación de servicios/subcontratación, cuyo valor es el TOTAL del contrato.
+// Ver el mismo par de constantes en backend/contractTemplates.js para el detalle legal completo.
+const IS_NOMINA_ELIGIBLE = (t) => IS_LABORAL(t) || t === 'aprendizaje';
+const IS_TOTAL_CONTRACT_VALUE = (t) => ['prestacion_servicios', 'subcontratista_natural', 'subcontratista_juridica'].includes(t);
 
 // Un solo componente para las DOS vistas de Personal: dentro de un proyecto (useOutletContext trae
 // projectId, ver ProjectLayout.jsx) y la vista general del menú principal (sin ese contexto,
@@ -171,7 +176,10 @@ export default function PersonnelListPage() {
           <Input label={t('personnel.list.position')} value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} required />
           <Input label={t('personnel.list.entryDate')} type="date" value={form.entryDate} onChange={(e) => setForm({ ...form, entryDate: e.target.value })} required />
           <Input label={t('personnel.list.dedicationHours')} type="number" min="0" step="0.01" value={form.dedicationHours} onChange={(e) => setForm({ ...form, dedicationHours: e.target.value })} />
-          <Input label={t('personnel.list.salaryBase')} type="number" min="0" step="0.01" value={form.salaryValue} onChange={(e) => setForm({ ...form, salaryValue: e.target.value })} required />
+          <Input
+            label={IS_TOTAL_CONTRACT_VALUE(form.contractType) ? t('personnel.list.totalContractValue') : t('personnel.list.salaryBase')}
+            type="number" min="0" step="0.01" value={form.salaryValue} onChange={(e) => setForm({ ...form, salaryValue: e.target.value })} required
+          />
           <Input label={t('personnel.list.contractFile')} type="file" onChange={(e) => setFile(e.target.files[0])} />
           <ContractValueHelper
             laborParams={laborParams}
@@ -179,7 +187,7 @@ export default function PersonnelListPage() {
             salaryValue={form.salaryValue}
             entryDate={form.entryDate}
             contractEndDate={form.contractEndDate}
-            showRange={NEEDS_END_DATE.has(form.contractType)}
+            showRange={NEEDS_END_DATE.has(form.contractType) && IS_NOMINA_ELIGIBLE(form.contractType)}
           />
 
           <Select label={t('personnel.contract.type')} value={form.contractType} onChange={(e) => setForm({ ...form, contractType: e.target.value })} className="lg:col-span-1">

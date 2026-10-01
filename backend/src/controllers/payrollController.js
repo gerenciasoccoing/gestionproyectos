@@ -11,6 +11,7 @@ const { saveGeneratedFile } = require('../middleware/upload');
 const { generateLaborCalculationPdf } = require('../services/pdfService');
 const { assertCashBoxUsable, overdraftWarning } = require('../services/cashBoxService');
 const { nextExpenseNumber } = require('../services/numberingService');
+const { NOMINA_ELIGIBLE_TYPES } = require('../services/contractTemplates');
 
 function pdfDocToBuffer(doc) {
   return new Promise((resolve, reject) => {
@@ -27,9 +28,17 @@ function scopeWhere(req) {
   return where;
 }
 
+// Nómina es una figura del contrato de trabajo (CST): solo obra_labor/término_fijo/término
+// indefinido/aprendizaje la generan. Prestación de servicios y subcontratación (natural/jurídica)
+// son civiles — su salaryValue es el VALOR TOTAL del contrato/honorarios, no un salario mensual
+// (ver NOMINA_ELIGIBLE_TYPES en contractTemplates.js para el porqué completo); tratarlo como tal
+// fue la causa del bug de auxilio de transporte reportado.
 async function loadEmployee(req) {
   const employee = await Employee.findOne({ where: scopeWhere(req) });
   if (!employee) throw new ApiError(404, 'Empleado no encontrado');
+  if (!NOMINA_ELIGIBLE_TYPES.includes(employee.contractType)) {
+    throw new ApiError(400, 'Este trabajador no tiene un tipo de contrato que genere nómina (prestación de servicios y subcontratación se pagan como honorarios, ver Gastos).');
+  }
   return employee;
 }
 

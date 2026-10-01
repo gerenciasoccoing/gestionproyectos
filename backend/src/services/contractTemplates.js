@@ -44,6 +44,18 @@ const FIELD_LABELS = {
   subcontractorLegalName: 'Razón social del subcontratista', subcontractorNit: 'NIT del subcontratista', subcontractorLegalRep: 'Representante legal',
 };
 
+// Nómina (salario mensual + auxilio de transporte) y Liquidación de prestaciones sociales son
+// figuras del CONTRATO DE TRABAJO (CST) — nunca aplican a prestación de servicios ni a
+// subcontratación (natural/jurídica), que son civiles/comerciales: su "salaryValue" es el VALOR
+// TOTAL del contrato/honorarios (ver buildContractorInfoTable/buildJuridicaInfoTable, que NO dicen
+// "mensuales"), no un salario mensual — tratarlo como tal fue la causa del bug de auxilio de
+// transporte reportado ("todo contrato de 2+ meses supera 2 SMMLV"). El pago a estos contratistas
+// se gestiona como honorarios/factura en Gastos, no por Nómina. Aprendizaje SÍ entra a Nómina (su
+// apoyo de sostenimiento es mensual, con derecho a auxilio de transporte), pero NO a Liquidación
+// (Ley 789/2002: no genera cesantías, prima ni vacaciones).
+const NOMINA_ELIGIBLE_TYPES = ['obra_labor', 'termino_fijo', 'termino_indefinido', 'aprendizaje'];
+const SEVERANCE_ELIGIBLE_TYPES = ['obra_labor', 'termino_fijo', 'termino_indefinido'];
+
 const CONTRACT_TYPE_LABELS = {
   obra_labor: 'Contrato por Obra o Labor Contratada',
   termino_fijo: 'Contrato a Término Fijo',
@@ -361,6 +373,8 @@ function buildContractContent(ctx) {
 module.exports = {
   CONTRACT_TYPE_LABELS,
   REQUIRED_FIELDS_BY_TYPE,
+  NOMINA_ELIGIBLE_TYPES,
+  SEVERANCE_ELIGIBLE_TYPES,
   missingFieldsForContract,
   buildContractContent,
   formatDateEs,

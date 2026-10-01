@@ -7,6 +7,7 @@ const { assertCashBoxUsable, overdraftWarning } = require('../services/cashBoxSe
 const { getLetterheadForProject } = require('../services/letterheadService');
 const { generateLaborCalculationPdf } = require('../services/pdfService');
 const { nextExpenseNumber, contractPrefixForProject } = require('../services/numberingService');
+const { SEVERANCE_ELIGIBLE_TYPES } = require('../services/contractTemplates');
 
 function pdfDocToBuffer(doc) {
   return new Promise((resolve, reject) => {
@@ -23,10 +24,16 @@ function scopeWhere(req) {
   return where;
 }
 
+// Liquidación de prestaciones sociales (cesantías, intereses, prima, vacaciones, indemnización) es
+// exclusiva del contrato de trabajo — ni aprendizaje (Ley 789/2002, no genera estas prestaciones)
+// ni prestación de servicios/subcontratación (civiles) tienen derecho a ella.
 async function loadActiveEmployee(req) {
   const employee = await Employee.findOne({ where: scopeWhere(req) });
   if (!employee) throw new ApiError(404, 'Empleado no encontrado');
   if (employee.status === 'retirado') throw new ApiError(400, 'El empleado ya fue retirado');
+  if (!SEVERANCE_ELIGIBLE_TYPES.includes(employee.contractType)) {
+    throw new ApiError(400, 'Este trabajador no tiene un tipo de contrato que genere liquidación de prestaciones sociales.');
+  }
   return employee;
 }
 

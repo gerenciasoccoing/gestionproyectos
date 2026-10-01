@@ -62,11 +62,23 @@ export default function EmployeeDetailPage() {
       <BasicDataSection api={api} employee={employee} onChange={load} />
       <ContractsSection api={api} project={project} employee={employee} onChange={load} />
       <SocialSecuritySection api={api} employee={employee} onChange={load} />
-      <PaymentsSection api={api} employee={employee} onChange={load} />
-      {employee.status === 'activo' ? (
-        <SeveranceSection api={api} employee={employee} onChange={load} />
+      {IS_NOMINA_ELIGIBLE(employee.contractType) ? (
+        <PaymentsSection api={api} employee={employee} onChange={load} />
       ) : (
-        <SeveranceSummary api={api} employee={employee} onChange={load} />
+        <Card title={t('personnel.detail.payments.title')}>
+          <p className="text-sm text-gray-500">{t('personnel.detail.payments.notEligible')}</p>
+        </Card>
+      )}
+      {IS_LABORAL(employee.contractType) ? (
+        employee.status === 'activo' ? (
+          <SeveranceSection api={api} employee={employee} onChange={load} />
+        ) : (
+          <SeveranceSummary api={api} employee={employee} onChange={load} />
+        )
+      ) : (
+        <Card title={t('personnel.detail.severance.title')}>
+          <p className="text-sm text-gray-500">{t('personnel.detail.severance.notEligible')}</p>
+        </Card>
       )}
     </div>
   );
@@ -75,6 +87,14 @@ export default function EmployeeDetailPage() {
 const NEEDS_END_DATE = new Set(['termino_fijo', 'aprendizaje', 'prestacion_servicios', 'subcontratista_natural', 'subcontratista_juridica']);
 const IS_SUBCONTRATISTA_JURIDICA = (t) => t === 'subcontratista_juridica';
 const IS_LABORAL = (t) => ['obra_labor', 'termino_fijo', 'termino_indefinido'].includes(t);
+// Nómina (salario mensual + posible auxilio de transporte) sí aplica a aprendizaje (apoyo de
+// sostenimiento mensual) además de los contratos laborales — pero NO a prestación de servicios ni
+// subcontratación, cuyo salaryValue es el valor TOTAL del contrato/honorarios, no mensual. Ver
+// NOMINA_ELIGIBLE_TYPES en backend/contractTemplates.js para el detalle legal completo.
+const IS_NOMINA_ELIGIBLE = (t) => IS_LABORAL(t) || t === 'aprendizaje';
+// Para estos tipos, salaryValue YA es el valor total del contrato: el campo se etiqueta distinto y
+// no tiene sentido calcularle "valor total = salario x días" (ver ContractValueHelper más abajo).
+const IS_TOTAL_CONTRACT_VALUE = (t) => ['prestacion_servicios', 'subcontratista_natural', 'subcontratista_juridica'].includes(t);
 
 function BasicDataSection({ api, employee, onChange }) {
   const { t } = useTranslation();
@@ -162,7 +182,10 @@ function BasicDataSection({ api, employee, onChange }) {
           <Input label={t('personnel.list.name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           <Input label={t('personnel.list.entryDate')} type="date" value={form.entryDate} onChange={(e) => setForm({ ...form, entryDate: e.target.value })} required />
           <Input label={t('personnel.detail.position')} value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} />
-          <Input label={t('personnel.list.salaryBase')} type="number" min="0" step="0.01" value={form.salaryValue} onChange={(e) => setForm({ ...form, salaryValue: e.target.value })} />
+          <Input
+            label={IS_TOTAL_CONTRACT_VALUE(form.contractType) ? t('personnel.list.totalContractValue') : t('personnel.list.salaryBase')}
+            type="number" min="0" step="0.01" value={form.salaryValue} onChange={(e) => setForm({ ...form, salaryValue: e.target.value })}
+          />
           <Input label={t('personnel.detail.dedication')} type="number" min="0" step="0.01" value={form.dedicationHours} onChange={(e) => setForm({ ...form, dedicationHours: e.target.value })} />
           <ContractValueHelper
             laborParams={laborParams}
@@ -170,7 +193,7 @@ function BasicDataSection({ api, employee, onChange }) {
             salaryValue={form.salaryValue}
             entryDate={form.entryDate}
             contractEndDate={form.contractEndDate}
-            showRange={NEEDS_END_DATE.has(form.contractType)}
+            showRange={NEEDS_END_DATE.has(form.contractType) && IS_NOMINA_ELIGIBLE(form.contractType)}
           />
 
           <Select label={t('personnel.contract.type')} value={form.contractType} onChange={(e) => setForm({ ...form, contractType: e.target.value })}>

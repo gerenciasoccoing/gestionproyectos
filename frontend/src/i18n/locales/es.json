@@ -663,6 +663,7 @@
       "dedicationHours": "Dedicación (horas)",
       "salary": "Salario mensual",
       "salaryBase": "Salario mensual básico",
+      "totalContractValue": "Valor total del contrato / honorarios",
       "contractFile": "Contrato laboral (archivo)",
       "table": {
         "name": "Nombre",
@@ -754,6 +755,7 @@
       },
       "payments": {
         "title": "Comprobantes de Pago (Nómina)",
+        "notEligible": "Este tipo de contrato no genera nómina ni auxilio de transporte (es un contrato civil/comercial). El pago se gestiona como honorarios desde Gastos.",
         "manualTitle": "Subir comprobante manual",
         "date": "Fecha",
         "period": "Periodo",
@@ -788,6 +790,7 @@
       },
       "severance": {
         "title": "Retiro y Liquidación de Prestaciones Sociales",
+        "notEligible": "Este tipo de contrato no genera liquidación de prestaciones sociales (cesantías, prima, vacaciones).",
         "exitDate": "Fecha de retiro",
         "cause": "Causal",
         "causes": {
