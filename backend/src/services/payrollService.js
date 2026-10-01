@@ -4,11 +4,12 @@
 // liquidación y el valor de contrato por rango (employeeController.js#previewContractValue) sean
 // siempre consistentes entre sí.
 const { Op } = require('sequelize');
-const { EmployeeLeave } = require('../models');
+const { EmployeeLeave, EmployeeDeduction } = require('../models');
 const {
   days360, getEffectiveLaborParameters, computeAuxTransporte,
   computeOvertimeItems, overtimeWarning, computeDeductions,
   overlapDays360, cumulativeLeaveDaysBefore, incapacidadGeneralSplit, incapacidadLaboralSplit, simpleLeavePay,
+  computeOtherDeductions, netPayWarning,
 } = require('./laborCalculations');
 
 const LEAVE_DEVENGADO_LABELS = {
@@ -63,7 +64,7 @@ async function processLeaves({ employeeId, periodStart, periodEnd, salaryValue, 
 // laborCalculations.js) — todas opcionales, un período sin horas extra calcula exactamente igual
 // que antes de esta fase. `total` (y por tanto lo que termina pagándose/registrándose como gasto
 // administrativo) es el NETO A PAGAR (devengado - deducciones de ley).
-async function calculatePayroll({ employeeId, salaryValue, periodStart, periodEnd, overtimeHours }) {
+async function calculatePayroll({ employeeId, salaryValue, periodStart, periodEnd, overtimeHours, retefuente }) {
   const params = await getEffectiveLaborParameters(periodEnd);
   const nominalDays = days360(periodStart, periodEnd);
 
@@ -106,11 +107,29 @@ async function calculatePayroll({ employeeId, salaryValue, periodStart, periodEn
 
   // Base de cotización (sección 5): salario + horas extra + recargos + valor pagado por
   // incapacidades/vacaciones/licencias remuneradas — SIN auxilio de transporte (no es salario).
-  const { items: deductionItems, total: totalDeducciones } = computeDeductions({
+  const { items: deductionItems, total: totalDeduccionesLey, cotizacionBase } = computeDeductions({
     baseAmount: baseSalaryForPeriod + overtimeTotal + leaveContributionToBase, salaryValue, daysWorked: workedDays, params,
   });
 
+  // Otros descuentos (sección 6): préstamos/anticipos, libranzas, embargos judiciales y otros
+  // descuentos autorizados vigentes del trabajador, más la retención en la fuente manual de este
+  // período (no persiste saldo — ver computeOtherDeductions). `applied` solo se usa al CONFIRMAR
+  // (ver payrollController.js#confirm) para decrementar el saldo real; preview no lo toca.
+  const activeDeductions = employeeId
+    ? await EmployeeDeduction.findAll({ where: { employeeId, active: true } })
+    : [];
+  const { items: otherDeductionItems, total: totalOtrosDescuentos, applied: appliedDeductions } = computeOtherDeductions({
+    deductions: activeDeductions, cotizacionBase, smlv: params.smlv, daysWorked: workedDays, retefuente,
+  });
+
+  const allDeductionItems = [...deductionItems, ...otherDeductionItems];
+  const totalDeducciones = totalDeduccionesLey + totalOtrosDescuentos;
   const total = totalDevengado - totalDeducciones; // neto a pagar
+
+  // Protección de salario mínimo: se suma a la advertencia de horas extra (si ambas aplican, se
+  // muestran juntas) en vez de pisarla.
+  const minWageWarning = netPayWarning(total, params.smlv, workedDays);
+  const combinedWarning = [warning, minWageWarning].filter(Boolean).join(' ') || null;
 
   const breakdown = {
     parametrosUsados: {
@@ -128,8 +147,9 @@ async function calculatePayroll({ employeeId, salaryValue, periodStart, periodEn
     dailySalary,
     auxilioTransporteAplica: auxTransporteApplies,
     overtimeWarning: warning,
+    minWageWarning,
     devengados,
-    deducciones: deductionItems,
+    deducciones: allDeductionItems,
     totalDevengado,
     totalDeducciones,
     total,
@@ -144,7 +164,8 @@ async function calculatePayroll({ employeeId, salaryValue, periodStart, periodEn
     grossEarnings: totalDevengado,
     totalDeductions: totalDeducciones,
     total,
-    warning,
+    warning: combinedWarning,
+    appliedDeductions,
     breakdown,
   };
 }

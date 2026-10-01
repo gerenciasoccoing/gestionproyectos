@@ -237,6 +237,23 @@ export const generalEmployeeLeavesApi = {
   vacationBalance: (employeeId) => client.get(`/employees/${employeeId}/vacation-balance`).then((r) => r.data),
 };
 
+// Otros descuentos de nómina (préstamos/anticipos, libranzas, embargos, otros autorizados) de un
+// trabajador — ver employeeDeductionController.js. No tiene update: solo setStatus (activar/
+// desactivar) y remove (solo si todavía no se aplicó ninguna cuota).
+export const employeeDeductionsApi = {
+  list: (pid, employeeId) => client.get(`/projects/${pid}/employees/${employeeId}/deductions`).then((r) => r.data),
+  create: (pid, employeeId, formData) => client.post(`/projects/${pid}/employees/${employeeId}/deductions`, formData).then((r) => r.data),
+  setStatus: (pid, employeeId, deductionId, active) => client.post(`/projects/${pid}/employees/${employeeId}/deductions/${deductionId}/status`, { active }).then((r) => r.data),
+  remove: (pid, employeeId, deductionId) => client.delete(`/projects/${pid}/employees/${employeeId}/deductions/${deductionId}`).then((r) => r.data),
+};
+
+export const generalEmployeeDeductionsApi = {
+  list: (employeeId) => client.get(`/employees/${employeeId}/deductions`).then((r) => r.data),
+  create: (employeeId, formData) => client.post(`/employees/${employeeId}/deductions`, formData).then((r) => r.data),
+  setStatus: (employeeId, deductionId, active) => client.post(`/employees/${employeeId}/deductions/${deductionId}/status`, { active }).then((r) => r.data),
+  remove: (employeeId, deductionId) => client.delete(`/employees/${employeeId}/deductions/${deductionId}`).then((r) => r.data),
+};
+
 export const employeeContractsApi = {
   contractTypes: () => client.get('/employee-contract-types').then((r) => r.data),
   list: (pid, employeeId) => client.get(`/projects/${pid}/employees/${employeeId}/contracts`).then((r) => r.data),

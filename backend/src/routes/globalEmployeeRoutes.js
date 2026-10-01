@@ -9,6 +9,7 @@ const severanceController = require('../controllers/severanceController');
 const employeeContractController = require('../controllers/employeeContractController');
 const payrollController = require('../controllers/payrollController');
 const employeeLeaveController = require('../controllers/employeeLeaveController');
+const employeeDeductionController = require('../controllers/employeeDeductionController');
 
 // Montado en /employees (sin :projectId en la URL): Personal del menú principal, donde se ve TODO
 // el personal de la empresa (administrativo + de proyecto) con sus propios filtros. Es el mismo
@@ -23,6 +24,7 @@ const uploadPayment = makeUploader('payment-receipts', 'document');
 const uploadPazYSalvo = makeUploader('paz-y-salvo', 'document');
 const uploadCedula = makeUploader('employee-id-documents', 'any');
 const uploadLeaveSupport = makeUploader('employee-leaves', 'paymentSupport');
+const uploadDeductionSupport = makeUploader('employee-deductions', 'paymentSupport');
 
 router.use(authenticate);
 
@@ -55,5 +57,10 @@ router.get('/:id/leaves', requirePermission('personal', 'view'), requireOptional
 router.post('/:id/leaves', requirePermission('personal', 'edit'), requireOptionalProjectAccess(byIdParam), uploadLeaveSupport.single('file'), preventDuplicateSubmit, employeeLeaveController.create);
 router.delete('/:id/leaves/:leaveId', requirePermission('personal', 'delete'), requireOptionalProjectAccess(byIdParam), employeeLeaveController.remove);
 router.get('/:id/vacation-balance', requirePermission('personal', 'view'), requireOptionalProjectAccess(byIdParam), employeeLeaveController.vacationBalance);
+
+router.get('/:id/deductions', requirePermission('personal', 'view'), requireOptionalProjectAccess(byIdParam), employeeDeductionController.list);
+router.post('/:id/deductions', requirePermission('personal', 'edit'), requireOptionalProjectAccess(byIdParam), uploadDeductionSupport.single('file'), preventDuplicateSubmit, employeeDeductionController.create);
+router.post('/:id/deductions/:deductionId/status', requirePermission('personal', 'edit'), requireOptionalProjectAccess(byIdParam), employeeDeductionController.setStatus);
+router.delete('/:id/deductions/:deductionId', requirePermission('personal', 'delete'), requireOptionalProjectAccess(byIdParam), employeeDeductionController.remove);
 
 module.exports = router;

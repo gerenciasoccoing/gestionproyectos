@@ -2,6 +2,7 @@ import {
   employeesApi, generalEmployeesApi, payrollApi, generalPayrollApi,
   employeeContractsApi, generalEmployeeContractsApi,
   employeeLeavesApi, generalEmployeeLeavesApi,
+  employeeDeductionsApi, generalEmployeeDeductionsApi,
 } from '../../api';
 
 // Une los tres módulos de API de Personal (fichas/nómina/contratos) en un solo objeto, sin que cada
@@ -71,6 +72,17 @@ export function buildEmployeeApi(projectId) {
       create: (employeeId, formData) => employeeLeavesApi.create(projectId, employeeId, formData),
       remove: (employeeId, leaveId) => employeeLeavesApi.remove(projectId, employeeId, leaveId),
       vacationBalance: (employeeId) => employeeLeavesApi.vacationBalance(projectId, employeeId),
+    },
+    deductions: isGeneral ? {
+      list: (employeeId) => generalEmployeeDeductionsApi.list(employeeId),
+      create: (employeeId, formData) => generalEmployeeDeductionsApi.create(employeeId, formData),
+      setStatus: (employeeId, deductionId, active) => generalEmployeeDeductionsApi.setStatus(employeeId, deductionId, active),
+      remove: (employeeId, deductionId) => generalEmployeeDeductionsApi.remove(employeeId, deductionId),
+    } : {
+      list: (employeeId) => employeeDeductionsApi.list(projectId, employeeId),
+      create: (employeeId, formData) => employeeDeductionsApi.create(projectId, employeeId, formData),
+      setStatus: (employeeId, deductionId, active) => employeeDeductionsApi.setStatus(projectId, employeeId, deductionId, active),
+      remove: (employeeId, deductionId) => employeeDeductionsApi.remove(projectId, employeeId, deductionId),
     },
   };
 }

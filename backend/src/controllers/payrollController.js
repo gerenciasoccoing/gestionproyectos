@@ -4,7 +4,7 @@
 // employeeController.js, que sigue existiendo intacto para el flujo manual de "subir comprobante").
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { sequelize, Employee, PaymentReceipt, Expense, AdminExpenseCategory } = require('../models');
+const { sequelize, Employee, PaymentReceipt, Expense, AdminExpenseCategory, EmployeeDeduction } = require('../models');
 const { calculatePayroll } = require('../services/payrollService');
 const { getLetterheadForProject } = require('../services/letterheadService');
 const { saveGeneratedFile } = require('../middleware/upload');
@@ -54,7 +54,7 @@ function validatePeriod(periodStart, periodEnd, paymentDate) {
 // Previsualiza el cálculo desglosado de un período de nómina sin persistir nada.
 const preview = asyncHandler(async (req, res) => {
   const employee = await loadEmployee(req);
-  const { periodStart, periodEnd, paymentDate, overtimeHours } = req.body;
+  const { periodStart, periodEnd, paymentDate, overtimeHours, retefuente } = req.body;
   validatePeriod(periodStart, periodEnd, paymentDate);
 
   const result = await calculatePayroll({
@@ -63,8 +63,12 @@ const preview = asyncHandler(async (req, res) => {
     periodStart,
     periodEnd,
     overtimeHours,
+    retefuente,
   });
-  res.json(result);
+  // appliedDeductions es información interna para decrementar saldos al CONFIRMAR (ver abajo) — un
+  // preview no debe sugerir que ya se aplicó nada.
+  const { appliedDeductions, ...previewResult } = result;
+  res.json(previewResult);
 });
 
 // Calcula, persiste el comprobante de pago (PaymentReceipt) y genera su PDF de soporte. Para
@@ -75,7 +79,7 @@ const preview = asyncHandler(async (req, res) => {
 // especificación del cliente).
 const confirm = asyncHandler(async (req, res) => {
   const employee = await loadEmployee(req);
-  const { periodStart, periodEnd, paymentDate, cashBoxId, overtimeHours } = req.body;
+  const { periodStart, periodEnd, paymentDate, cashBoxId, overtimeHours, retefuente } = req.body;
   validatePeriod(periodStart, periodEnd, paymentDate);
 
   const isAdministrative = !employee.projectId;
@@ -89,6 +93,7 @@ const confirm = asyncHandler(async (req, res) => {
     periodStart,
     periodEnd,
     overtimeHours,
+    retefuente,
   });
 
   // result.total es el NETO a pagar (devengado - deducciones, ver payrollService.js) — es lo que
@@ -135,6 +140,20 @@ const confirm = asyncHandler(async (req, res) => {
       created.expenseId = expense.id;
       await created.save({ transaction: t });
       cashBoxWarning = await overdraftWarning(cashBoxId, { transaction: t });
+    }
+
+    // Descuenta de cada préstamo/libranza/embargo/otro con saldo conocido el monto realmente
+    // aplicado este período (ver computeOtherDeductions) — recién AQUÍ, al confirmar, nunca en el
+    // preview. Al llegar a 0 se desactiva sola (deja de aplicarse en los períodos siguientes).
+    for (const { id, amount } of result.appliedDeductions) {
+      // eslint-disable-next-line no-await-in-loop
+      const deduction = await EmployeeDeduction.findByPk(id, { transaction: t });
+      if (!deduction || deduction.balance == null) continue;
+      const newBalance = Math.max(Number(deduction.balance) - amount, 0);
+      deduction.balance = newBalance;
+      if (newBalance <= 0) deduction.active = false;
+      // eslint-disable-next-line no-await-in-loop
+      await deduction.save({ transaction: t });
     }
 
     return created;

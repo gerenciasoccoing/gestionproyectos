@@ -797,7 +797,8 @@
           "deductions": "Deductions",
           "noDeductions": "No deductions.",
           "totalDeductions": "Total deductions",
-          "netPay": "Net pay"
+          "netPay": "Net pay",
+          "retefuente": "Withholding tax (manual value for this period)"
         }
       },
       "breakdown": {
@@ -858,6 +859,41 @@
           "taken": "Taken days",
           "pending": "Pending balance"
         }
+      },
+      "deductions": {
+        "title": "Other Deductions",
+        "help": "Loans/advances, payroll-deducted loans, court-ordered garnishments and other authorized deductions, applied automatically on every payroll while active and with a pending balance.",
+        "newDeduction": "+ New deduction",
+        "type": "Type",
+        "types": {
+          "prestamo": "Loan / advance",
+          "libranza": "Payroll-deducted loan",
+          "embargo": "Court-ordered garnishment",
+          "otro": "Other authorized deduction"
+        },
+        "concept": "Concept",
+        "embargoKind": "Garnishment type",
+        "embargoKinds": {
+          "ordinario": "Ordinary (civil or commercial debt) — cap: 1/5 of the excess over 1 minimum wage",
+          "alimentos": "Child/spousal support — cap: 50% of salary"
+        },
+        "totalAmount": "Total amount (blank = indefinite)",
+        "installmentAmount": "Installment per period",
+        "startDate": "Start date",
+        "authorizationRequired": "Written authorization (required)",
+        "authorizationOptional": "Court order or other support (optional)",
+        "notes": "Notes",
+        "table": {
+          "type": "Type",
+          "concept": "Concept",
+          "installment": "Installment",
+          "balance": "Balance",
+          "status": "Status",
+          "support": "Support"
+        },
+        "indefinite": "Indefinite",
+        "empty": "No deductions registered.",
+        "confirmDelete": "Delete this deduction? If any installment was already applied, deactivate it instead."
       }
     },
     "contract": {

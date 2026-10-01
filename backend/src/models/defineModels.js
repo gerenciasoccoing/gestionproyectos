@@ -64,6 +64,7 @@ const modelDefiners = [
   require('./PublicHoliday'),
   require('./LeaveType'),
   require('./EmployeeLeave'),
+  require('./EmployeeDeduction'),
 ];
 
 // Company (la tabla de empresas en sí), Permission (catálogo global fijo de permisos, no datos de

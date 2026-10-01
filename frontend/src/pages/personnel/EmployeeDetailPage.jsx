@@ -70,6 +70,13 @@ export default function EmployeeDetailPage() {
         </Card>
       )}
       {IS_NOMINA_ELIGIBLE(employee.contractType) ? (
+        <DeductionsSection api={api} employee={employee} />
+      ) : (
+        <Card title={t('personnel.detail.deductions.title')}>
+          <p className="text-sm text-gray-500">{t('personnel.detail.payments.notEligible')}</p>
+        </Card>
+      )}
+      {IS_NOMINA_ELIGIBLE(employee.contractType) ? (
         <PaymentsSection api={api} employee={employee} onChange={load} />
       ) : (
         <Card title={t('personnel.detail.payments.title')}>
@@ -616,6 +623,142 @@ function LeavesSection({ api, employee }) {
   );
 }
 
+const DEDUCTION_TYPES = ['prestamo', 'libranza', 'embargo', 'otro'];
+const REQUIRES_AUTHORIZATION_FILE = (type) => type === 'prestamo' || type === 'libranza' || type === 'otro';
+
+const emptyDeductionForm = { type: '', concept: '', embargoKind: '', totalAmount: '', installmentAmount: '', startDate: '', notes: '' };
+
+// Otros descuentos de nómina (préstamos/anticipos, libranzas, embargos judiciales, otros
+// descuentos autorizados) — ver EmployeeDeduction.js y laborCalculations.js#computeOtherDeductions
+// en el backend para cómo se aplican y, en el caso de un embargo, cómo se limita al tope legal.
+// Mismo gate que Novedades/Nómina: un contrato civil no tiene estas figuras.
+function DeductionsSection({ api, employee }) {
+  const { t } = useTranslation();
+  const [deductions, setDeductions] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(emptyDeductionForm);
+  const [file, setFile] = useState(null);
+  const [error, setError] = useState('');
+  const [busyId, setBusyId] = useState(null);
+
+  const load = () => api.deductions.list(employee.id).then(setDeductions);
+  useEffect(() => { load(); }, [employee.id]);
+
+  const startCreate = () => { setForm(emptyDeductionForm); setFile(null); setError(''); setShowForm(true); };
+
+  const [submit, submitting] = useSubmitGuard(async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      const fd = new FormData();
+      fd.append('type', form.type);
+      fd.append('concept', form.concept);
+      if (form.type === 'embargo') fd.append('embargoKind', form.embargoKind);
+      if (form.totalAmount) fd.append('totalAmount', form.totalAmount);
+      fd.append('installmentAmount', form.installmentAmount);
+      if (form.startDate) fd.append('startDate', form.startDate);
+      if (form.notes) fd.append('notes', form.notes);
+      if (file) fd.append('file', file);
+      await api.deductions.create(employee.id, fd);
+      setForm(emptyDeductionForm);
+      setFile(null);
+      setShowForm(false);
+      load();
+    } catch (err) {
+      setError(extractError(err));
+    }
+  });
+
+  const toggleStatus = async (deduction) => {
+    setError('');
+    setBusyId(deduction.id);
+    try {
+      await api.deductions.setStatus(employee.id, deduction.id, !deduction.active);
+      load();
+    } catch (err) {
+      setError(extractError(err));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const remove = async (deduction) => {
+    if (!window.confirm(t('personnel.detail.deductions.confirmDelete'))) return;
+    setError('');
+    setBusyId(deduction.id);
+    try {
+      await api.deductions.remove(employee.id, deduction.id);
+      load();
+    } catch (err) {
+      setError(extractError(err));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <Card title={t('personnel.detail.deductions.title')} actions={
+      <Can module="personal" action="edit">
+        <Button onClick={() => (showForm ? setShowForm(false) : startCreate())}>
+          {showForm ? t('common.cancel') : t('personnel.detail.deductions.newDeduction')}
+        </Button>
+      </Can>
+    }>
+      <p className="text-sm text-gray-500 mb-3">{t('personnel.detail.deductions.help')}</p>
+      {showForm && (
+        <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4 items-end">
+          <Select label={t('personnel.detail.deductions.type')} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value, embargoKind: '' })} required>
+            <option value="">{t('common.selectPlaceholder')}</option>
+            {DEDUCTION_TYPES.map((dt) => <option key={dt} value={dt}>{t(`personnel.detail.deductions.types.${dt}`)}</option>)}
+          </Select>
+          <Input label={t('personnel.detail.deductions.concept')} value={form.concept} onChange={(e) => setForm({ ...form, concept: e.target.value })} required className="lg:col-span-2" />
+          {form.type === 'embargo' && (
+            <Select label={t('personnel.detail.deductions.embargoKind')} value={form.embargoKind} onChange={(e) => setForm({ ...form, embargoKind: e.target.value })} required>
+              <option value="">{t('common.selectPlaceholder')}</option>
+              <option value="ordinario">{t('personnel.detail.deductions.embargoKinds.ordinario')}</option>
+              <option value="alimentos">{t('personnel.detail.deductions.embargoKinds.alimentos')}</option>
+            </Select>
+          )}
+          <Input label={t('personnel.detail.deductions.totalAmount')} type="number" min="0" step="0.01" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} />
+          <Input label={t('personnel.detail.deductions.installmentAmount')} type="number" min="0" step="0.01" value={form.installmentAmount} onChange={(e) => setForm({ ...form, installmentAmount: e.target.value })} required />
+          <Input label={t('personnel.detail.deductions.startDate')} type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
+          <Input
+            label={REQUIRES_AUTHORIZATION_FILE(form.type) ? t('personnel.detail.deductions.authorizationRequired') : t('personnel.detail.deductions.authorizationOptional')}
+            type="file" onChange={(e) => setFile(e.target.files[0])} required={REQUIRES_AUTHORIZATION_FILE(form.type)}
+          />
+          <Input label={t('personnel.detail.deductions.notes')} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="lg:col-span-2" />
+          <Button type="submit" className="col-span-full" loading={submitting}>{t('common.save')}</Button>
+          <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
+        </form>
+      )}
+      {!showForm && <ErrorText>{error}</ErrorText>}
+      <Table columns={[t('personnel.detail.deductions.table.type'), t('personnel.detail.deductions.table.concept'), t('personnel.detail.deductions.table.installment'), t('personnel.detail.deductions.table.balance'), t('personnel.detail.deductions.table.status'), t('personnel.detail.deductions.table.support'), '']}>
+        {deductions.map((d) => (
+          <tr key={d.id} className="border-b border-gray-100">
+            <td className="py-1 pr-3">{t(`personnel.detail.deductions.types.${d.type}`)}</td>
+            <td className="py-1 pr-3">{d.concept}</td>
+            <td className="py-1 pr-3">{money(d.installmentAmount)}</td>
+            <td className="py-1 pr-3">{d.balance != null ? money(d.balance) : t('personnel.detail.deductions.indefinite')}</td>
+            <td className="py-1 pr-3"><Badge color={d.active ? 'green' : 'gray'}>{t(d.active ? 'admin.leaveTypes.active' : 'admin.leaveTypes.inactive')}</Badge></td>
+            <td className="py-1 pr-3">{d.authorizationFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(d.authorizationFilePath)} target="_blank" rel="noreferrer">{t('common.view')}</a> : '-'}</td>
+            <td className="py-1 pr-3 text-right whitespace-nowrap">
+              <Can module="personal" action="edit">
+                <button type="button" className="text-blue-600 hover:underline text-xs" disabled={busyId === d.id} onClick={() => toggleStatus(d)}>
+                  {d.active ? t('admin.leaveTypes.deactivate') : t('admin.leaveTypes.activate')}
+                </button>
+              </Can>
+              <Can module="personal" action="delete">
+                <button type="button" className="text-red-600 hover:underline text-xs ml-2" disabled={busyId === d.id} onClick={() => remove(d)}>{t('common.delete')}</button>
+              </Can>
+            </td>
+          </tr>
+        ))}
+        {deductions.length === 0 && <tr><td colSpan={7} className="py-2 text-center text-gray-400">{t('personnel.detail.deductions.empty')}</td></tr>}
+      </Table>
+    </Card>
+  );
+}
+
 // Las 7 horas extra/recargos de Ley (ver OVERTIME_TYPES en laborCalculations.js, backend) — mismo
 // orden y mismas claves, para que overtimeHours viaje tal cual al payload de preview/confirm.
 const OVERTIME_FIELDS = [
@@ -630,7 +773,7 @@ const EMPTY_OVERTIME = Object.fromEntries(OVERTIME_FIELDS.map((f) => [f, '']));
 function PayrollCalculator({ api, employee, onChange }) {
   const { t } = useTranslation();
   const isAdministrative = !employee.projectId;
-  const [form, setForm] = useState({ periodStart: '', periodEnd: '', paymentDate: '', cashBoxId: '' });
+  const [form, setForm] = useState({ periodStart: '', periodEnd: '', paymentDate: '', cashBoxId: '', retefuente: '' });
   const [overtime, setOvertime] = useState(EMPTY_OVERTIME);
   const [showOvertime, setShowOvertime] = useState(false);
   const [preview, setPreview] = useState(null);
@@ -666,7 +809,7 @@ function PayrollCalculator({ api, employee, onChange }) {
       const result = await api.payroll.confirm(employee.id, buildPayload());
       if (result.warning) setWarning(result.warning);
       setPreview(null);
-      setForm({ periodStart: '', periodEnd: '', paymentDate: '', cashBoxId: '' });
+      setForm({ periodStart: '', periodEnd: '', paymentDate: '', cashBoxId: '', retefuente: '' });
       setOvertime(EMPTY_OVERTIME);
       onChange();
     } catch (err) {
@@ -687,6 +830,7 @@ function PayrollCalculator({ api, employee, onChange }) {
             {cashBoxOptions.map((cb) => <option key={cb.id} value={cb.id}>{cb.name} ({money(cb.balance)})</option>)}
           </Select>
         )}
+        <Input label={t('personnel.detail.payments.payroll.retefuente')} type="number" min="0" step="0.01" value={form.retefuente} onChange={(e) => setForm({ ...form, retefuente: e.target.value })} />
         <div className="col-span-full">
           <button type="button" className="text-blue-600 hover:underline text-xs" onClick={() => setShowOvertime((s) => !s)}>
             {showOvertime ? t('personnel.detail.payments.payroll.hideOvertime') : t('personnel.detail.payments.payroll.showOvertime')}

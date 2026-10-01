@@ -797,7 +797,8 @@
           "deductions": "Deducciones",
           "noDeductions": "Sin deducciones.",
           "totalDeductions": "Total deducciones",
-          "netPay": "Neto a pagar"
+          "netPay": "Neto a pagar",
+          "retefuente": "Retención en la fuente (valor manual de este período)"
         }
       },
       "breakdown": {
@@ -858,6 +859,41 @@
           "taken": "Días tomados",
           "pending": "Saldo pendiente"
         }
+      },
+      "deductions": {
+        "title": "Otros Descuentos",
+        "help": "Préstamos/anticipos, libranzas, embargos judiciales y otros descuentos autorizados que se aplican automáticamente en cada nómina mientras estén activos y tengan saldo pendiente.",
+        "newDeduction": "+ Nuevo descuento",
+        "type": "Tipo",
+        "types": {
+          "prestamo": "Préstamo / anticipo",
+          "libranza": "Libranza",
+          "embargo": "Embargo judicial",
+          "otro": "Otro descuento autorizado"
+        },
+        "concept": "Concepto",
+        "embargoKind": "Tipo de embargo",
+        "embargoKinds": {
+          "ordinario": "Ordinario (deuda civil o comercial) — tope: 1/5 del exceso sobre 1 SMMLV",
+          "alimentos": "Cuota alimentaria — tope: 50% del salario"
+        },
+        "totalAmount": "Monto total (vacío = indefinido)",
+        "installmentAmount": "Cuota por período",
+        "startDate": "Fecha de inicio",
+        "authorizationRequired": "Autorización escrita (obligatoria)",
+        "authorizationOptional": "Orden judicial u otro soporte (opcional)",
+        "notes": "Notas",
+        "table": {
+          "type": "Tipo",
+          "concept": "Concepto",
+          "installment": "Cuota",
+          "balance": "Saldo",
+          "status": "Estado",
+          "support": "Soporte"
+        },
+        "indefinite": "Indefinido",
+        "empty": "Sin descuentos registrados.",
+        "confirmDelete": "¿Eliminar este descuento? Si ya se aplicó alguna cuota, desactívalo en vez de eliminarlo."
       }
     },
     "contract": {

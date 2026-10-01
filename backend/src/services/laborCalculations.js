@@ -284,6 +284,78 @@ function simpleLeavePay({ concepto, overlapDays, salaryValue }) {
   };
 }
 
+// ====================== Otros descuentos (préstamos, libranzas, embargos, otros) ======================
+
+const DEDUCTION_TYPE_LABELS = {
+  prestamo: 'Préstamo/anticipo',
+  libranza: 'Libranza',
+  embargo: 'Embargo judicial',
+  otro: 'Otro descuento autorizado',
+};
+
+// Tope legal de un embargo de salario (CST arts. 154-155, Ley 1527/2012 para libranza no aplica
+// acá: esto es para embargo judicial, de naturaleza distinta). 'alimentos' (cuota alimentaria a
+// favor de hijos/cónyuge): hasta el 50% del salario total. 'ordinario' (cualquier otra deuda,
+// civil o comercial): solo el exceso sobre 1 SMMLV es embargable, y de ese exceso solo 1/5.
+function embargoLegalCap({ embargoKind, cotizacionBase, smlv, daysWorked }) {
+  if (embargoKind === 'alimentos') return cotizacionBase * 0.5;
+  const smlvProrated = (Number(smlv) / 30) * daysWorked;
+  const excess = Math.max(cotizacionBase - smlvProrated, 0);
+  return excess / 5;
+}
+
+// Aplica sobre la base de cotización del período las deducciones vigentes del trabajador
+// (préstamos/libranzas/embargos/otros) más, si se informó, el valor manual de retención en la
+// fuente de este período puntual (sección 4d/4e de la especificación: retefuente no es una cuota
+// recurrente con saldo, se captura período a período igual que las horas extra).
+// Devuelve además `applied` (deductionId -> monto realmente aplicado) para que el llamador
+// decremente el saldo SOLO al confirmar la nómina (preview no debe tocar ningún saldo).
+function computeOtherDeductions({ deductions, cotizacionBase, smlv, daysWorked, retefuente }) {
+  const items = [];
+  const applied = [];
+  for (const d of deductions || []) {
+    if (!d.active) continue;
+    let amount = Number(d.installmentAmount);
+    if (d.balance != null) amount = Math.min(amount, Number(d.balance));
+    let formula = 'Cuota fija registrada para este descuento';
+    if (d.type === 'embargo') {
+      const cap = embargoLegalCap({ embargoKind: d.embargoKind, cotizacionBase, smlv, daysWorked });
+      if (amount > cap) {
+        formula = `Cuota registrada limitada al tope legal de embargo (${d.embargoKind === 'alimentos' ? '50% del salario' : '1/5 del exceso sobre 1 SMMLV'})`;
+        amount = Math.max(cap, 0);
+      }
+    }
+    if (amount <= 0) continue;
+    items.push({
+      concepto: `${DEDUCTION_TYPE_LABELS[d.type]} — ${d.concept}`,
+      formula,
+      valores: { deductionId: d.id, type: d.type },
+      valor: amount,
+    });
+    applied.push({ id: d.id, amount });
+  }
+  if (Number(retefuente) > 0) {
+    items.push({
+      concepto: 'Retención en la fuente',
+      formula: 'Valor manual ingresado para este período (no es una cuota recurrente)',
+      valores: {},
+      valor: Number(retefuente),
+    });
+  }
+  return { items, total: items.reduce((s, i) => s + i.valor, 0), applied };
+}
+
+// Advertencia (no bloquea el cálculo) si el neto a pagar del período queda por debajo del SMMLV
+// proporcional a los días trabajados — protección de salario mínimo (CST art. 149-150: ningún
+// descuento, ni siquiera autorizado por el trabajador, puede dejarlo por debajo del mínimo).
+function netPayWarning(netPay, smlv, daysWorked) {
+  const floor = (Number(smlv) / 30) * daysWorked;
+  if (netPay < floor) {
+    return `El neto a pagar de este período (${netPay.toFixed(0)}) queda por debajo del salario mínimo proporcional a los días trabajados (${floor.toFixed(0)}). Revisa los descuentos aplicados antes de confirmar.`;
+  }
+  return null;
+}
+
 // Saldo de vacaciones de un trabajador: causadas (15 días hábiles por año de servicio, proporcional
 // — misma proporción que ya usa severanceService.js con vacacionesDivisor=720, equivalente a 15
 // días por cada 360 trabajados), disfrutadas (días hábiles reales de cada período de vacaciones ya
@@ -309,4 +381,5 @@ module.exports = {
   solidarityFundPercent, computeDeductions,
   clipRange, overlapDays360, countBusinessDays, cumulativeLeaveDaysBefore,
   incapacidadGeneralSplit, incapacidadLaboralSplit, simpleLeavePay, getVacationBalance,
+  DEDUCTION_TYPE_LABELS, embargoLegalCap, computeOtherDeductions, netPayWarning,
 };

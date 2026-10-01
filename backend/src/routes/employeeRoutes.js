@@ -8,6 +8,7 @@ const severanceController = require('../controllers/severanceController');
 const employeeContractController = require('../controllers/employeeContractController');
 const payrollController = require('../controllers/payrollController');
 const employeeLeaveController = require('../controllers/employeeLeaveController');
+const employeeDeductionController = require('../controllers/employeeDeductionController');
 
 const uploadContract = makeUploader('employee-contracts', 'document');
 const uploadSocialSecurity = makeUploader('social-security', 'document');
@@ -16,6 +17,7 @@ const uploadPazYSalvo = makeUploader('paz-y-salvo', 'document');
 const uploadCedula = makeUploader('employee-id-documents', 'any');
 // 'paymentSupport' = PDF/JPG/PNG, exactamente lo pedido para el soporte de una novedad.
 const uploadLeaveSupport = makeUploader('employee-leaves', 'paymentSupport');
+const uploadDeductionSupport = makeUploader('employee-deductions', 'paymentSupport');
 
 router.use(authenticate, requireProjectAccess((r) => r.params.projectId));
 
@@ -46,5 +48,10 @@ router.get('/:id/leaves', requirePermission('personal', 'view'), employeeLeaveCo
 router.post('/:id/leaves', requirePermission('personal', 'edit'), uploadLeaveSupport.single('file'), preventDuplicateSubmit, employeeLeaveController.create);
 router.delete('/:id/leaves/:leaveId', requirePermission('personal', 'delete'), employeeLeaveController.remove);
 router.get('/:id/vacation-balance', requirePermission('personal', 'view'), employeeLeaveController.vacationBalance);
+
+router.get('/:id/deductions', requirePermission('personal', 'view'), employeeDeductionController.list);
+router.post('/:id/deductions', requirePermission('personal', 'edit'), uploadDeductionSupport.single('file'), preventDuplicateSubmit, employeeDeductionController.create);
+router.post('/:id/deductions/:deductionId/status', requirePermission('personal', 'edit'), employeeDeductionController.setStatus);
+router.delete('/:id/deductions/:deductionId', requirePermission('personal', 'delete'), employeeDeductionController.remove);
 
 module.exports = router;
