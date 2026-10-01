@@ -780,7 +780,24 @@
           "calculate": "Calcular",
           "processing": "Procesando...",
           "confirmButton": "Confirmar y generar PDF",
-          "cashBoxRequired": "Debe seleccionar la caja de origen para registrar el gasto administrativo de esta nómina"
+          "cashBoxRequired": "Debe seleccionar la caja de origen para registrar el gasto administrativo de esta nómina",
+          "showOvertime": "+ Agregar horas extra o recargos",
+          "hideOvertime": "Ocultar horas extra y recargos",
+          "overtime": {
+            "horaExtraDiurna": "Hora extra diurna (horas)",
+            "horaExtraNocturna": "Hora extra nocturna (horas)",
+            "recargoNocturno": "Recargo nocturno (horas)",
+            "recargoDominical": "Recargo dominical o festivo (horas)",
+            "recargoNocturnoDominical": "Recargo nocturno dominical/festivo (horas)",
+            "horaExtraDiurnaDominical": "Hora extra diurna dominical/festiva (horas)",
+            "horaExtraNocturnaDominical": "Hora extra nocturna dominical/festiva (horas)"
+          },
+          "earned": "Devengados",
+          "totalEarned": "Total devengado",
+          "deductions": "Deducciones",
+          "noDeductions": "Sin deducciones.",
+          "totalDeductions": "Total deducciones",
+          "netPay": "Neto a pagar"
         }
       },
       "breakdown": {

@@ -780,7 +780,24 @@
           "calculate": "Calculate",
           "processing": "Processing...",
           "confirmButton": "Confirm and generate PDF",
-          "cashBoxRequired": "Select the source cash box to register this payroll's administrative expense"
+          "cashBoxRequired": "Select the source cash box to register this payroll's administrative expense",
+          "showOvertime": "+ Add overtime or surcharges",
+          "hideOvertime": "Hide overtime and surcharges",
+          "overtime": {
+            "horaExtraDiurna": "Daytime overtime (hours)",
+            "horaExtraNocturna": "Nighttime overtime (hours)",
+            "recargoNocturno": "Night surcharge (hours)",
+            "recargoDominical": "Sunday/holiday surcharge (hours)",
+            "recargoNocturnoDominical": "Night surcharge on Sunday/holiday (hours)",
+            "horaExtraDiurnaDominical": "Daytime overtime on Sunday/holiday (hours)",
+            "horaExtraNocturnaDominical": "Nighttime overtime on Sunday/holiday (hours)"
+          },
+          "earned": "Earnings",
+          "totalEarned": "Total earnings",
+          "deductions": "Deductions",
+          "noDeductions": "No deductions.",
+          "totalDeductions": "Total deductions",
+          "netPay": "Net pay"
         }
       },
       "breakdown": {

@@ -9,6 +9,11 @@ module.exports = (sequelize) => {
     employeeId: { type: DataTypes.UUID, allowNull: false },
     date: { type: DataTypes.DATEONLY, allowNull: false },
     periodLabel: { type: DataTypes.STRING, allowNull: false },
+    // Para un comprobante calculado por Nómina (periodStart/periodEnd no nulos): NETO a pagar
+    // (devengado - deducciones de ley, ver payrollService.js#calculatePayroll) desde la Fase 2 de
+    // horas extra/recargos/deducciones — antes de esa fase era el devengado bruto, sin descontar
+    // nada (no existían deducciones todavía). Para un comprobante subido a mano: el monto que
+    // digitó el usuario, sin ningún significado derivado.
     amount: { type: DataTypes.DECIMAL(18, 2), allowNull: false, validate: { min: 0 } },
     // Antes obligatorio (siempre era un comprobante subido a mano); ahora opcional porque un
     // registro también puede venir de calcular la nómina (ver payrollService.js), que genera su
@@ -22,6 +27,15 @@ module.exports = (sequelize) => {
     daysWorked: { type: DataTypes.INTEGER, allowNull: true },
     baseSalary: { type: DataTypes.DECIMAL(18, 2), allowNull: true },
     auxTransporte: { type: DataTypes.DECIMAL(18, 2), allowNull: true },
+    // Horas extra/recargos capturadas para este período (ver OVERTIME_TYPES en
+    // laborCalculations.js) — se guardan las cantidades de entrada, no solo el valor calculado, para
+    // poder auditar/reconstruir el cálculo después aunque cambien los parámetros vigentes.
+    overtimeHours: { type: DataTypes.JSONB, allowNull: true },
+    // Total devengado (salario + auxilio + horas extra/recargos, ANTES de deducciones) y total de
+    // deducciones de ley (salud + pensión + fondo de solidaridad) — amount = grossEarnings -
+    // totalDeductions. Ambos nullable: un comprobante subido a mano no los tiene.
+    grossEarnings: { type: DataTypes.DECIMAL(18, 2), allowNull: true },
+    totalDeductions: { type: DataTypes.DECIMAL(18, 2), allowNull: true },
     breakdown: { type: DataTypes.JSONB, allowNull: true },
     pdfFilePath: { type: DataTypes.STRING, allowNull: true },
     // Gasto administrativo generado automáticamente al confirmar esta nómina (solo para

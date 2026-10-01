@@ -475,6 +475,14 @@ function SocialSecuritySection({ api, employee, onChange }) {
   );
 }
 
+// Las 7 horas extra/recargos de Ley (ver OVERTIME_TYPES en laborCalculations.js, backend) — mismo
+// orden y mismas claves, para que overtimeHours viaje tal cual al payload de preview/confirm.
+const OVERTIME_FIELDS = [
+  'horaExtraDiurna', 'horaExtraNocturna', 'recargoNocturno', 'recargoDominical',
+  'recargoNocturnoDominical', 'horaExtraDiurnaDominical', 'horaExtraNocturnaDominical',
+];
+const EMPTY_OVERTIME = Object.fromEntries(OVERTIME_FIELDS.map((f) => [f, '']));
+
 // Personal ADMINISTRATIVO (employee.projectId null) exige caja de origen: confirmar su nómina
 // genera automáticamente el Gasto administrativo correspondiente (ver payrollController.js#confirm)
 // — personal de proyecto sigue funcionando exactamente igual que antes (sin caja, sin Gasto).
@@ -482,6 +490,8 @@ function PayrollCalculator({ api, employee, onChange }) {
   const { t } = useTranslation();
   const isAdministrative = !employee.projectId;
   const [form, setForm] = useState({ periodStart: '', periodEnd: '', paymentDate: '', cashBoxId: '' });
+  const [overtime, setOvertime] = useState(EMPTY_OVERTIME);
+  const [showOvertime, setShowOvertime] = useState(false);
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
@@ -490,12 +500,17 @@ function PayrollCalculator({ api, employee, onChange }) {
   useEffect(() => { if (isAdministrative) cashBoxesApi.list().then(setCashBoxes); }, [isAdministrative]);
   const cashBoxOptions = cashBoxes.filter((cb) => cb.status === 'activa');
 
+  const buildPayload = () => ({
+    ...form,
+    overtimeHours: Object.fromEntries(OVERTIME_FIELDS.map((f) => [f, Number(overtime[f]) || 0])),
+  });
+
   const doPreview = async (e) => {
     e.preventDefault();
     setError('');
     setPreview(null);
     try {
-      const result = await api.payroll.preview(employee.id, form);
+      const result = await api.payroll.preview(employee.id, buildPayload());
       setPreview(result);
     } catch (err) {
       setError(extractError(err));
@@ -507,10 +522,11 @@ function PayrollCalculator({ api, employee, onChange }) {
     setError('');
     setWarning('');
     try {
-      const result = await api.payroll.confirm(employee.id, form);
+      const result = await api.payroll.confirm(employee.id, buildPayload());
       if (result.warning) setWarning(result.warning);
       setPreview(null);
       setForm({ periodStart: '', periodEnd: '', paymentDate: '', cashBoxId: '' });
+      setOvertime(EMPTY_OVERTIME);
       onChange();
     } catch (err) {
       setError(extractError(err));
@@ -530,15 +546,32 @@ function PayrollCalculator({ api, employee, onChange }) {
             {cashBoxOptions.map((cb) => <option key={cb.id} value={cb.id}>{cb.name} ({money(cb.balance)})</option>)}
           </Select>
         )}
+        <div className="col-span-full">
+          <button type="button" className="text-blue-600 hover:underline text-xs" onClick={() => setShowOvertime((s) => !s)}>
+            {showOvertime ? t('personnel.detail.payments.payroll.hideOvertime') : t('personnel.detail.payments.payroll.showOvertime')}
+          </button>
+        </div>
+        {showOvertime && (
+          <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 border-t pt-3">
+            {OVERTIME_FIELDS.map((f) => (
+              <Input
+                key={f}
+                label={t(`personnel.detail.payments.payroll.overtime.${f}`)}
+                type="number" min="0" step="0.5"
+                value={overtime[f]}
+                onChange={(e) => setOvertime({ ...overtime, [f]: e.target.value })}
+              />
+            ))}
+          </div>
+        )}
         <Button type="submit">{t('personnel.detail.payments.payroll.calculate')}</Button>
       </form>
       <ErrorText>{error}</ErrorText>
       {warning && <p className="text-sm text-yellow-600 mb-2">⚠ {warning}</p>}
       {preview && (
         <div className="mt-2">
-          <BreakdownTable breakdown={preview.breakdown} />
-          <div className="flex items-center justify-between mt-2">
-            <p className="font-bold">{t('common.total')}: {money(preview.total)}</p>
+          <PayrollBreakdownTable breakdown={preview.breakdown} />
+          <div className="flex items-center justify-end mt-2">
             <Button onClick={confirm} loading={confirming}>
               {confirming ? t('personnel.detail.payments.payroll.processing') : t('personnel.detail.payments.payroll.confirmButton')}
             </Button>
@@ -616,6 +649,42 @@ function BreakdownTable({ breakdown }) {
         </tr>
       ))}
     </Table>
+  );
+}
+
+// Nómina (a partir de la Fase 2 de horas extra/recargos/deducciones) agrupa el desglose en
+// Devengados / Deducciones / Neto a pagar — distinto de BreakdownTable (lista plana), que sigue
+// usando Liquidación, sin deducciones de ley.
+function PayrollBreakdownTable({ breakdown }) {
+  const { t } = useTranslation();
+  const rows = (items) => items.map((c, i) => (
+    <tr key={i} className="border-b border-gray-100">
+      <td className="py-1 pr-3 font-medium">{c.concepto}</td>
+      <td className="py-1 pr-3 text-xs text-gray-500">{c.formula}</td>
+      <td className="py-1 pr-3">{money(c.valor)}</td>
+    </tr>
+  ));
+  return (
+    <div>
+      {breakdown.overtimeWarning && <p className="text-sm text-yellow-600 mb-2">⚠ {breakdown.overtimeWarning}</p>}
+      <h5 className="text-xs font-semibold text-gray-600 mb-1">{t('personnel.detail.payments.payroll.earned')}</h5>
+      <Table columns={[t('personnel.detail.breakdown.concept'), t('personnel.detail.breakdown.formula'), t('personnel.detail.breakdown.value')]}>
+        {rows(breakdown.devengados)}
+      </Table>
+      <p className="text-right text-sm font-semibold mt-1">{t('personnel.detail.payments.payroll.totalEarned')}: {money(breakdown.totalDevengado)}</p>
+
+      <h5 className="text-xs font-semibold text-gray-600 mb-1 mt-3">{t('personnel.detail.payments.payroll.deductions')}</h5>
+      {breakdown.deducciones.length ? (
+        <Table columns={[t('personnel.detail.breakdown.concept'), t('personnel.detail.breakdown.formula'), t('personnel.detail.breakdown.value')]}>
+          {rows(breakdown.deducciones)}
+        </Table>
+      ) : (
+        <p className="text-sm text-gray-400">{t('personnel.detail.payments.payroll.noDeductions')}</p>
+      )}
+      <p className="text-right text-sm font-semibold mt-1">{t('personnel.detail.payments.payroll.totalDeductions')}: {money(breakdown.totalDeducciones)}</p>
+
+      <p className="text-right font-bold text-lg mt-2 border-t pt-2">{t('personnel.detail.payments.payroll.netPay')}: {money(breakdown.total)}</p>
+    </div>
   );
 }
 

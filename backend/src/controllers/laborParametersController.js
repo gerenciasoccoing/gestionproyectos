@@ -22,7 +22,11 @@ const current = asyncHandler(async (req, res) => {
 const create = asyncHandler(async (req, res) => {
   const {
     effectiveDate, smlv, auxTransporte, cesantiasDivisor, interesesCesantiasPercent,
-    primaDivisor, vacacionesDivisor, topeAuxTransporteSalarios, indemnizacionRules, notes,
+    primaDivisor, vacacionesDivisor, topeAuxTransporteSalarios, notes,
+    horasMensuales, horaExtraDiurnaPercent, horaExtraNocturnaPercent, recargoNocturnoPercent,
+    recargoDominicalPercent, recargoNocturnoDominicalPercent, horaExtraDiurnaDominicalPercent,
+    horaExtraNocturnaDominicalPercent, horarioNocturnoInicio, horarioNocturnoFin,
+    topeHorasExtraDiarias, topeHorasExtraSemanales, saludPercent, pensionPercent, solidarityFundBrackets,
   } = req.body;
   if (!effectiveDate || smlv === undefined || smlv === '') throw new ApiError(400, 'effectiveDate y smlv son obligatorios');
   if (Number(smlv) < 0) throw new ApiError(400, 'smlv no puede ser negativo');
@@ -38,7 +42,23 @@ const create = asyncHandler(async (req, res) => {
     primaDivisor: orDefault(primaDivisor, 360),
     vacacionesDivisor: orDefault(vacacionesDivisor, 720),
     topeAuxTransporteSalarios: orDefault(topeAuxTransporteSalarios, 2),
-    indemnizacionRules: indemnizacionRules ?? { baseDays: 30, extraDaysPerYear: 20, thresholdYears: 1 },
+    // Horas extra y recargos — ver LaborParameters.js para el porqué de cada default.
+    horasMensuales: orDefault(horasMensuales, 210),
+    horaExtraDiurnaPercent: orDefault(horaExtraDiurnaPercent, 25),
+    horaExtraNocturnaPercent: orDefault(horaExtraNocturnaPercent, 75),
+    recargoNocturnoPercent: orDefault(recargoNocturnoPercent, 35),
+    recargoDominicalPercent: orDefault(recargoDominicalPercent, 90),
+    recargoNocturnoDominicalPercent: orDefault(recargoNocturnoDominicalPercent, 125),
+    horaExtraDiurnaDominicalPercent: orDefault(horaExtraDiurnaDominicalPercent, 115),
+    horaExtraNocturnaDominicalPercent: orDefault(horaExtraNocturnaDominicalPercent, 165),
+    horarioNocturnoInicio: orDefault(horarioNocturnoInicio, '19:00'),
+    horarioNocturnoFin: orDefault(horarioNocturnoFin, '06:00'),
+    topeHorasExtraDiarias: orDefault(topeHorasExtraDiarias, 2),
+    topeHorasExtraSemanales: orDefault(topeHorasExtraSemanales, 12),
+    // Deducciones de ley.
+    saludPercent: orDefault(saludPercent, 4),
+    pensionPercent: orDefault(pensionPercent, 4),
+    solidarityFundBrackets: solidarityFundBrackets ?? undefined, // undefined => usa el defaultValue del modelo
     notes,
   });
   res.status(201).json(params);

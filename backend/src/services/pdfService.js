@@ -1315,10 +1315,12 @@ function generateContractPdf(content, company, signature) {
   return doc;
 }
 
-// Reporte de un cálculo laboral desglosado por conceptos (nómina o liquidación) — ambos
-// servicios (payrollService.js#calculatePayroll, severanceService.js#calculateSeverance) devuelven
-// el mismo `breakdown.conceptos: [{concepto, formula, valor}]` + `breakdown.total`, así que un solo
-// generador cubre los dos reportes sin duplicar el layout.
+// Reporte de un cálculo laboral desglosado por conceptos (nómina o liquidación) — un solo
+// generador cubre los dos reportes sin duplicar el layout. Dos formas de breakdown.total posibles:
+// liquidación (severanceService.js#calculateSeverance) sigue devolviendo la lista plana
+// `conceptos: [{concepto, formula, valor}]`; nómina (payrollService.js#calculatePayroll, desde la
+// Fase 2 de horas extra/deducciones) devuelve `devengados`/`deducciones` agrupados, para mostrar
+// el neto a pagar después de salud/pensión/fondo de solidaridad en vez de un solo total mezclado.
 function generateLaborCalculationPdf({ title, employee, company, breakdown, meta }) {
   const doc = new PDFDocument({ margin: 50 });
 
@@ -1347,20 +1349,49 @@ function generateLaborCalculationPdf({ title, employee, company, breakdown, meta
   });
   doc.moveDown(1);
 
-  sectionTitle(doc, 'Detalle del cálculo');
-  breakdown.conceptos.forEach((c) => {
+  const drawConceptLine = (c) => {
     if (doc.y > 700) doc.addPage();
     doc.font('Helvetica-Bold').fontSize(10).fillColor('#000').text(c.concepto, { continued: true });
     doc.font('Helvetica').text(`   ${money(c.valor)}`, { align: 'right' });
     doc.font('Helvetica-Oblique').fontSize(8).fillColor('#555').text(c.formula);
     doc.fillColor('#000').fontSize(10);
     doc.moveDown(0.5);
-  });
+  };
 
-  doc.moveDown(0.5);
-  doc.strokeColor('#1f2937').moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-  doc.moveDown(0.5);
-  doc.font('Helvetica-Bold').fontSize(13).text(`TOTAL: ${money(breakdown.total)}`, { align: 'right' });
+  if (breakdown.devengados) {
+    sectionTitle(doc, 'Devengados');
+    breakdown.devengados.forEach(drawConceptLine);
+    doc.font('Helvetica-Bold').fontSize(11).text(`Total devengado: ${money(breakdown.totalDevengado)}`, { align: 'right' });
+    doc.moveDown(0.5);
+
+    if (breakdown.overtimeWarning) {
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#b45309').text(`⚠ ${breakdown.overtimeWarning}`);
+      doc.fillColor('#000').fontSize(10);
+      doc.moveDown(0.5);
+    }
+
+    sectionTitle(doc, 'Deducciones');
+    if (breakdown.deducciones.length) {
+      breakdown.deducciones.forEach(drawConceptLine);
+    } else {
+      doc.font('Helvetica').fontSize(10).text('Sin deducciones.');
+      doc.moveDown(0.5);
+    }
+    doc.font('Helvetica-Bold').fontSize(11).text(`Total deducciones: ${money(breakdown.totalDeducciones)}`, { align: 'right' });
+
+    doc.moveDown(0.5);
+    doc.strokeColor('#1f2937').moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+    doc.moveDown(0.5);
+    doc.font('Helvetica-Bold').fontSize(13).text(`NETO A PAGAR: ${money(breakdown.total)}`, { align: 'right' });
+  } else {
+    sectionTitle(doc, 'Detalle del cálculo');
+    breakdown.conceptos.forEach(drawConceptLine);
+
+    doc.moveDown(0.5);
+    doc.strokeColor('#1f2937').moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+    doc.moveDown(0.5);
+    doc.font('Helvetica-Bold').fontSize(13).text(`TOTAL: ${money(breakdown.total)}`, { align: 'right' });
+  }
 
   doc.end();
   return doc;

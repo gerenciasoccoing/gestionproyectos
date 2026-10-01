@@ -54,13 +54,14 @@ function validatePeriod(periodStart, periodEnd, paymentDate) {
 // Previsualiza el cálculo desglosado de un período de nómina sin persistir nada.
 const preview = asyncHandler(async (req, res) => {
   const employee = await loadEmployee(req);
-  const { periodStart, periodEnd, paymentDate } = req.body;
+  const { periodStart, periodEnd, paymentDate, overtimeHours } = req.body;
   validatePeriod(periodStart, periodEnd, paymentDate);
 
   const result = await calculatePayroll({
     salaryValue: employee.salaryValue,
     periodStart,
     periodEnd,
+    overtimeHours,
   });
   res.json(result);
 });
@@ -73,7 +74,7 @@ const preview = asyncHandler(async (req, res) => {
 // especificación del cliente).
 const confirm = asyncHandler(async (req, res) => {
   const employee = await loadEmployee(req);
-  const { periodStart, periodEnd, paymentDate, cashBoxId } = req.body;
+  const { periodStart, periodEnd, paymentDate, cashBoxId, overtimeHours } = req.body;
   validatePeriod(periodStart, periodEnd, paymentDate);
 
   const isAdministrative = !employee.projectId;
@@ -85,9 +86,13 @@ const confirm = asyncHandler(async (req, res) => {
     salaryValue: employee.salaryValue,
     periodStart,
     periodEnd,
+    overtimeHours,
   });
 
-  let warning = null;
+  // result.total es el NETO a pagar (devengado - deducciones, ver payrollService.js) — es lo que
+  // registra tanto el comprobante como, para personal administrativo, el Gasto administrativo
+  // asociado (el desembolso real de caja al trabajador, no el bruto antes de salud/pensión).
+  let cashBoxWarning = null;
   const receipt = await sequelize.transaction(async (t) => {
     const created = await PaymentReceipt.create({
       employeeId: employee.id,
@@ -99,6 +104,9 @@ const confirm = asyncHandler(async (req, res) => {
       daysWorked: result.daysWorked,
       baseSalary: result.baseSalary,
       auxTransporte: result.auxTransporte,
+      overtimeHours: result.overtimeHours,
+      grossEarnings: result.grossEarnings,
+      totalDeductions: result.totalDeductions,
       breakdown: result.breakdown,
     }, { transaction: t });
 
@@ -124,7 +132,7 @@ const confirm = asyncHandler(async (req, res) => {
       }, { transaction: t });
       created.expenseId = expense.id;
       await created.save({ transaction: t });
-      warning = await overdraftWarning(cashBoxId, { transaction: t });
+      cashBoxWarning = await overdraftWarning(cashBoxId, { transaction: t });
     }
 
     return created;
@@ -145,7 +153,7 @@ const confirm = asyncHandler(async (req, res) => {
   receipt.pdfFilePath = saveGeneratedFile(receipt.companyId, 'payroll-receipts', `nomina-${receipt.id}.pdf`, pdfBuffer);
   await receipt.save();
 
-  res.status(201).json({ ...receipt.toJSON(), warning });
+  res.status(201).json({ ...receipt.toJSON(), warning: cashBoxWarning, overtimeWarning: result.warning });
 });
 
 module.exports = { preview, confirm };
