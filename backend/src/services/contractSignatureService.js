@@ -1,6 +1,8 @@
 const crypto = require('crypto');
 const path = require('path');
+const fs = require('fs');
 const { UPLOAD_ROOT } = require('../middleware/upload');
+const { appendSignatureCertificate } = require('./externalContractService');
 // requestSignature se llama siempre autenticado (desde la ficha del trabajador, con la empresa ya
 // resuelta por el JWT) — usa la conexión normal, con RLS activo, igual que el resto de la app.
 const { EmployeeContractDocument, Employee, Project } = require('../models');
@@ -113,22 +115,14 @@ async function getSignableDocument(rawToken) {
   return { doc, status: 'pendiente' };
 }
 
-// Firma: reconstruye el mismo `content` con el que se generó el documento original, a partir de
-// los datos YA guardados en el propio EmployeeContractDocument (objectAtIssue/valueAtIssue/
-// effectiveFrom/effectiveTo) — nunca vuelve a leer la ficha del trabajador, que pudo cambiar desde
-// que se generó. Para un otrosí, `changes` (el delta contra el documento padre) se deriva
-// comparando doc contra su parent, igual criterio que generateOtrosi al crearlo. El PDF resultante
-// agrega, al final del mismo documento, un bloque de certificación con la firma + metadatos (ver
-// generateContractPdf en pdfService.js) y se guarda aparte en signedPdfFilePath — pdfFilePath (el
-// original sin firmar) queda intacto.
-async function signDocument({ rawToken, signatureDataUrl, signerName, ip, userAgent }) {
-  const { doc, status } = await getSignableDocument(rawToken);
-  if (status === 'firmado') throw new ApiError(400, 'Este documento ya fue firmado.');
-  if (status === 'vencido') throw new ApiError(400, 'Este enlace venció. Pide que te envíen uno nuevo.');
-  if (!signatureDataUrl || !String(signerName || '').trim()) {
-    throw new ApiError(400, 'signatureDataUrl y signerName son obligatorios.');
-  }
-
+// Firma de un documento 'generado': reconstruye el mismo `content` con el que se generó el
+// documento original, a partir de los datos YA guardados en el propio EmployeeContractDocument
+// (objectAtIssue/valueAtIssue/effectiveFrom/effectiveTo) — nunca vuelve a leer la ficha del
+// trabajador, que pudo cambiar desde que se generó. Para un otrosí, `changes` (el delta contra el
+// documento padre) se deriva comparando doc contra su parent, igual criterio que generateOtrosi al
+// crearlo. El PDF resultante agrega, al final del mismo documento, un bloque de certificación con
+// la firma + metadatos (ver generateContractPdf en pdfService.js).
+async function signGeneratedDocument(doc, { signatureDataUrl, signerName, signedAt, ip }) {
   const employee = await adminModels.Employee.findByPk(doc.employeeId, { hooks: false });
   if (!employee) throw new ApiError(404, 'Trabajador no encontrado.');
   const project = await adminModels.Project.findByPk(employee.projectId, { hooks: false });
@@ -149,13 +143,37 @@ async function signDocument({ rawToken, signatureDataUrl, signerName, ip, userAg
   const content = buildContractContent({ employee, company, project, doc: ctxDoc, changes });
   content.signDate = formatDateEs(new Date().toISOString().slice(0, 10));
 
-  const signedAt = new Date();
-  const pdfDoc = generateContractPdf(content, company, {
-    dataUrl: signatureDataUrl, signerName: String(signerName).trim(), signedAt, ip,
-  });
+  const pdfDoc = generateContractPdf(content, company, { dataUrl: signatureDataUrl, signerName, signedAt, ip });
   const pdfBuffer = await pdfDocToBuffer(pdfDoc);
   const base = `${doc.employeeId}-${doc.kind}-${doc.sequenceNumber}-firmado-${Date.now()}`;
-  const signedPdfFilePath = saveGeneratedFile(doc.companyId, 'employee-contracts-generated', `${base}.pdf`, pdfBuffer);
+  return saveGeneratedFile(doc.companyId, 'employee-contracts-generated', `${base}.pdf`, pdfBuffer);
+}
+
+// Firma de un documento 'externo' (ver employeeContractController.js#uploadExternal): no hay
+// ningún `content` estructurado del que partir, así que en vez de regenerar el documento se le
+// agrega una página de certificación al PDF YA guardado (doc.pdfFilePath — el archivo subido tal
+// cual si ya era PDF, o la conversión a PDF si era Word/imagen, ver externalContractService.js).
+async function signExternalDocument(doc, { signatureDataUrl, signerName, signedAt, ip }) {
+  if (!doc.pdfFilePath) throw new ApiError(400, 'Este documento todavía no tiene un PDF para firmar.');
+  const pdfBuffer = fs.readFileSync(path.join(UPLOAD_ROOT, doc.pdfFilePath));
+  const signedBuffer = await appendSignatureCertificate({ pdfBuffer, dataUrl: signatureDataUrl, signerName, signedAt, ip });
+  const base = `${doc.employeeId}-${doc.kind}-${doc.sequenceNumber}-firmado-${Date.now()}`;
+  return saveGeneratedFile(doc.companyId, 'employee-contracts-generated', `${base}.pdf`, signedBuffer);
+}
+
+async function signDocument({ rawToken, signatureDataUrl, signerName, ip, userAgent }) {
+  const { doc, status } = await getSignableDocument(rawToken);
+  if (status === 'firmado') throw new ApiError(400, 'Este documento ya fue firmado.');
+  if (status === 'vencido') throw new ApiError(400, 'Este enlace venció. Pide que te envíen uno nuevo.');
+  if (!signatureDataUrl || !String(signerName || '').trim()) {
+    throw new ApiError(400, 'signatureDataUrl y signerName son obligatorios.');
+  }
+
+  const signedAt = new Date();
+  const trimmedSignerName = String(signerName).trim();
+  const signedPdfFilePath = doc.source === 'externo'
+    ? await signExternalDocument(doc, { signatureDataUrl, signerName: trimmedSignerName, signedAt, ip })
+    : await signGeneratedDocument(doc, { signatureDataUrl, signerName: trimmedSignerName, signedAt, ip });
 
   doc.signedPdfFilePath = signedPdfFilePath;
   doc.signatureStatus = 'firmado';

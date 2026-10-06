@@ -1,3 +1,5 @@
+const multer = require('multer');
+const path = require('path');
 const router = require('express').Router();
 const { authenticate } = require('../middleware/auth');
 const { requirePermission, requireOptionalProjectAccess } = require('../middleware/authorize');
@@ -7,6 +9,7 @@ const { Employee } = require('../models');
 const employeeController = require('../controllers/employeeController');
 const severanceController = require('../controllers/severanceController');
 const employeeContractController = require('../controllers/employeeContractController');
+const aiDocumentController = require('../controllers/aiDocumentController');
 const payrollController = require('../controllers/payrollController');
 const employeeLeaveController = require('../controllers/employeeLeaveController');
 const employeeDeductionController = require('../controllers/employeeDeductionController');
@@ -25,6 +28,19 @@ const uploadPazYSalvo = makeUploader('paz-y-salvo', 'document');
 const uploadCedula = makeUploader('employee-id-documents', 'any');
 const uploadLeaveSupport = makeUploader('employee-leaves', 'paymentSupport');
 const uploadDeductionSupport = makeUploader('employee-deductions', 'paymentSupport');
+const uploadExternalContract = makeUploader('employee-contracts-external', 'any');
+
+const scanContractUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!['.pdf', '.jpg', '.jpeg', '.png', '.webp'].includes(ext)) {
+      return cb(new Error('El archivo debe ser PDF, JPG, PNG o WEBP'));
+    }
+    cb(null, true);
+  },
+});
 
 router.use(authenticate);
 
@@ -49,6 +65,9 @@ router.post('/:id/severance/paz-y-salvo', requirePermission('personal', 'edit'),
 
 router.get('/:id/contracts', requirePermission('personal', 'view'), requireOptionalProjectAccess(byIdParam), employeeContractController.list);
 router.post('/:id/contracts', requirePermission('personal', 'edit'), requireOptionalProjectAccess(byIdParam), preventDuplicateSubmit, employeeContractController.generate);
+router.post('/:id/contracts/scan', requirePermission('personal', 'edit'), requireOptionalProjectAccess(byIdParam), scanContractUpload.single('file'), aiDocumentController.scanDocument('employeeContract'));
+router.post('/:id/contracts/external', requirePermission('personal', 'edit'), requireOptionalProjectAccess(byIdParam), uploadExternalContract.single('file'), preventDuplicateSubmit, employeeContractController.uploadExternal);
+router.put('/:id/contracts/:contractId/file', requirePermission('personal', 'edit'), requireOptionalProjectAccess(byIdParam), uploadExternalContract.single('file'), employeeContractController.replaceFile);
 router.post('/:id/contracts/:contractId/otrosi', requirePermission('personal', 'edit'), requireOptionalProjectAccess(byIdParam), preventDuplicateSubmit, employeeContractController.generateOtrosi);
 router.delete('/:id/contracts/:contractId', requirePermission('personal', 'delete'), requireOptionalProjectAccess(byIdParam), employeeContractController.removeDocument);
 router.post('/:id/contracts/:contractId/request-signature', requirePermission('personal', 'edit'), requireOptionalProjectAccess(byIdParam), preventDuplicateSubmit, employeeContractController.sendForSignature);

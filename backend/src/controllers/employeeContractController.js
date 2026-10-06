@@ -5,7 +5,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { Employee, EmployeeContractDocument, Project } = require('../models');
 const { getLetterheadForProject } = require('../services/letterheadService');
-const { saveGeneratedFile } = require('../middleware/upload');
+const { saveGeneratedFile, relativePath } = require('../middleware/upload');
 const { generateContractPdf } = require('../services/pdfService');
 const { generateContractDocxBuffer } = require('../services/contractDocService');
 const {
@@ -13,6 +13,13 @@ const {
 } = require('../services/contractTemplates');
 const { requestSignature } = require('../services/contractSignatureService');
 const { contractPrefixForProject } = require('../services/numberingService');
+const { convertToSignablePdf } = require('../services/externalContractService');
+const fs = require('fs');
+
+const DOCX_MIMETYPES = new Set([
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+]);
 
 function pdfDocToBuffer(doc) {
   return new Promise((resolve, reject) => {
@@ -159,6 +166,116 @@ const generateOtrosi = asyncHandler(async (req, res) => {
   res.status(201).json(doc);
 });
 
+// Procesa el archivo YA guardado en disco (req.file, ver makeUploader en la ruta) de un contrato
+// externo: originalFilePath siempre queda con el archivo exacto tal como se subió; pdfFilePath
+// queda listo para ver/firmar (el mismo archivo si ya era PDF, o convertido si era Word/imagen —
+// ver externalContractService.js); docxFilePath solo se llena si lo subido ya era un .docx, para
+// que el link "Word" de la tabla del historial siga teniendo sentido.
+async function persistExternalFile({ companyId, employeeId, kind, sequenceNumber, file }) {
+  const originalFilePath = relativePath(file);
+  const originalMimeType = file.mimetype;
+  let pdfFilePath;
+  let docxFilePath = null;
+
+  if (file.mimetype === 'application/pdf') {
+    pdfFilePath = originalFilePath;
+  } else {
+    const buffer = fs.readFileSync(file.path);
+    const pdfBuffer = await convertToSignablePdf({ buffer, mimetype: file.mimetype });
+    const base = `${employeeId}-${kind}-${sequenceNumber}-externo-${Date.now()}`;
+    pdfFilePath = saveGeneratedFile(companyId, 'employee-contracts-generated', `${base}.pdf`, pdfBuffer);
+    if (DOCX_MIMETYPES.has(file.mimetype)) docxFilePath = originalFilePath;
+  }
+
+  return { originalFilePath, originalMimeType, pdfFilePath, docxFilePath };
+}
+
+// Sube un contrato ya elaborado/firmado por fuera del sistema, en vez de generarlo desde las
+// minutas (ver contractTemplates.js) — segunda opción de "Generar contrato" (ver
+// EmployeeDetailPage.jsx). A diferencia de generate(), SÍ acepta los datos clave por body (el
+// trabajador puede no tener todavía contractType/fechas/salario cargados — por eso existe la
+// lectura con IA que los sugiere, ver /contracts/scan): si vienen, también actualizan la ficha del
+// trabajador, igual criterio que generateOtrosi con los campos que cambia.
+const uploadExternal = asyncHandler(async (req, res) => {
+  const employee = await loadEmployee(req);
+  if (!req.file) throw new ApiError(400, 'Debe adjuntar el archivo del contrato (PDF, Word o imagen).');
+
+  const { contractType, startDate, endDate, salaryValue, alreadySigned, notes } = req.body;
+  if (!contractType || !CONTRACT_TYPE_LABELS[contractType]) {
+    throw new ApiError(400, 'contractType es obligatorio y debe ser un tipo de contrato válido.');
+  }
+  if (!startDate) throw new ApiError(400, 'startDate es obligatorio.');
+
+  const sequenceNumber = await EmployeeContractDocument.count({ where: { employeeId: employee.id } });
+  const { originalFilePath, originalMimeType, pdfFilePath, docxFilePath } = await persistExternalFile({
+    companyId: employee.companyId, employeeId: employee.id, kind: 'contrato', sequenceNumber, file: req.file,
+  });
+
+  const isSigned = alreadySigned === 'true' || alreadySigned === true;
+  const doc = await EmployeeContractDocument.create({
+    employeeId: employee.id,
+    kind: 'contrato',
+    source: 'externo',
+    contractType,
+    sequenceNumber,
+    effectiveFrom: startDate,
+    effectiveTo: endDate || null,
+    valueAtIssue: salaryValue === undefined || salaryValue === '' ? null : salaryValue,
+    notes: notes || null,
+    generatedBy: req.user.id,
+    contractPrefix: await contractPrefixForEmployee(employee),
+    pdfFilePath,
+    docxFilePath,
+    originalFilePath,
+    originalMimeType,
+    signatureStatus: isSigned ? 'firmado' : 'no_solicitado',
+    signedAt: isSigned ? new Date() : null,
+  });
+
+  // La ficha del trabajador refleja las condiciones vigentes — mismo criterio que generateOtrosi.
+  employee.contractType = contractType;
+  employee.entryDate = employee.entryDate || startDate;
+  if (endDate) employee.contractEndDate = endDate;
+  if (salaryValue !== undefined && salaryValue !== '') employee.salaryValue = salaryValue;
+  await employee.save();
+
+  res.status(201).json(doc);
+});
+
+// Reemplaza el archivo de un contrato externo ya subido (ej. se adjuntó el archivo equivocado, o
+// llega una copia escaneada de mejor calidad) — el mismo registro conserva su número/secuencia e
+// historial; solo cambian los campos de archivo. Si ya estaba firmado por el flujo de firma
+// digital (signedPdfFilePath), reemplazar el archivo invalida esa firma (ya no correspondería al
+// contenido firmado) y vuelve a dejarlo disponible para enviarse a firmar de nuevo.
+const replaceFile = asyncHandler(async (req, res) => {
+  const employee = await loadEmployee(req);
+  const doc = await EmployeeContractDocument.findOne({ where: { id: req.params.contractId, employeeId: employee.id } });
+  if (!doc) throw new ApiError(404, 'Documento no encontrado para este trabajador.');
+  if (doc.source !== 'externo') throw new ApiError(400, 'Solo se puede reemplazar el archivo de un documento externo.');
+  if (!req.file) throw new ApiError(400, 'Debe adjuntar el nuevo archivo.');
+
+  const { alreadySigned } = req.body;
+  const { originalFilePath, originalMimeType, pdfFilePath, docxFilePath } = await persistExternalFile({
+    companyId: employee.companyId, employeeId: employee.id, kind: doc.kind, sequenceNumber: doc.sequenceNumber, file: req.file,
+  });
+
+  const isSigned = alreadySigned === 'true' || alreadySigned === true;
+  doc.originalFilePath = originalFilePath;
+  doc.originalMimeType = originalMimeType;
+  doc.pdfFilePath = pdfFilePath;
+  doc.docxFilePath = docxFilePath;
+  doc.signatureStatus = isSigned ? 'firmado' : 'no_solicitado';
+  doc.signedAt = isSigned ? new Date() : null;
+  doc.signedPdfFilePath = null;
+  doc.signatureTokenHash = null;
+  doc.signatureTokenExpiresAt = null;
+  doc.signerIp = null;
+  doc.signerUserAgent = null;
+  await doc.save();
+
+  res.json(doc);
+});
+
 // Elimina un documento puntual del historial (contrato u otrosí). No toca al trabajador ni a
 // ningún otro documento — si otro otrosí depende de este como su parentDocumentId, se rechaza en
 // vez de romper esa cadena o cascadear el borrado.
@@ -194,4 +311,5 @@ const sendForSignature = asyncHandler(async (req, res) => {
 
 module.exports = {
   listContractTypes, list, generate, generateOtrosi, removeDocument, renderAndPersist, sendForSignature,
+  uploadExternal, replaceFile,
 };

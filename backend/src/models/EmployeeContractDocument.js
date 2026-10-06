@@ -16,6 +16,13 @@ module.exports = (sequelize) => {
     employeeId: { type: DataTypes.UUID, allowNull: false },
     parentDocumentId: { type: DataTypes.UUID, allowNull: true },
     kind: { type: DataTypes.ENUM('contrato', 'otrosi'), allowNull: false },
+    // 'generado': minuta producida por el sistema a partir de contractTemplates.js (comportamiento
+    // histórico, valor por defecto — los documentos existentes antes de esta columna quedan así
+    // automáticamente, sin backfill). 'externo': el usuario subió un contrato ya elaborado o
+    // firmado por fuera del sistema (ver employeeContractController.js#uploadExternal) — no tiene
+    // `content` derivable de contractTemplates.js, así que la firma digital y la vista de estos
+    // documentos se tratan distinto (ver externalContractService.js).
+    source: { type: DataTypes.ENUM('generado', 'externo'), allowNull: false, defaultValue: 'generado' },
     // Copia de Employee.contractType al momento de emitirse (un otrosí de un contrato por obra o
     // labor siempre hereda este mismo valor; queda igual aquí para no tener que ir a buscarlo al
     // padre cada vez que se lista el historial).
@@ -27,8 +34,16 @@ module.exports = (sequelize) => {
     objectAtIssue: { type: DataTypes.TEXT, allowNull: true },
     notes: { type: DataTypes.TEXT, allowNull: true },
     generatedBy: { type: DataTypes.UUID, allowNull: true }, // userId de quien lo generó
+    // Para 'generado' son siempre el PDF/Word que el sistema produjo. Para 'externo', pdfFilePath
+    // es el archivo LISTO PARA VER/FIRMAR (el mismo PDF subido si ya era PDF, o la conversión a PDF
+    // si se subió Word/imagen — ver externalContractService.js#convertToSignablePdf); docxFilePath
+    // solo se llena si lo subido YA era un .docx (para que el link "Word" siga mostrando algo útil).
     pdfFilePath: { type: DataTypes.STRING, allowNull: true },
     docxFilePath: { type: DataTypes.STRING, allowNull: true },
+    // Solo para source='externo': el archivo EXACTO tal como se subió, sin ninguna conversión —
+    // la copia de referencia/legal, independiente de qué se use para mostrarlo o firmarlo.
+    originalFilePath: { type: DataTypes.STRING, allowNull: true },
+    originalMimeType: { type: DataTypes.STRING, allowNull: true },
     // Prefijo de 3 dígitos tomado de Project.contractNumber AL MOMENTO DE GENERARSE este documento
     // (ver numberingService.js) — null si el proyecto no tenía número de contrato asignado en ese
     // momento. No se recalcula si el número del proyecto cambia después.

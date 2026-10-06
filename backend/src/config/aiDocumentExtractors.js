@@ -19,6 +19,14 @@ const EXTRACTORS = {
     instructions: 'Este documento es un contrato de obra o de servicios. Extrae el objeto del contrato (descripción de su alcance), sus datos clave, y el número o consecutivo de contrato/adjudicación (busca etiquetas como "Contrato No.", "No. de Contrato", "Contrato N°" u similares, tal como aparece en el documento, sin inventar un formato).',
     schemaDescription: '{ "object": string|null, "value": number|null, "signedDate": "YYYY-MM-DD"|null, "endDate": "YYYY-MM-DD"|null, "contractNumber": string|null }',
   },
+  // Contrato laboral o civil de UN trabajador/contratista (ver employeeContractController.js, flujo
+  // de "Subir contrato externo"), distinto del extractor "contract" de arriba (que es el contrato
+  // con el CLIENTE del proyecto). contractType debe venir en el código interno del sistema, no en
+  // español, para poder precargar directo el selector del formulario sin un mapeo adicional.
+  employeeContract: {
+    instructions: 'Este documento es un contrato laboral o civil (de prestación de servicios o subcontratación) de un trabajador o contratista colombiano. Extrae sus datos clave. El campo "contractType" debe ser EXACTAMENTE uno de estos códigos (en inglés, tal como aparecen aquí, nunca en español ni traducidos): "obra_labor" (contrato por obra o labor), "termino_fijo" (contrato a término fijo), "termino_indefinido" (contrato a término indefinido), "aprendizaje" (contrato de aprendizaje), "prestacion_servicios" (contrato de prestación de servicios), "subcontratista_natural" (subcontrato con persona natural), "subcontratista_juridica" (subcontrato con persona jurídica/empresa) — infiere cuál corresponde según el título y las cláusulas del documento. Extrae también el nombre completo y el número de cédula/documento de identidad de la persona contratada (para verificar que coincide con el trabajador del sistema), el salario mensual u honorarios (el valor que se paga, no un valor total acumulado a menos que el documento no distinga), y si el documento aparenta estar firmado: busca firmas manuscritas, firma digital, huella o sellos de las partes, o menciones explícitas de que ya fue firmado.',
+    schemaDescription: '{ "contractType": string|null, "startDate": "YYYY-MM-DD"|null, "endDate": "YYYY-MM-DD"|null, "salaryValue": number|null, "personName": string|null, "personDocumentNumber": string|null, "appearsSigned": boolean|null }',
+  },
   policy: {
     instructions: 'Este documento es una póliza de seguro asociada a un proyecto de construcción (ej. cumplimiento, responsabilidad civil, todo riesgo). Extrae su tipo y su vigencia.',
     schemaDescription: '{ "type": string|null, "value": number|null, "coverageStart": "YYYY-MM-DD"|null, "coverageEnd": "YYYY-MM-DD"|null }',

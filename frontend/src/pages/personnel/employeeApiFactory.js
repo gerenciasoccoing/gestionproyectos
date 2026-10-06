@@ -55,12 +55,18 @@ export function buildEmployeeApi(projectId) {
       generateOtrosi: (employeeId, contractId, data) => generalEmployeeContractsApi.generateOtrosi(employeeId, contractId, data),
       remove: (employeeId, contractId) => generalEmployeeContractsApi.remove(employeeId, contractId),
       requestSignature: (employeeId, contractId) => generalEmployeeContractsApi.requestSignature(employeeId, contractId),
+      scan: (employeeId, formData) => generalEmployeeContractsApi.scan(employeeId, formData),
+      uploadExternal: (employeeId, formData) => generalEmployeeContractsApi.uploadExternal(employeeId, formData),
+      replaceFile: (employeeId, contractId, formData) => generalEmployeeContractsApi.replaceFile(employeeId, contractId, formData),
     } : {
       list: (employeeId) => employeeContractsApi.list(projectId, employeeId),
       generate: (employeeId) => employeeContractsApi.generate(projectId, employeeId),
       generateOtrosi: (employeeId, contractId, data) => employeeContractsApi.generateOtrosi(projectId, employeeId, contractId, data),
       remove: (employeeId, contractId) => employeeContractsApi.remove(projectId, employeeId, contractId),
       requestSignature: (employeeId, contractId) => employeeContractsApi.requestSignature(projectId, employeeId, contractId),
+      scan: (employeeId, formData) => employeeContractsApi.scan(projectId, employeeId, formData),
+      uploadExternal: (employeeId, formData) => employeeContractsApi.uploadExternal(projectId, employeeId, formData),
+      replaceFile: (employeeId, contractId, formData) => employeeContractsApi.replaceFile(projectId, employeeId, contractId, formData),
     },
     leaves: isGeneral ? {
       list: (employeeId) => generalEmployeeLeavesApi.list(employeeId),

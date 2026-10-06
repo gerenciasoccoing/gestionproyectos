@@ -265,6 +265,10 @@ function BasicDataSection({ api, employee, onChange }) {
   );
 }
 
+const emptyExternalForm = { contractType: '', startDate: '', endDate: '', salaryValue: '', alreadySigned: false, notes: '' };
+const EXTERNAL_SCAN_FIELDS = ['contractType', 'startDate', 'endDate', 'salaryValue'];
+const onlyDigits = (s) => String(s || '').replace(/\D/g, '');
+
 function ContractsSection({ api, project, employee, onChange }) {
   const { t } = useTranslation();
   const [docs, setDocs] = useState([]);
@@ -276,6 +280,19 @@ function ContractsSection({ api, project, employee, onChange }) {
   const [deletingId, setDeletingId] = useState(null);
   const [sendingSignatureId, setSendingSignatureId] = useState(null);
   const [signatureNotes, setSignatureNotes] = useState({});
+
+  // --- Subir contrato externo (segunda opción de "Generar contrato") ---
+  const [showExternalForm, setShowExternalForm] = useState(false);
+  const [externalForm, setExternalForm] = useState(emptyExternalForm);
+  const [externalFile, setExternalFile] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanNotice, setScanNotice] = useState('');
+  const [uncertainFields, setUncertainFields] = useState(new Set());
+  const [personMismatchWarning, setPersonMismatchWarning] = useState('');
+  const [salaryMismatch, setSalaryMismatch] = useState(null); // { scanned, current } mientras no se resuelve
+  const [replacingId, setReplacingId] = useState(null);
+  const [replaceFile, setReplaceFile] = useState(null);
+  const [replaceSigned, setReplaceSigned] = useState(false);
 
   const load = () => api.contracts.list(employee.id).then(setDocs);
   useEffect(() => { load(); }, [employee.id]);
@@ -291,6 +308,131 @@ function ContractsSection({ api, project, employee, onChange }) {
     } catch (err) {
       setError(extractError(err));
       setMissingFields(err?.response?.data?.details?.missingFields || []);
+    }
+  });
+
+  const resetExternalForm = () => {
+    setExternalForm(emptyExternalForm);
+    setExternalFile(null);
+    setScanNotice('');
+    setUncertainFields(new Set());
+    setPersonMismatchWarning('');
+    setSalaryMismatch(null);
+  };
+
+  const startExternal = () => {
+    setShowOtrosi(false);
+    resetExternalForm();
+    setError('');
+    setShowExternalForm((s) => !s);
+  };
+
+  const clearUncertain = (key) => setUncertainFields((prev) => {
+    if (!prev.has(key)) return prev;
+    const next = new Set(prev);
+    next.delete(key);
+    return next;
+  });
+
+  // .docx no se puede leer con IA (ver aiVisionService.js): se deshabilita el botón para ese
+  // formato en vez de dejar que el usuario espere un error — el formulario sigue disponible para
+  // llenado manual exactamente igual (ver especificación, "si la lectura falla... sigue disponible").
+  const isDocxFile = (file) => file && /\.(docx?|doc)$/i.test(file.name);
+
+  const scanExternalFile = async () => {
+    if (!externalFile) return;
+    setScanning(true);
+    setError('');
+    setScanNotice('');
+    setPersonMismatchWarning('');
+    setSalaryMismatch(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', externalFile);
+      const result = await api.contracts.scan(employee.id, fd);
+
+      const uncertain = new Set(EXTERNAL_SCAN_FIELDS.filter((k) => result[k] === null || result[k] === undefined));
+      setUncertainFields(uncertain);
+
+      const currentSalary = Number(employee.salaryValue) || null;
+      const scannedSalary = result.salaryValue === null || result.salaryValue === undefined ? null : Number(result.salaryValue);
+      const salaryDiffers = scannedSalary !== null && currentSalary !== null && scannedSalary !== currentSalary;
+
+      setExternalForm((f) => ({
+        ...f,
+        contractType: result.contractType && contractTypes.some((ct) => ct.value === result.contractType) ? result.contractType : f.contractType,
+        startDate: result.startDate || f.startDate,
+        endDate: result.endDate || f.endDate,
+        salaryValue: salaryDiffers ? f.salaryValue : (scannedSalary ?? f.salaryValue),
+        alreadySigned: result.appearsSigned === true,
+      }));
+
+      if (salaryDiffers) setSalaryMismatch({ scanned: scannedSalary, current: currentSalary });
+
+      if (result.personDocumentNumber && employee.documentNumber && onlyDigits(result.personDocumentNumber) !== onlyDigits(employee.documentNumber)) {
+        setPersonMismatchWarning(t('personnel.contract.external.documentMismatch', { read: result.personDocumentNumber, expected: employee.documentNumber }));
+      } else if (result.personName && employee.name) {
+        const firstName = employee.name.trim().split(/\s+/)[0]?.toLowerCase();
+        if (firstName && !result.personName.toLowerCase().includes(firstName)) {
+          setPersonMismatchWarning(t('personnel.contract.external.nameMismatch', { read: result.personName, expected: employee.name }));
+        }
+      }
+
+      setScanNotice(t('personnel.contract.external.scanDone'));
+    } catch (err) {
+      // La lectura con IA es best-effort: si falla (sin configurar, tiempo agotado, documento
+      // ilegible), el formulario sigue disponible para llenado manual — nunca se bloquea.
+      setError(t('personnel.contract.external.scanFailed', { error: extractError(err) }));
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const [submitExternal, submittingExternal] = useSubmitGuard(async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!externalFile) { setError(t('personnel.contract.external.fileRequired')); return; }
+    if (!externalForm.contractType) { setError(t('personnel.contract.external.typeRequired')); return; }
+    if (!externalForm.startDate) { setError(t('personnel.contract.external.startDateRequired')); return; }
+    try {
+      const fd = new FormData();
+      fd.append('contractType', externalForm.contractType);
+      fd.append('startDate', externalForm.startDate);
+      if (externalForm.endDate) fd.append('endDate', externalForm.endDate);
+      if (externalForm.salaryValue) fd.append('salaryValue', externalForm.salaryValue);
+      fd.append('alreadySigned', String(externalForm.alreadySigned));
+      if (externalForm.notes) fd.append('notes', externalForm.notes);
+      fd.append('file', externalFile);
+      await api.contracts.uploadExternal(employee.id, fd);
+      resetExternalForm();
+      setShowExternalForm(false);
+      load();
+      onChange();
+    } catch (err) {
+      setError(extractError(err));
+    }
+  });
+
+  const startReplace = (doc) => {
+    setReplacingId(doc.id);
+    setReplaceFile(null);
+    setReplaceSigned(doc.signatureStatus === 'firmado');
+    setError('');
+  };
+
+  const [submitReplace, submittingReplace] = useSubmitGuard(async () => {
+    if (!replaceFile) { setError(t('personnel.contract.external.fileRequired')); return; }
+    setError('');
+    try {
+      const fd = new FormData();
+      fd.append('file', replaceFile);
+      fd.append('alreadySigned', String(replaceSigned));
+      await api.contracts.replaceFile(employee.id, replacingId, fd);
+      setReplacingId(null);
+      setReplaceFile(null);
+      load();
+    } catch (err) {
+      setError(extractError(err));
     }
   });
 
@@ -350,10 +492,11 @@ function ContractsSection({ api, project, employee, onChange }) {
   return (
     <Card title={t('personnel.contract.title')} actions={
       <Can module="personal" action="edit">
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {employee.contractType === 'obra_labor' && docs.length > 0 && (
-            <Button variant="secondary" onClick={() => setShowOtrosi((s) => !s)}>{showOtrosi ? t('common.cancel') : t('personnel.contract.newOtrosi')}</Button>
+            <Button variant="secondary" onClick={() => { setShowExternalForm(false); setShowOtrosi((s) => !s); }}>{showOtrosi ? t('common.cancel') : t('personnel.contract.newOtrosi')}</Button>
           )}
+          <Button variant="secondary" onClick={startExternal}>{showExternalForm ? t('common.cancel') : t('personnel.contract.external.upload')}</Button>
           <Button onClick={generate} loading={generating}>{generating ? t('personnel.contract.generating') : t('personnel.contract.generate')}</Button>
         </div>
       </Can>
@@ -373,7 +516,75 @@ function ContractsSection({ api, project, employee, onChange }) {
           <Button type="submit" loading={submittingOtrosi}>{t('personnel.contract.generateOtrosi')}</Button>
         </form>
       )}
-      <Table columns={[t('personnel.contract.table.type'), t('personnel.contract.table.number'), t('personnel.contract.table.from'), t('personnel.contract.table.to'), t('personnel.contract.table.value'), t('personnel.contract.table.pdf'), t('personnel.contract.table.docx'), t('personnel.contract.table.signature'), '']}>
+      {showExternalForm && (
+        <form onSubmit={submitExternal} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4 items-end border-b pb-4">
+          <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+            <Input
+              label={t('personnel.contract.external.file')} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              onChange={(e) => { setExternalFile(e.target.files[0]); setScanNotice(''); }}
+            />
+            <Button
+              type="button" variant="secondary"
+              disabled={!externalFile || scanning || isDocxFile(externalFile)}
+              onClick={scanExternalFile}
+            >
+              {scanning ? t('personnel.contract.external.reading') : t('personnel.contract.external.readAuto')}
+            </Button>
+          </div>
+          {externalFile && isDocxFile(externalFile) && (
+            <p className="text-xs text-gray-400 col-span-full">{t('personnel.contract.external.docxNoScan')}</p>
+          )}
+          {scanNotice && <p className="text-sm text-green-700 col-span-full">{scanNotice}</p>}
+          {personMismatchWarning && <p className="text-sm text-yellow-700 col-span-full bg-yellow-50 border border-yellow-200 rounded p-2">⚠ {personMismatchWarning}</p>}
+          {salaryMismatch && (
+            <div className="col-span-full bg-yellow-50 border border-yellow-200 rounded p-2 text-sm flex items-center gap-3 flex-wrap">
+              <span>{t('personnel.contract.external.salaryMismatch', { read: money(salaryMismatch.scanned), current: money(salaryMismatch.current) })}</span>
+              <Button type="button" variant="secondary" onClick={() => { setExternalForm((f) => ({ ...f, salaryValue: salaryMismatch.current })); setSalaryMismatch(null); }}>{t('personnel.contract.external.keepCurrent')}</Button>
+              <Button type="button" variant="secondary" onClick={() => { setExternalForm((f) => ({ ...f, salaryValue: salaryMismatch.scanned })); setSalaryMismatch(null); }}>{t('personnel.contract.external.useRead')}</Button>
+            </div>
+          )}
+
+          <Select
+            label={t('personnel.contract.type')}
+            value={externalForm.contractType}
+            onChange={(e) => { setExternalForm({ ...externalForm, contractType: e.target.value }); clearUncertain('contractType'); }}
+            className={uncertainFields.has('contractType') ? 'bg-yellow-50 border border-yellow-300 rounded p-1' : ''}
+            required
+          >
+            <option value="">{t('personnel.contract.selectType')}</option>
+            {contractTypes.map((ct) => <option key={ct.value} value={ct.value}>{ct.label}</option>)}
+          </Select>
+          <Input
+            label={t('personnel.contract.external.startDate')} type="date" value={externalForm.startDate}
+            onChange={(e) => { setExternalForm({ ...externalForm, startDate: e.target.value }); clearUncertain('startDate'); }}
+            className={uncertainFields.has('startDate') ? 'bg-yellow-50 border border-yellow-300 rounded p-1' : ''}
+            required
+          />
+          {NEEDS_END_DATE.has(externalForm.contractType) && (
+            <Input
+              label={t('personnel.contract.external.endDate')} type="date" value={externalForm.endDate}
+              onChange={(e) => { setExternalForm({ ...externalForm, endDate: e.target.value }); clearUncertain('endDate'); }}
+              className={uncertainFields.has('endDate') ? 'bg-yellow-50 border border-yellow-300 rounded p-1' : ''}
+            />
+          )}
+          <Input
+            label={IS_TOTAL_CONTRACT_VALUE(externalForm.contractType) ? t('personnel.list.totalContractValue') : t('personnel.list.salaryBase')}
+            type="number" min="0" step="0.01" value={externalForm.salaryValue}
+            onChange={(e) => { setExternalForm({ ...externalForm, salaryValue: e.target.value }); clearUncertain('salaryValue'); }}
+            className={uncertainFields.has('salaryValue') ? 'bg-yellow-50 border border-yellow-300 rounded p-1' : ''}
+          />
+          <label className="flex items-center gap-2 text-sm mb-2">
+            <input type="checkbox" checked={externalForm.alreadySigned} onChange={(e) => setExternalForm({ ...externalForm, alreadySigned: e.target.checked })} />
+            {t('personnel.contract.external.alreadySigned')}
+          </label>
+          <Input label={t('personnel.contract.external.notes')} value={externalForm.notes} onChange={(e) => setExternalForm({ ...externalForm, notes: e.target.value })} className="lg:col-span-2" />
+          <Button type="submit" className="col-span-full" loading={submittingExternal}>{t('personnel.contract.external.save')}</Button>
+        </form>
+      )}
+      <Table columns={[
+        t('personnel.contract.table.type'), t('personnel.contract.table.number'), t('personnel.contract.table.from'), t('personnel.contract.table.to'), t('personnel.contract.table.value'),
+        t('personnel.contract.table.origin'), t('personnel.contract.table.pdf'), t('personnel.contract.table.docx'), t('personnel.contract.table.original'), t('personnel.contract.table.signature'), '',
+      ]}>
         {docs.map((d) => (
           <Fragment key={d.id}>
             <tr className="border-b border-gray-100 align-top">
@@ -382,8 +593,10 @@ function ContractsSection({ api, project, employee, onChange }) {
               <td className="py-1 pr-3">{formatDate(d.effectiveFrom) || '-'}</td>
               <td className="py-1 pr-3">{formatDate(d.effectiveTo) || '-'}</td>
               <td className="py-1 pr-3">{money(d.valueAtIssue)}</td>
+              <td className="py-1 pr-3"><Badge color={d.source === 'externo' ? 'blue' : 'gray'}>{t(`personnel.contract.source.${d.source || 'generado'}`)}</Badge></td>
               <td className="py-1 pr-3">{d.pdfFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(d.pdfFilePath)} target="_blank" rel="noreferrer">PDF</a> : '-'}</td>
               <td className="py-1 pr-3">{d.docxFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(d.docxFilePath)} target="_blank" rel="noreferrer">Word</a> : '-'}</td>
+              <td className="py-1 pr-3">{d.originalFilePath ? <a className="text-blue-600 hover:underline" href={fileUrl(d.originalFilePath)} target="_blank" rel="noreferrer">{t('common.view')}</a> : '-'}</td>
               <td className="py-1 pr-3">
                 {d.signatureStatus === 'firmado' ? (
                   <div className="flex flex-col gap-1">
@@ -405,6 +618,9 @@ function ContractsSection({ api, project, employee, onChange }) {
                       {d.signatureStatus === 'pendiente' ? t('personnel.contract.resendSignature') : t('personnel.contract.sendSignature')}
                     </Button>
                   )}
+                  {d.source === 'externo' && (
+                    <Button variant="secondary" className="ml-2" onClick={() => startReplace(d)}>{t('personnel.contract.external.replaceFile')}</Button>
+                  )}
                 </Can>
                 <Can module="personal" action="delete">
                   <Button variant="danger" className="ml-2" loading={deletingId === d.id} onClick={() => removeDoc(d)}>{t('common.delete')}</Button>
@@ -413,7 +629,7 @@ function ContractsSection({ api, project, employee, onChange }) {
             </tr>
             {signatureNotes[d.id] && (
               <tr key={`${d.id}-note`} className="border-b border-gray-100 bg-gray-50">
-                <td colSpan={9} className={`py-1 px-3 text-xs ${signatureNotes[d.id].isError ? 'text-yellow-700' : 'text-green-700'}`}>
+                <td colSpan={11} className={`py-1 px-3 text-xs ${signatureNotes[d.id].isError ? 'text-yellow-700' : 'text-green-700'}`}>
                   {signatureNotes[d.id].text}
                   {signatureNotes[d.id].link && (
                     <button
@@ -427,9 +643,24 @@ function ContractsSection({ api, project, employee, onChange }) {
                 </td>
               </tr>
             )}
+            {replacingId === d.id && (
+              <tr key={`${d.id}-replace`} className="border-b border-gray-100 bg-gray-50">
+                <td colSpan={11} className="py-2 px-3">
+                  <div className="flex items-end gap-3 flex-wrap">
+                    <Input label={t('personnel.contract.external.newFile')} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={(e) => setReplaceFile(e.target.files[0])} />
+                    <label className="flex items-center gap-2 text-sm mb-2">
+                      <input type="checkbox" checked={replaceSigned} onChange={(e) => setReplaceSigned(e.target.checked)} />
+                      {t('personnel.contract.external.alreadySigned')}
+                    </label>
+                    <Button loading={submittingReplace} onClick={submitReplace}>{t('common.save')}</Button>
+                    <Button variant="secondary" onClick={() => setReplacingId(null)}>{t('common.cancel')}</Button>
+                  </div>
+                </td>
+              </tr>
+            )}
           </Fragment>
         ))}
-        {docs.length === 0 && <tr><td colSpan={8} className="py-2 text-center text-gray-400">{t('personnel.contract.empty')}</td></tr>}
+        {docs.length === 0 && <tr><td colSpan={11} className="py-2 text-center text-gray-400">{t('personnel.contract.empty')}</td></tr>}
       </Table>
     </Card>
   );

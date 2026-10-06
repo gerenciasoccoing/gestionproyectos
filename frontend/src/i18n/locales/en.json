@@ -924,7 +924,9 @@
         "value": "Value",
         "pdf": "PDF",
         "docx": "Word",
-        "signature": "Signature"
+        "signature": "Signature",
+        "origin": "Source",
+        "original": "Original document"
       },
       "signatureStatus": {
         "no_solicitado": "No digital signature",
@@ -937,7 +939,35 @@
       "signatureSent": "The signing link was sent to {{email}}.",
       "signatureEmailFailed": "The signature email could not be sent. Share this link manually: {{link}}",
       "copyLink": "Copy link",
-      "viewSigned": "View signed"
+      "viewSigned": "View signed",
+      "source": {
+        "generado": "System template",
+        "externo": "External document"
+      },
+      "external": {
+        "upload": "+ Upload external contract",
+        "file": "Contract file",
+        "readAuto": "Read automatically with AI",
+        "reading": "Reading document...",
+        "docxNoScan": "Word files can't be read automatically with AI — fill in the form by hand.",
+        "scanDone": "Data read. Review and correct before saving.",
+        "scanFailed": "Could not read the document automatically ({{error}}). Fill in the form by hand.",
+        "documentMismatch": "The document mentions ID {{read}}, which does not match this employee's ({{expected}}). Verify this is the correct contract.",
+        "nameMismatch": "The document mentions \"{{read}}\", which does not seem to match this employee ({{expected}}). Verify this is the correct contract.",
+        "salaryMismatch": "The value read ({{read}}) differs from the one on file for this employee ({{current}}). Which one do you want to keep?",
+        "keepCurrent": "Keep the employee's",
+        "useRead": "Use the one read",
+        "startDate": "Start date",
+        "endDate": "End date",
+        "alreadySigned": "This document is already signed",
+        "notes": "Observations (optional)",
+        "save": "Save external contract",
+        "fileRequired": "You must attach the contract file.",
+        "typeRequired": "You must select the contract type.",
+        "startDateRequired": "You must enter the start date.",
+        "replaceFile": "Replace file",
+        "newFile": "New file"
+      }
     }
   },
   "expenses": {

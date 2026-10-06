@@ -264,6 +264,13 @@ export const employeeContractsApi = {
   // contractSignatureService.js#requestSignature. Devuelve signUrl aunque el correo falle, para
   // poder copiarlo y mandarlo a mano.
   requestSignature: (pid, employeeId, contractId) => client.post(`/projects/${pid}/employees/${employeeId}/contracts/${contractId}/request-signature`).then((r) => r.data),
+  // "Subir contrato externo" (segunda opción de "Generar contrato", ver
+  // employeeContractController.js): scan() lee el archivo con IA SIN guardarlo (mismo patrón que
+  // contractsApi.scan de Contractual); uploadExternal() persiste el documento; replaceFile()
+  // cambia el archivo de un documento externo ya subido.
+  scan: (pid, employeeId, formData) => client.post(`/projects/${pid}/employees/${employeeId}/contracts/scan`, formData).then((r) => r.data),
+  uploadExternal: (pid, employeeId, formData) => client.post(`/projects/${pid}/employees/${employeeId}/contracts/external`, formData).then((r) => r.data),
+  replaceFile: (pid, employeeId, contractId, formData) => client.put(`/projects/${pid}/employees/${employeeId}/contracts/${contractId}/file`, formData).then((r) => r.data),
 };
 
 // Personal del menú principal (sin proyecto fijo, ver backend/globalEmployeeRoutes.js) — mismo
@@ -297,6 +304,9 @@ export const generalEmployeeContractsApi = {
   generateOtrosi: (employeeId, contractId, data) => client.post(`/employees/${employeeId}/contracts/${contractId}/otrosi`, data).then((r) => r.data),
   remove: (employeeId, contractId) => client.delete(`/employees/${employeeId}/contracts/${contractId}`).then((r) => r.data),
   requestSignature: (employeeId, contractId) => client.post(`/employees/${employeeId}/contracts/${contractId}/request-signature`).then((r) => r.data),
+  scan: (employeeId, formData) => client.post(`/employees/${employeeId}/contracts/scan`, formData).then((r) => r.data),
+  uploadExternal: (employeeId, formData) => client.post(`/employees/${employeeId}/contracts/external`, formData).then((r) => r.data),
+  replaceFile: (employeeId, contractId, formData) => client.put(`/employees/${employeeId}/contracts/${contractId}/file`, formData).then((r) => r.data),
 };
 
 // Flujo PÚBLICO de firma digital de contratos (sin sesión, ver contractSignatureRoutes.js): el

@@ -924,7 +924,9 @@
         "value": "Valor",
         "pdf": "PDF",
         "docx": "Word",
-        "signature": "Firma"
+        "signature": "Firma",
+        "origin": "Origen",
+        "original": "Documento original"
       },
       "signatureStatus": {
         "no_solicitado": "Sin firma digital",
@@ -937,7 +939,35 @@
       "signatureSent": "Se envió el enlace de firma a {{email}}.",
       "signatureEmailFailed": "No se pudo enviar el correo de firma. Comparte este enlace manualmente: {{link}}",
       "copyLink": "Copiar enlace",
-      "viewSigned": "Ver firmado"
+      "viewSigned": "Ver firmado",
+      "source": {
+        "generado": "Modelo del sistema",
+        "externo": "Documento externo"
+      },
+      "external": {
+        "upload": "+ Subir contrato externo",
+        "file": "Archivo del contrato",
+        "readAuto": "Leer automáticamente con IA",
+        "reading": "Leyendo documento...",
+        "docxNoScan": "Los archivos Word no se pueden leer automáticamente con IA — completa el formulario a mano.",
+        "scanDone": "Datos leídos. Revisa y corrige antes de guardar.",
+        "scanFailed": "No se pudo leer el documento automáticamente ({{error}}). Completa el formulario a mano.",
+        "documentMismatch": "El documento menciona la cédula {{read}}, que no coincide con la de este trabajador ({{expected}}). Verifica que sea el contrato correcto.",
+        "nameMismatch": "El documento menciona a \"{{read}}\", que no parece coincidir con este trabajador ({{expected}}). Verifica que sea el contrato correcto.",
+        "salaryMismatch": "El valor leído ({{read}}) difiere del registrado en la ficha del trabajador ({{current}}). ¿Cuál deseas conservar?",
+        "keepCurrent": "Mantener el del trabajador",
+        "useRead": "Usar el leído",
+        "startDate": "Fecha de inicio",
+        "endDate": "Fecha de terminación",
+        "alreadySigned": "Este documento ya está firmado",
+        "notes": "Observaciones (opcional)",
+        "save": "Guardar contrato externo",
+        "fileRequired": "Debes adjuntar el archivo del contrato.",
+        "typeRequired": "Debes seleccionar el tipo de contrato.",
+        "startDateRequired": "Debes indicar la fecha de inicio.",
+        "replaceFile": "Reemplazar archivo",
+        "newFile": "Nuevo archivo"
+      }
     }
   },
   "expenses": {
