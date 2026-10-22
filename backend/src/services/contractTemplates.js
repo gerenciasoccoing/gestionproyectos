@@ -83,6 +83,17 @@ function row(label, value) {
   return { label, value: value === undefined || value === null || value === '' ? '' : String(value) };
 }
 
+// Lugar de ejecución citado en las cláusulas y en la tabla de datos clave. Personal DE PROYECTO
+// siempre tiene project con su nombre; personal ADMINISTRATIVO (employee.projectId null) no tiene
+// ningún proyecto que citar — antes esto leía project.name sin verificar que project existiera,
+// lo que rompía con un error de JavaScript (no un mensaje de negocio) al generar o firmar
+// cualquier contrato/otrosí de un trabajador administrativo. preposition cambia porque cada
+// cláusula arma la frase con una preposición distinta ("dentro del", "en el", "relacionado con
+// el"), pero sin proyecto todas caen al mismo texto genérico.
+function workplacePhrase(project, preposition = 'dentro del proyecto') {
+  return project ? `${preposition} ${project.name}` : 'en la sede administrativa de la empresa';
+}
+
 // Tabla de datos clave al inicio del contrato (etiqueta | valor), consumida tanto por
 // generateContractPdf como por contractDocService.js — misma fuente para los dos formatos, así
 // nunca quedan desincronizados. Todo se lee de lo ya capturado en el trabajador/subcontratista, el
@@ -101,7 +112,7 @@ function buildPersonalInfoTable({ employee, company, project, doc, salaryLabel =
     row('Período de pago', 'Mensual'),
     row('Fecha de iniciación de labores', formatDateEs(doc.effectiveFrom)),
     row('Fecha de finalización de las actividades', doc.effectiveTo ? formatDateEs(doc.effectiveTo) : endDateFallback),
-    row('Lugar donde se desempeñarán las labores', project.name),
+    row('Lugar donde se desempeñarán las labores', project ? project.name : 'Sede administrativa de la empresa'),
     row('Ciudad donde ha sido contratado el trabajador', employee.city),
     // Términos fijo/indefinido no exigen un objeto de obra/labor (contractObject es opcional para
     // ellos, ver REQUIRED_FIELDS_BY_TYPE): si no se capturó, se describe con el oficio en vez de
@@ -122,7 +133,7 @@ function buildContractorInfoTable({ employee, company, project, doc, docLabel })
     row('Período de pago', 'Mensual'),
     row('Fecha de inicio', formatDateEs(doc.effectiveFrom)),
     row('Fecha de terminación', formatDateEs(doc.effectiveTo)),
-    row('Lugar donde se prestará el servicio', project.name),
+    row('Lugar donde se prestará el servicio', project ? project.name : 'Sede administrativa de la empresa'),
     row('Ciudad donde ha sido contratado', employee.city),
     row('Objeto del contrato', doc.objectAtIssue),
   ];
@@ -141,7 +152,7 @@ function buildJuridicaInfoTable({ employee, company, project, doc }) {
     row('Período de pago', 'Mensual'),
     row('Fecha de inicio', formatDateEs(doc.effectiveFrom)),
     row('Fecha de terminación', formatDateEs(doc.effectiveTo)),
-    row('Lugar donde se prestará el servicio', project.name),
+    row('Lugar donde se prestará el servicio', project ? project.name : 'Sede administrativa de la empresa'),
     row('Ciudad donde ha sido contratado', employee.city),
     row('Objeto del contrato', doc.objectAtIssue),
   ];
@@ -180,7 +191,7 @@ function buildObraLabor({ employee, company, project, doc }) {
     infoTable: buildPersonalInfoTable({ employee, company, project, doc, endDateFallback: 'Hasta la finalización de la obra o labor contratada' }),
     intro: `Entre los suscritos, ${p.companyName}, sociedad identificada con NIT ${p.companyNit}, representada legalmente por ${p.managerName} (en adelante "EL EMPLEADOR"), y ${employee.name}, identificado(a) con ${p.docLabel} No. ${employee.documentNumber}, domiciliado(a) en ${employee.address}, ${employee.city} (en adelante "EL TRABAJADOR"), se celebra el presente Contrato Individual de Trabajo por Obra o Labor Contratada, regido por las siguientes cláusulas:`,
     clauses: [
-      { heading: 'PRIMERA — Objeto.', body: `EL TRABAJADOR se obliga a prestar sus servicios personales como ${employee.position} para la ejecución de la obra o labor determinada: "${doc.objectAtIssue}", dentro del proyecto ${project.name}, bajo la continuada dependencia y subordinación de EL EMPLEADOR.` },
+      { heading: 'PRIMERA — Objeto.', body: `EL TRABAJADOR se obliga a prestar sus servicios personales como ${employee.position} para la ejecución de la obra o labor determinada: "${doc.objectAtIssue}", ${workplacePhrase(project)}, bajo la continuada dependencia y subordinación de EL EMPLEADOR.` },
       { heading: 'SEGUNDA — Duración.', body: `El presente contrato dura por el tiempo que demande la ejecución de la obra o labor contratada, iniciando el ${formatDateEs(doc.effectiveFrom)}. Terminará de forma automática al concluir dicha obra o labor, sin necesidad de preaviso, de conformidad con el artículo 61 del Código Sustantivo del Trabajo (CST), con la sola notificación de la fecha de terminación con al menos un (1) día de anticipación.` },
       { heading: 'TERCERA — Salario y forma de pago.', body: `EL EMPLEADOR pagará a EL TRABAJADOR un salario de ${money(doc.valueAtIssue)} mensuales, más el auxilio de transporte legal cuando aplique según la ley vigente.` },
       { heading: 'CUARTA — Jornada de trabajo.', body: 'La jornada laboral será la máxima legal vigente, distribuida de acuerdo con las necesidades del servicio y la obra, respetando los descansos de ley.' },
@@ -236,7 +247,7 @@ function buildTerminoFijoOIndefinido({ employee, company, project, doc }, indefi
     infoTable: buildPersonalInfoTable({ employee, company, project, doc, endDateFallback: 'Indefinida' }),
     intro: `Entre ${p.companyName}, NIT ${p.companyNit}, representada legalmente por ${p.managerName} (EL EMPLEADOR), y ${employee.name}, identificado(a) con ${p.docLabel} No. ${employee.documentNumber}, domiciliado(a) en ${employee.address}, ${employee.city} (EL TRABAJADOR), se celebra el presente contrato de trabajo:`,
     clauses: [
-      { heading: 'PRIMERA — Objeto.', body: `EL TRABAJADOR prestará sus servicios personales como ${employee.position}, bajo continuada dependencia y subordinación de EL EMPLEADOR, dentro del proyecto ${project.name}.` },
+      { heading: 'PRIMERA — Objeto.', body: `EL TRABAJADOR prestará sus servicios personales como ${employee.position}, bajo continuada dependencia y subordinación de EL EMPLEADOR, ${workplacePhrase(project)}.` },
       durationClause,
       { heading: 'TERCERA — Salario y forma de pago.', body: `${money(doc.valueAtIssue)} mensuales, más auxilio de transporte legal cuando aplique.` },
       { heading: 'CUARTA — Jornada de trabajo.', body: 'La jornada laboral será la máxima legal vigente.' },
@@ -260,7 +271,7 @@ function buildAprendizaje({ employee, company, project, doc }) {
     infoTable: buildPersonalInfoTable({ employee, company, project, doc, salaryLabel: 'Salario / Apoyo de sostenimiento', endDateFallback: 'No aplica' }),
     intro: `Entre ${p.companyName}, NIT ${p.companyNit}, representada legalmente por ${p.managerName} (en adelante "LA EMPRESA PATROCINADORA"), y ${employee.name}, identificado(a) con ${p.docLabel} No. ${employee.documentNumber} (en adelante "EL APRENDIZ"), se celebra el presente Contrato de Aprendizaje, de conformidad con la Ley 789 de 2002. Este contrato no genera relación laboral ni salario, sino apoyo de sostenimiento, por tratarse de una forma especial de vinculación con fines de formación.`,
     clauses: [
-      { heading: 'PRIMERA — Objeto.', body: `EL APRENDIZ desarrollará su etapa práctica mediante actividades de tipo formativo en el proyecto ${project.name}, en el cargo/función de ${employee.position}.` },
+      { heading: 'PRIMERA — Objeto.', body: `EL APRENDIZ desarrollará su etapa práctica mediante actividades de tipo formativo ${workplacePhrase(project, 'en el proyecto')}, en el cargo/función de ${employee.position}.` },
       { heading: 'SEGUNDA — Duración.', body: `El contrato tiene una duración desde el ${formatDateEs(doc.effectiveFrom)} hasta el ${formatDateEs(doc.effectiveTo)}, sin exceder en conjunto el término máximo de dos (2) años previsto en la ley.` },
       { heading: 'TERCERA — Apoyo de sostenimiento.', body: `LA EMPRESA PATROCINADORA reconocerá a EL APRENDIZ un apoyo de sostenimiento mensual de ${money(doc.valueAtIssue)}, de conformidad con el artículo 30 de la Ley 789 de 2002 (mínimo el 50% de un SMLMV en etapa lectiva y el 75% en etapa productiva, o el 100% si la tasa de desempleo nacional es inferior al 10%).` },
       { heading: 'CUARTA — Afiliación a seguridad social.', body: `EL APRENDIZ estará afiliado durante toda la vigencia del contrato a la EPS ${employee.epsName} en la modalidad correspondiente a aprendices, y a la ARL ${employee.arlName}; no genera afiliación obligatoria al Sistema General de Pensiones.` },
@@ -284,7 +295,7 @@ function buildPrestacionServicios({ employee, company, project, doc }) {
     infoTable: buildContractorInfoTable({ employee, company, project, doc, docLabel: p.docLabel }),
     intro: `Entre ${p.companyName}, NIT ${p.companyNit}, representada legalmente por ${p.managerName} (en adelante "EL CONTRATANTE"), y ${employee.name}, identificado(a) con ${p.docLabel} No. ${employee.documentNumber}, domiciliado(a) en ${employee.address}, ${employee.city} (en adelante "EL CONTRATISTA"), se celebra el presente Contrato de Prestación de Servicios, de naturaleza civil. Este contrato NO constituye relación laboral ni genera subordinación, prestaciones sociales ni relación de dependencia.`,
     clauses: [
-      { heading: 'PRIMERA — Objeto.', body: `EL CONTRATISTA se obliga, de manera independiente y autónoma, a prestar a EL CONTRATANTE el servicio de: "${doc.objectAtIssue}", relacionado con el proyecto ${project.name}, empleando sus propios medios, conocimiento técnico y sin sujeción a horario ni subordinación laboral alguna.` },
+      { heading: 'PRIMERA — Objeto.', body: `EL CONTRATISTA se obliga, de manera independiente y autónoma, a prestar a EL CONTRATANTE el servicio de: "${doc.objectAtIssue}", ${workplacePhrase(project, 'relacionado con el proyecto')}, empleando sus propios medios, conocimiento técnico y sin sujeción a horario ni subordinación laboral alguna.` },
       { heading: 'SEGUNDA — Autonomía e independencia.', body: 'EL CONTRATISTA ejecutará el objeto contratado con plena autonomía técnica, administrativa y directiva, sin subordinación, dependencia continuada ni sujeción a horario frente a EL CONTRATANTE.' },
       { heading: 'TERCERA — Duración.', body: `Del ${formatDateEs(doc.effectiveFrom)} al ${formatDateEs(doc.effectiveTo)}, sin perjuicio de que pueda darse por terminado anticipadamente conforme a la cláusula sexta.` },
       { heading: 'CUARTA — Honorarios y forma de pago.', body: `EL CONTRATANTE pagará a EL CONTRATISTA la suma de ${money(doc.valueAtIssue)} por concepto de honorarios, previa presentación de cuenta de cobro o factura, sujeta a las retenciones de ley.` },
@@ -308,7 +319,7 @@ function buildSubcontratistaNatural({ employee, company, project, doc }) {
     infoTable: buildContractorInfoTable({ employee, company, project, doc, docLabel: p.docLabel }),
     intro: `Entre ${p.companyName}, NIT ${p.companyNit}, representada legalmente por ${p.managerName} (en adelante "EL CONTRATANTE"), y ${employee.name}, identificado(a) con ${p.docLabel} No. ${employee.documentNumber}, domiciliado(a) en ${employee.address}, ${employee.city} (en adelante "EL SUBCONTRATISTA"), se celebra el presente Contrato de Subcontratación.`,
     clauses: [
-      { heading: 'PRIMERA — Objeto.', body: `EL SUBCONTRATISTA se obliga a ejecutar, de manera independiente y con sus propios medios, la siguiente labor dentro del proyecto ${project.name}: "${doc.objectAtIssue}".` },
+      { heading: 'PRIMERA — Objeto.', body: `EL SUBCONTRATISTA se obliga a ejecutar, de manera independiente y con sus propios medios, la siguiente labor ${workplacePhrase(project)}: "${doc.objectAtIssue}".` },
       { heading: 'SEGUNDA — Independencia.', body: 'EL SUBCONTRATISTA actúa como contratista independiente, sin subordinación laboral frente a EL CONTRATANTE, asumiendo bajo su propia responsabilidad los riesgos derivados de la ejecución del objeto contratado.' },
       { heading: 'TERCERA — Duración.', body: `Del ${formatDateEs(doc.effectiveFrom)} al ${formatDateEs(doc.effectiveTo)}.` },
       { heading: 'CUARTA — Valor y forma de pago.', body: `EL CONTRATANTE pagará a EL SUBCONTRATISTA la suma de ${money(doc.valueAtIssue)}, contra cuenta de cobro o factura y verificación de la afiliación vigente a que se refiere la cláusula quinta.` },
@@ -333,7 +344,7 @@ function buildSubcontratistaJuridica({ employee, company, project, doc }) {
     infoTable: buildJuridicaInfoTable({ employee, company, project, doc }),
     intro: `Entre ${p.companyName}, NIT ${p.companyNit}, representada legalmente por ${p.managerName} (en adelante "EL CONTRATANTE"), y ${employee.subcontractorLegalName}, sociedad identificada con NIT ${employee.subcontractorNit}, representada legalmente por ${employee.subcontractorLegalRep}, identificado(a) con ${p.docLabel} No. ${employee.documentNumber} (en adelante "EL SUBCONTRATISTA"), se celebra el presente Contrato de Subcontratación.`,
     clauses: [
-      { heading: 'PRIMERA — Objeto.', body: `EL SUBCONTRATISTA se obliga a ejecutar, con su propio personal, equipos y medios, la siguiente labor dentro del proyecto ${project.name}: "${doc.objectAtIssue}".` },
+      { heading: 'PRIMERA — Objeto.', body: `EL SUBCONTRATISTA se obliga a ejecutar, con su propio personal, equipos y medios, la siguiente labor ${workplacePhrase(project)}: "${doc.objectAtIssue}".` },
       { heading: 'SEGUNDA — Independencia y personal a cargo.', body: 'EL SUBCONTRATISTA ejecutará el objeto contratado con autonomía técnica y administrativa, con personal vinculado laboralmente por él mismo, sin que se genere ningún tipo de relación laboral, directa ni indirecta, entre dicho personal y EL CONTRATANTE.' },
       { heading: 'TERCERA — Duración.', body: `Del ${formatDateEs(doc.effectiveFrom)} al ${formatDateEs(doc.effectiveTo)}.` },
       { heading: 'CUARTA — Valor y forma de pago.', body: `EL CONTRATANTE pagará a EL SUBCONTRATISTA la suma de ${money(doc.valueAtIssue)}, contra factura y los soportes de cumplimiento de las obligaciones de la cláusula quinta.` },
