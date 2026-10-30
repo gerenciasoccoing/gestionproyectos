@@ -48,6 +48,15 @@ const history = asyncHandler(async (req, res) => {
   res.json(data);
 });
 
+// '' llega tal cual desde un <input type="number"> que el usuario dejó o dejó vacío (el form lo
+// manda como multipart por la foto, así que nunca es undefined/null, siempre string) — antes se
+// colaba hasta la base de datos tal cual, y Postgres rechaza '' como NUMERIC con un error crudo de
+// SQL en vez de un 400 legible (ver el mismo criterio ya usado en employeeController.js
+// #dedicationHours, employeeDeductionController.js#totalAmount, etc.).
+function isBlankOrInvalidNumber(value) {
+  return value === undefined || value === null || value === '' || Number.isNaN(Number(value));
+}
+
 function validateBody({ name, code, category, trackingType, stockQuantity }) {
   if (!name || !name.trim()) throw new ApiError(400, 'name es obligatorio');
   if (!code || !code.trim()) throw new ApiError(400, 'code es obligatorio');
@@ -55,7 +64,7 @@ function validateBody({ name, code, category, trackingType, stockQuantity }) {
   if (trackingType !== undefined && !TRACKING_TYPES.includes(trackingType)) {
     throw new ApiError(400, `trackingType debe ser uno de: ${TRACKING_TYPES.join(', ')}`);
   }
-  if (trackingType === 'cantidad' && (stockQuantity === undefined || Number(stockQuantity) < 0)) {
+  if (trackingType === 'cantidad' && (isBlankOrInvalidNumber(stockQuantity) || Number(stockQuantity) < 0)) {
     throw new ApiError(400, 'stockQuantity es obligatorio y no puede ser negativo para equipos de tipo "cantidad"');
   }
 }
@@ -72,7 +81,7 @@ const create = asyncHandler(async (req, res) => {
     code: code.trim(),
     category: category.trim(),
     trackingType,
-    stockQuantity: trackingType === 'cantidad' ? stockQuantity : null,
+    stockQuantity: trackingType === 'cantidad' ? Number(stockQuantity) : null,
     value: value || null,
     notes: notes || null,
     photoPath: relativePath(req.file),
@@ -87,7 +96,11 @@ const update = asyncHandler(async (req, res) => {
 
   const { name, code, category, trackingType, value, stockQuantity, notes, status } = req.body;
   const nextTrackingType = trackingType !== undefined ? trackingType : item.trackingType;
-  if (name !== undefined || code !== undefined || category !== undefined || trackingType !== undefined) {
+  // stockQuantity entra a la validación aunque nadie toque name/code/category/trackingType: antes
+  // de este fix, editar SOLO la cantidad (el caso más común) nunca pasaba por validateBody y un
+  // valor vacío llegaba crudo hasta la base de datos (ver el error de SequelizeDatabaseError
+  // reportado en producción).
+  if (name !== undefined || code !== undefined || category !== undefined || trackingType !== undefined || stockQuantity !== undefined) {
     validateBody({
       name: name !== undefined ? name : item.name,
       code: code !== undefined ? code : item.code,
@@ -106,7 +119,9 @@ const update = asyncHandler(async (req, res) => {
   if (category !== undefined) item.category = category.trim();
   if (trackingType !== undefined) item.trackingType = trackingType;
   if (value !== undefined) item.value = value || null;
-  if (stockQuantity !== undefined) item.stockQuantity = stockQuantity;
+  // Mismo criterio que create(): solo tiene sentido numérico para "cantidad" — para "serializado"
+  // (o si llega vacío por error) se guarda null en vez de reenviar el string crudo a Postgres.
+  if (stockQuantity !== undefined) item.stockQuantity = nextTrackingType === 'cantidad' ? Number(stockQuantity) : null;
   if (notes !== undefined) item.notes = notes || null;
   // Cambio manual de estado (ej. marcar "en mantenimiento"/"dado de baja" sin pasar por una
   // devolución, o reactivar un equipo serializado a "disponible"). Solo aplica directo para
