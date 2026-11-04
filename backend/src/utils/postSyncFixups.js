@@ -4,8 +4,9 @@ const { v4: uuidv4 } = require('uuid');
 // Conexión de administración: este archivo hace DDL (ALTER TABLE, políticas RLS, creación del rol
 // restringido) y backfills que cruzan empresas — todo eso exige el rol dueño de las tablas, no el
 // restringido que usa la app en tiempo real (ver models/adminModels.js).
+const { QueryTypes } = require('sequelize');
 const {
-  sequelize, Company, CashBox,
+  sequelize, Company, CashBox, CashBoxMovement, Project,
   Contract, Employee, Expense, ExpenseItem, ExpenseTax, InventoryItem, Minute, PaymentReceipt, Policy,
   ProgressPhoto, PurchaseReceipt, Severance, SocialSecurityDocument,
   SocialSecurityProvider, ThirdParty, WithholdingType, AdminExpenseCategory, PublicHoliday, LeaveType,
@@ -322,6 +323,7 @@ async function applyPostSyncFixups() {
   await seedPublicHolidaysForExistingCompanies();
   await backfillCashBoxMovementGrossAmount();
   await seedExpenseVoucherCounterForExistingCompanies();
+  await backfillVoucherNumbersForExistingRecords();
 
   await ensureAppDbRole();
   await applyRowLevelSecurity();
@@ -529,6 +531,80 @@ async function seedExpenseVoucherCounterForExistingCompanies() {
         { replacements: { id: uuidv4(), companyId: company.id, value: maxExisting } }
       );
     });
+  }
+}
+
+// Asigna expenseNumber/incomeNumber (+ contractPrefix) a los gastos e ingresos que quedaron sin
+// número por haberse creado antes de que esos campos existieran (ver el comentario "no existía
+// antes de este campo" en Expense.js/CashBoxMovement.js) — ahora también deben poder generar su
+// comprobante. Recorre cada empresa en orden de creación (createdAt ASC) para que el consecutivo
+// conserve sentido cronológico, usando el mismo contador atómico de VoucherCounters pero con SQL
+// crudo sobre la conexión de administración (mismo criterio que
+// seedExpenseVoucherCounterForExistingCompanies: no hace falta pasar por la ruta RLS de
+// numberingService.js porque esto corre fuera de cualquier petición HTTP). hooks:false porque cruza
+// todas las empresas a la vez (sin companyId de contexto); paranoid:false para numerar también los
+// que ya estuvieran anulados antes de tener número, y para que lean cualquiera ya existente. Solo
+// toca filas con el número NULL, así que es idempotente y seguro de repetir en cada arranque.
+async function nextVoucherNumberRaw(companyId, kind) {
+  const [row] = await sequelize.query(
+    `INSERT INTO "VoucherCounters" ("id", "companyId", "kind", "value", "createdAt", "updatedAt")
+     VALUES (:id, :companyId, :kind, 1, now(), now())
+     ON CONFLICT ("companyId", "kind") DO UPDATE SET "value" = "VoucherCounters"."value" + 1, "updatedAt" = now()
+     RETURNING "value"`,
+    { replacements: { id: uuidv4(), companyId, kind }, type: QueryTypes.SELECT }
+  );
+  return row.value;
+}
+
+async function backfillVoucherNumbersForExistingRecords() {
+  const pendingExpenses = await Expense.findAll({
+    where: { expenseNumber: null }, order: [['createdAt', 'ASC']], hooks: false, paranoid: false,
+  });
+  const expensesByCompany = new Map();
+  for (const expense of pendingExpenses) {
+    const list = expensesByCompany.get(expense.companyId) || [];
+    list.push(expense);
+    expensesByCompany.set(expense.companyId, list);
+  }
+  for (const [companyId, expenses] of expensesByCompany) {
+    for (const expense of expenses) {
+      // eslint-disable-next-line no-await-in-loop
+      const expenseNumber = await nextVoucherNumberRaw(companyId, 'egreso');
+      let contractPrefix = null;
+      if (expense.expenseType === 'administrativo') {
+        contractPrefix = 'ADM';
+      } else if (expense.projectId) {
+        // eslint-disable-next-line no-await-in-loop
+        const project = await Project.findByPk(expense.projectId, { hooks: false });
+        contractPrefix = project?.contractNumber ? project.contractNumber.slice(0, 3) : null;
+      }
+      // eslint-disable-next-line no-await-in-loop
+      await Expense.update({ expenseNumber, contractPrefix }, { where: { id: expense.id }, hooks: false, paranoid: false });
+    }
+  }
+
+  const pendingMovements = await CashBoxMovement.findAll({
+    where: { incomeNumber: null }, order: [['createdAt', 'ASC']], hooks: false, paranoid: false,
+  });
+  const movementsByCompany = new Map();
+  for (const movement of pendingMovements) {
+    const list = movementsByCompany.get(movement.companyId) || [];
+    list.push(movement);
+    movementsByCompany.set(movement.companyId, list);
+  }
+  for (const [companyId, movements] of movementsByCompany) {
+    for (const movement of movements) {
+      // eslint-disable-next-line no-await-in-loop
+      const incomeNumber = await nextVoucherNumberRaw(companyId, 'ingreso');
+      let contractPrefix = null;
+      if (movement.projectId) {
+        // eslint-disable-next-line no-await-in-loop
+        const project = await Project.findByPk(movement.projectId, { hooks: false });
+        contractPrefix = project?.contractNumber ? project.contractNumber.slice(0, 3) : null;
+      }
+      // eslint-disable-next-line no-await-in-loop
+      await CashBoxMovement.update({ incomeNumber, contractPrefix }, { where: { id: movement.id }, hooks: false, paranoid: false });
+    }
   }
 }
 

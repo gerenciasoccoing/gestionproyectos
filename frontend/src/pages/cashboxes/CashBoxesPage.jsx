@@ -6,6 +6,12 @@ import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
 import { useAuth } from '../../context/AuthContext';
 import useSubmitGuard from '../../hooks/useSubmitGuard';
+import VoucherSignaturePanel from '../../components/VoucherSignaturePanel';
+
+const SIGNATURE_ROLES = [
+  { role: 'entrego', label: 'Entregó' },
+  { role: 'recibio', label: 'Recibió' },
+];
 
 const emptyForm = { name: '', initialBalance: '' };
 
@@ -435,20 +441,15 @@ function MovementRow({ m, cashBoxId, expanded, onToggle, canEdit, onEdit, onRemo
         <td className="py-1 pr-3">
           {m.concept}
           {m.isWithholdingReturn && <span className="ml-1"><Badge color="blue">{t('cashBoxes.movement.returnBadge')}</Badge></span>}
+          {m.deletedAt && <span className="ml-1"><Badge color="red">{t('cashBoxes.movement.voided')}</Badge></span>}
+          <button type="button" className="text-blue-600 hover:underline text-xs ml-2" onClick={onToggle}>
+            {expanded ? t('cashBoxes.movement.hideDetail') : t('cashBoxes.movement.viewDetail')}
+          </button>
         </td>
         <td className="py-1 pr-3">
-          {m.Project ? (
-            <>
-              {m.Project.contractNumber ? `${m.Project.contractNumber} – ` : ''}{m.Project.name}
-              {hasWithholdings && (
-                <button type="button" className="text-blue-600 hover:underline text-xs ml-2" onClick={onToggle}>
-                  {expanded ? t('cashBoxes.movement.hideWithholdings') : t('cashBoxes.movement.viewWithholdings')}
-                </button>
-              )}
-            </>
-          ) : '-'}
+          {m.Project ? `${m.Project.contractNumber ? `${m.Project.contractNumber} – ` : ''}${m.Project.name}` : '-'}
         </td>
-        <td className="py-1 pr-3 font-medium">{money(m.amount)}</td>
+        <td className={`py-1 pr-3 font-medium ${m.deletedAt ? 'line-through text-gray-400' : ''}`}>{money(m.amount)}</td>
         <td className="py-1 pr-3">
           {m.supportFilePath ? (
             <a href={fileUrl(m.supportFilePath)} target="_blank" rel="noreferrer" title={t('cashBoxes.movement.viewCurrentSupport')}>📎</a>
@@ -458,7 +459,7 @@ function MovementRow({ m, cashBoxId, expanded, onToggle, canEdit, onEdit, onRemo
           <a className="text-blue-600 hover:underline" href={cashBoxesApi.movementReceiptPdfUrl(cashBoxId, m.id)} target="_blank" rel="noreferrer">{t('common.view')}</a>
         </td>
         <td className="py-1 pr-3 text-right whitespace-nowrap">
-          {canEdit && (
+          {canEdit && !m.deletedAt && (
             <Can module="cajas" action="edit">
               <button type="button" className="text-blue-600 hover:underline text-xs" onClick={onEdit}>{t('common.edit')}</button>
               <button type="button" className="text-red-600 hover:underline text-xs ml-2" onClick={onRemove}>{t('common.delete')}</button>
@@ -466,35 +467,51 @@ function MovementRow({ m, cashBoxId, expanded, onToggle, canEdit, onEdit, onRemo
           )}
         </td>
       </tr>
-      {expanded && hasWithholdings && (
+      {expanded && (
         <tr className="border-b border-gray-100 bg-gray-50">
           <td colSpan={7} className="py-2 px-3">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-left text-gray-500">
-                  <th className="pr-2 py-1">{t('cashBoxes.movement.withholdingType')}</th>
-                  <th className="pr-2 py-1">{t('cashBoxes.movement.base')}</th>
-                  <th className="pr-2 py-1">{t('cashBoxes.movement.percent')}</th>
-                  <th className="pr-2 py-1">{t('cashBoxes.movement.value')}</th>
-                  <th className="pr-2 py-1">{t('cashBoxes.movement.recoverableStatus')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {m.withholdings.map((w) => (
-                  <tr key={w.id}>
-                    <td className="pr-2 py-1">{w.typeName}</td>
-                    <td className="pr-2 py-1">{money(w.base)}</td>
-                    <td className="pr-2 py-1">{Number(w.percent)}%</td>
-                    <td className="pr-2 py-1">{money(w.value)}</td>
-                    <td className="pr-2 py-1">
-                      {w.recoverable ? (w.returned ? t('cashBoxes.movement.returned') : t('cashBoxes.movement.pendingReturn')) : '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {m.grossAmount != null && (
-              <p className="text-xs text-gray-500 mt-1">{t('cashBoxes.movement.grossAmount')}: {money(m.grossAmount)}</p>
+            <div className="mb-3">
+              <h5 className="text-xs font-semibold text-gray-600 mb-1">{t('voucherSignature.title')}</h5>
+              <VoucherSignaturePanel
+                roles={SIGNATURE_ROLES}
+                api={{
+                  signatures: () => cashBoxesApi.movementSignatures(cashBoxId, m.id),
+                  sign: (role, data) => cashBoxesApi.signMovement(cashBoxId, m.id, role, data),
+                  requestSignature: (role, email) => cashBoxesApi.requestMovementSignature(cashBoxId, m.id, role, email),
+                }}
+                disabled={!!m.deletedAt}
+              />
+            </div>
+            {hasWithholdings && (
+              <>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-gray-500">
+                      <th className="pr-2 py-1">{t('cashBoxes.movement.withholdingType')}</th>
+                      <th className="pr-2 py-1">{t('cashBoxes.movement.base')}</th>
+                      <th className="pr-2 py-1">{t('cashBoxes.movement.percent')}</th>
+                      <th className="pr-2 py-1">{t('cashBoxes.movement.value')}</th>
+                      <th className="pr-2 py-1">{t('cashBoxes.movement.recoverableStatus')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {m.withholdings.map((w) => (
+                      <tr key={w.id}>
+                        <td className="pr-2 py-1">{w.typeName}</td>
+                        <td className="pr-2 py-1">{money(w.base)}</td>
+                        <td className="pr-2 py-1">{Number(w.percent)}%</td>
+                        <td className="pr-2 py-1">{money(w.value)}</td>
+                        <td className="pr-2 py-1">
+                          {w.recoverable ? (w.returned ? t('cashBoxes.movement.returned') : t('cashBoxes.movement.pendingReturn')) : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {m.grossAmount != null && (
+                  <p className="text-xs text-gray-500 mt-1">{t('cashBoxes.movement.grossAmount')}: {money(m.grossAmount)}</p>
+                )}
+              </>
             )}
           </td>
         </tr>

@@ -35,6 +35,9 @@ router.post('/scan', requirePermission('gastos', 'create'), scanUpload.single('f
 router.get('/', requirePermission('gastos', 'view'), expenseController.list);
 router.post('/', requirePermission('gastos', 'create'), uploadFiles, preventDuplicateSubmit, expenseController.create);
 router.get('/:id/pdf', requirePermission('gastos', 'view'), expenseController.exportReceiptPdf);
+router.get('/:id/signatures', requirePermission('gastos', 'view'), expenseController.listSignatures);
+router.post('/:id/signatures/:role', requirePermission('gastos', 'edit'), preventDuplicateSubmit, expenseController.signReceipt);
+router.post('/:id/signatures/:role/request', requirePermission('gastos', 'edit'), expenseController.requestReceiptSignature);
 router.put('/:id', requirePermission('gastos', 'edit'), uploadFiles, expenseController.update);
 router.delete('/:id', requirePermission('gastos', 'delete'), expenseController.remove);
 

@@ -7,6 +7,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import RegisterCompanyPage from './pages/RegisterCompanyPage';
 import ConfirmationPage from './pages/public/ConfirmationPage';
 import SignContractPage from './pages/public/SignContractPage';
+import SignVoucherPage from './pages/public/SignVoucherPage';
 import PlatformAdminLoginPage from './pages/platformAdmin/PlatformAdminLoginPage';
 import PlatformAdminDashboardPage from './pages/platformAdmin/PlatformAdminDashboardPage';
 import ProjectsListPage from './pages/ProjectsListPage';
@@ -73,6 +74,7 @@ export default function App() {
       <Route path="/register-company" element={<RegisterCompanyPage />} />
       <Route path="/confirm/:token" element={<ConfirmationPage />} />
       <Route path="/sign-contract/:token" element={<SignContractPage />} />
+      <Route path="/sign-voucher/:token" element={<SignVoucherPage />} />
       <Route path="/platform-admin/login" element={<PlatformAdminLoginPage />} />
       <Route path="/platform-admin" element={<PlatformAdminDashboardPage />} />
 

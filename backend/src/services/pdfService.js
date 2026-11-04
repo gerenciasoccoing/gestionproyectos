@@ -1522,21 +1522,59 @@ function drawReceiptLetterhead(doc, company, title) {
   doc.moveDown(1);
 }
 
-// Tres líneas de firma en blanco (para firmar a mano sobre el PDF impreso, no e-firma) — mismo
-// trazo "_______________________" + rol que ya usa generateContractPdf para su bloque de firmas,
-// pero sin nombre/cédula (acá no hay una persona concreta asociada a cada rol, solo el cargo).
-function drawSignatureLines(doc, roles) {
-  if (doc.y > 650) doc.addPage();
+// Línea de firma en blanco (para firmar a mano sobre el PDF impreso) por cada rol — mismo trazo
+// "_______________________" + rol que ya usa generateContractPdf para su bloque de firmas. Si el
+// rol YA tiene una firma digital registrada (ver voucherSignatureService.js: firmada dentro de la
+// app o por el enlace público), se dibuja la imagen de la firma + quién y cuándo en vez de la línea
+// en blanco — el comprobante sigue siendo UN solo PDF generado en vivo, nunca dos versiones.
+// `roles` es [{ role, label }]; `signaturesByRole` es un Map<role, { signerName, signaturePath,
+// signedAt }> (vacío si nadie firmó ningún rol todavía).
+function drawSignatureLines(doc, roles, signaturesByRole = new Map()) {
+  if (doc.y > 600) doc.addPage();
   doc.moveDown(2);
   const totalWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const colWidth = totalWidth / roles.length;
   const y = doc.y;
-  roles.forEach((role, i) => {
+  let blockHeight = 40;
+  roles.forEach(({ role, label }, i) => {
     const x = doc.page.margins.left + i * colWidth;
-    doc.fontSize(10).font('Helvetica').text('_______________________', x, y, { width: colWidth, align: 'center' });
-    doc.font('Helvetica-Bold').text(role, x, y + 16, { width: colWidth, align: 'center' });
+    const sig = signaturesByRole.get(role);
+    if (sig?.signaturePath) {
+      let colY = y;
+      const abs = path.join(UPLOAD_ROOT, sig.signaturePath);
+      try {
+        if (require('fs').existsSync(abs)) doc.image(abs, x + colWidth / 2 - 55, colY, { fit: [110, 45] });
+      } catch (e) { /* imagen de firma ilegible: se omite, el texto de certificación sigue siendo válido */ }
+      colY += 48;
+      doc.font('Helvetica-Bold').fontSize(10).text(label, x, colY, { width: colWidth, align: 'center' });
+      colY += 14;
+      doc.font('Helvetica').fontSize(9).text(sig.signerName || '-', x, colY, { width: colWidth, align: 'center' });
+      colY += 12;
+      doc.font('Helvetica').fontSize(7.5).fillColor('#555')
+        .text(`Firmado electrónicamente${sig.signedAt ? ` — ${new Date(sig.signedAt).toLocaleString('es-CO')}` : ''}`, x, colY, { width: colWidth, align: 'center' });
+      doc.fillColor('#000');
+      colY += 22;
+      blockHeight = Math.max(blockHeight, colY - y);
+    } else {
+      doc.fontSize(10).font('Helvetica').text('_______________________', x, y, { width: colWidth, align: 'center' });
+      doc.font('Helvetica-Bold').text(label, x, y + 16, { width: colWidth, align: 'center' });
+    }
   });
-  doc.y = y + 40;
+  doc.y = y + blockHeight;
+}
+
+// Sello diagonal semitransparente para un comprobante anulado (ver Expense.js/CashBoxMovement.js:
+// "anulado" = deletedAt, no un borrado real) — se superpone al final, sobre todo lo demás, para que
+// sea imposible no verlo sin tapar el contenido (opacity baja). Solo en la página donde se dibuja
+// (los comprobantes de este módulo nunca ocupan más de una), igual límite que el resto del archivo.
+function drawVoidStamp(doc) {
+  const { width, height } = doc.page;
+  doc.save();
+  doc.rotate(-30, { origin: [width / 2, height / 2] });
+  doc.fontSize(70).font('Helvetica-Bold').fillColor('#dc2626').opacity(0.25);
+  doc.text('ANULADO', 0, height / 2 - 35, { width, align: 'center' });
+  doc.restore();
+  doc.opacity(1).fillColor('#000');
 }
 
 // Comprobante de Egreso — se genera para CUALQUIER Expense recién creado, sin importar el punto de
@@ -1546,7 +1584,7 @@ function drawSignatureLines(doc, roles) {
 // hay ninguna copia cacheada del PDF que pueda quedar desincronizada, ver expenseController.js).
 // Cada fila de la tabla se omite si el dato no existe (ver la especificación: "cuando exista el
 // dato"), en vez de mostrar un "-" que no aporta nada en un comprobante formal.
-function generateExpenseReceiptPdf({ expense, company }) {
+function generateExpenseReceiptPdf({ expense, company, signatures = [] }) {
   const doc = new PDFDocument({ margin: 50 });
   const numberLabel = expense.expenseNumber
     ? `${expense.contractPrefix ? `${expense.contractPrefix}-` : ''}${expense.expenseNumber}`
@@ -1572,7 +1610,13 @@ function generateExpenseReceiptPdf({ expense, company }) {
   ].filter(Boolean);
 
   drawContractInfoTable(doc, rows);
-  drawSignatureLines(doc, ['Elaboró', 'Aprobó', 'Recibí conforme']);
+  const signaturesByRole = new Map(signatures.filter((s) => s.status === 'firmado').map((s) => [s.role, s]));
+  drawSignatureLines(doc, [
+    { role: 'elaboro', label: 'Elaboró' },
+    { role: 'aprobo', label: 'Aprobó' },
+    { role: 'recibi_conforme', label: 'Recibí conforme' },
+  ], signaturesByRole);
+  if (expense.deletedAt) drawVoidStamp(doc);
 
   doc.end();
   return doc;
@@ -1583,7 +1627,7 @@ function generateExpenseReceiptPdf({ expense, company }) {
 // persistido, nunca de una copia cacheada, así que un ingreso editado después produce un
 // comprobante con los datos actuales — pero SIEMPRE conserva su número (ver
 // cashBoxMovementService.js#createMovement, que nunca lo reasigna al editar).
-function generateCashIncomeReceiptPdf({ movement, company }) {
+function generateCashIncomeReceiptPdf({ movement, company, signatures = [] }) {
   const doc = new PDFDocument({ margin: 50 });
   const numberLabel = movement.incomeNumber
     ? `${movement.contractPrefix ? `${movement.contractPrefix}-` : ''}${movement.incomeNumber}`
@@ -1616,7 +1660,12 @@ function generateCashIncomeReceiptPdf({ movement, company }) {
     drawContractInfoTable(doc, whRows);
   }
 
-  drawSignatureLines(doc, ['Entregó', 'Recibió']);
+  const signaturesByRole = new Map(signatures.filter((s) => s.status === 'firmado').map((s) => [s.role, s]));
+  drawSignatureLines(doc, [
+    { role: 'entrego', label: 'Entregó' },
+    { role: 'recibio', label: 'Recibió' },
+  ], signaturesByRole);
+  if (movement.deletedAt) drawVoidStamp(doc);
 
   doc.end();
   return doc;

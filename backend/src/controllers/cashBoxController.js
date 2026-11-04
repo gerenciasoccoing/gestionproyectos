@@ -1,11 +1,12 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { CashBox, CashBoxMovement, CashBoxMovementWithholding, Project, User } = require('../models');
+const { CashBox, CashBoxMovement, CashBoxMovementWithholding, Project, User, VoucherSignature } = require('../models');
 const { getBalance, getBalancesForCashBoxes } = require('../services/cashBoxService');
 const { createMovement, updateMovement: updateMovementService, deleteMovement } = require('../services/cashBoxMovementService');
 const { relativePath } = require('../middleware/upload');
 const { getLetterheadForProject } = require('../services/letterheadService');
 const { generateCashIncomeReceiptPdf } = require('../services/pdfService');
+const voucherSignatureService = require('../services/voucherSignatureService');
 
 const MOVEMENT_INCLUDE = [
   { model: CashBoxMovementWithholding, as: 'withholdings' },
@@ -20,8 +21,11 @@ const list = asyncHandler(async (req, res) => {
 });
 
 const get = asyncHandler(async (req, res) => {
+  // paranoid:false en el include: un ingreso anulado (ver removeMovement) debe seguir viéndose en
+  // el historial de la caja, marcado como tal (deletedAt != null) — getBalance (sin paranoid:false)
+  // sí lo excluye del saldo, igual que balance/sumas del resto de la app.
   const cashBox = await CashBox.findByPk(req.params.id, {
-    include: [{ model: CashBoxMovement, as: 'movements', include: MOVEMENT_INCLUDE, order: [['date', 'DESC']] }],
+    include: [{ model: CashBoxMovement, as: 'movements', include: MOVEMENT_INCLUDE, order: [['date', 'DESC']], paranoid: false }],
   });
   if (!cashBox) throw new ApiError(404, 'Caja no encontrada');
   res.json({ ...cashBox.toJSON(), balance: await getBalance(cashBox.id) });
@@ -144,16 +148,68 @@ const removeMovement = asyncHandler(async (req, res) => {
 const exportMovementReceiptPdf = asyncHandler(async (req, res) => {
   const cashBox = await CashBox.findByPk(req.params.id);
   if (!cashBox) throw new ApiError(404, 'Caja no encontrada');
+  // paranoid:false: un ingreso anulado debe poder seguir viéndose (con el sello ANULADO) — es el
+  // comprobante que ya se había entregado, no algo que deba desaparecer al eliminarlo.
   const movement = await CashBoxMovement.findOne({
     where: { id: req.params.movementId, cashBoxId: cashBox.id },
     include: MOVEMENT_INCLUDE,
+    paranoid: false,
   });
   if (!movement) throw new ApiError(404, 'Ingreso no encontrado');
 
   const company = await getLetterheadForProject(movement.projectId);
-  const doc = generateCashIncomeReceiptPdf({ movement: { ...movement.toJSON(), CashBox: cashBox }, company });
+  const signatures = await VoucherSignature.findAll({ where: { voucherType: 'ingreso', voucherId: movement.id } });
+  const doc = generateCashIncomeReceiptPdf({
+    movement: { ...movement.toJSON(), CashBox: cashBox },
+    company,
+    signatures: signatures.map((s) => s.toJSON()),
+  });
   res.setHeader('Content-Type', 'application/pdf');
   doc.pipe(res);
 });
 
-module.exports = { list, get, create, update, setStatus, addMovement, updateMovement, removeMovement, exportMovementReceiptPdf };
+// Firma digital de un rol del comprobante de ingreso (ver voucherSignatureService.js): quien llama
+// ya está autenticado (p.ej. quien entregó o quien recibió el efectivo), así que firma de una vez,
+// sin enlace ni correo.
+const signMovementReceipt = asyncHandler(async (req, res) => {
+  const movement = await CashBoxMovement.findOne({ where: { id: req.params.movementId, cashBoxId: req.params.id } });
+  if (!movement) throw new ApiError(404, 'Ingreso no encontrado');
+  const signature = await voucherSignatureService.signInApp({
+    voucherType: 'ingreso',
+    voucherId: movement.id,
+    role: req.params.role,
+    signatureDataUrl: req.body.signatureDataUrl,
+    signerName: req.body.signerName,
+    userId: req.user.id,
+    ip: req.ip,
+    userAgent: req.headers['user-agent'],
+  });
+  res.json(signature);
+});
+
+// Estado de firma de cada rol (para la sección "Firmas" del historial de la caja).
+const listMovementSignatures = asyncHandler(async (req, res) => {
+  const movement = await CashBoxMovement.findOne({ where: { id: req.params.movementId, cashBoxId: req.params.id }, paranoid: false });
+  if (!movement) throw new ApiError(404, 'Ingreso no encontrado');
+  const signatures = await VoucherSignature.findAll({ where: { voucherType: 'ingreso', voucherId: movement.id } });
+  res.json(signatures);
+});
+
+// Genera (o regenera) el enlace público de firma de un rol y, si se dio un correo, lo envía.
+const requestMovementReceiptSignature = asyncHandler(async (req, res) => {
+  const movement = await CashBoxMovement.findOne({ where: { id: req.params.movementId, cashBoxId: req.params.id } });
+  if (!movement) throw new ApiError(404, 'Ingreso no encontrado');
+  const result = await voucherSignatureService.requestExternalSignature({
+    voucherType: 'ingreso',
+    voucherId: movement.id,
+    role: req.params.role,
+    email: req.body.email || null,
+    userId: req.user.id,
+  });
+  res.json(result);
+});
+
+module.exports = {
+  list, get, create, update, setStatus, addMovement, updateMovement, removeMovement, exportMovementReceiptPdf,
+  signMovementReceipt, requestMovementReceiptSignature, listMovementSignatures,
+};

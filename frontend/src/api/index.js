@@ -339,6 +339,12 @@ export const expensesApi = {
   // Comprobante de egreso — ver pdfService.js#generateExpenseReceiptPdf. Se genera en vivo en cada
   // vista, así que siempre refleja el dato actual del gasto (no hay nada que "regenerar" a mano).
   receiptPdfUrl: (pid, id) => pdfUrlWithToken(`/projects/${pid}/expenses/${id}/pdf`),
+  // Firma digital por rol (ver voucherSignatureService.js): signatures() trae el estado de cada
+  // rol; sign() firma dentro de la app (usuario ya autenticado); requestSignature() genera/reenvía
+  // el enlace público (y lo manda por correo si se da email) para que firme alguien sin cuenta.
+  signatures: (pid, id) => client.get(`/projects/${pid}/expenses/${id}/signatures`).then((r) => r.data),
+  sign: (pid, id, role, data) => client.post(`/projects/${pid}/expenses/${id}/signatures/${role}`, data).then((r) => r.data),
+  requestSignature: (pid, id, role, email) => client.post(`/projects/${pid}/expenses/${id}/signatures/${role}/request`, { email }).then((r) => r.data),
 };
 
 // Vista general de Gastos (sin proyecto fijo, ver backend/globalExpenseRoutes.js) — mismo modelo y
@@ -351,6 +357,9 @@ export const generalExpensesApi = {
   remove: (id) => client.delete(`/expenses/${id}`),
   scan: (formData) => client.post('/expenses/scan', formData).then((r) => r.data),
   receiptPdfUrl: (id) => pdfUrlWithToken(`/expenses/${id}/pdf`),
+  signatures: (id) => client.get(`/expenses/${id}/signatures`).then((r) => r.data),
+  sign: (id, role, data) => client.post(`/expenses/${id}/signatures/${role}`, data).then((r) => r.data),
+  requestSignature: (id, role, email) => client.post(`/expenses/${id}/signatures/${role}/request`, { email }).then((r) => r.data),
 };
 
 export const cashBoxesApi = {
@@ -367,6 +376,18 @@ export const cashBoxesApi = {
   // Comprobante de ingreso — ver pdfService.js#generateCashIncomeReceiptPdf. También se usa desde
   // "Pagos al proyecto" (ProjectPaymentsPage.jsx): un pago ahí ES un CashBoxMovement, mismo id.
   movementReceiptPdfUrl: (id, movementId) => pdfUrlWithToken(`/cash-boxes/${id}/movements/${movementId}/pdf`),
+  movementSignatures: (id, movementId) => client.get(`/cash-boxes/${id}/movements/${movementId}/signatures`).then((r) => r.data),
+  signMovement: (id, movementId, role, data) => client.post(`/cash-boxes/${id}/movements/${movementId}/signatures/${role}`, data).then((r) => r.data),
+  requestMovementSignature: (id, movementId, role, email) => client.post(`/cash-boxes/${id}/movements/${movementId}/signatures/${role}/request`, { email }).then((r) => r.data),
+};
+
+// Flujo PÚBLICO de firma digital de comprobantes de egreso/ingreso (sin sesión, ver
+// voucherSignatureRoutes.js) — mismo criterio que contractSignatureApi: el token largo de la URL es
+// la autenticación.
+export const voucherSignatureApi = {
+  get: (token) => client.get(`/voucher-signature/${token}`).then((r) => r.data),
+  documentUrl: (token) => `${(import.meta.env.VITE_API_URL || 'http://localhost:4000/api')}/voucher-signature/${token}/document`,
+  sign: (token, data) => client.post(`/voucher-signature/${token}`, data).then((r) => r.data),
 };
 
 export const withholdingTypesApi = {

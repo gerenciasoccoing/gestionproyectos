@@ -3,7 +3,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const {
   sequelize, Expense, ExpenseItem, ExpenseTax, ExpenseBudget, Project, CashBox, ThirdParty, PurchaseOrderPayment,
-  AdminExpenseCategory, Employee,
+  AdminExpenseCategory, Employee, VoucherSignature,
 } = require('../models');
 const { relativePath } = require('../middleware/upload');
 const { scanInvoice } = require('../services/invoiceScanService');
@@ -13,6 +13,7 @@ const { getExtractor } = require('../config/aiDocumentExtractors');
 const { nextExpenseNumber, contractPrefixForProject } = require('../services/numberingService');
 const { getLetterheadForProject } = require('../services/letterheadService');
 const { generateExpenseReceiptPdf } = require('../services/pdfService');
+const voucherSignatureService = require('../services/voucherSignatureService');
 
 // Estos controladores atienden DOS montajes de ruta: el anidado en proyecto
 // (/projects/:projectId/expenses, ver expenseRoutes.js — comportamiento sin cambios) y el global
@@ -28,7 +29,7 @@ const EXPENSE_INCLUDE = [
   { model: ExpenseTax, as: 'taxes' },
   { model: Project, attributes: ['id', 'name'] },
   { model: CashBox, attributes: ['id', 'name'] },
-  { model: ThirdParty, as: 'supplierParty', attributes: ['id', 'name'] },
+  { model: ThirdParty, as: 'supplierParty', attributes: ['id', 'name', 'email'] },
   { model: AdminExpenseCategory, as: 'adminCategory', attributes: ['id', 'name'] },
   { model: Employee, attributes: ['id', 'name'] },
 ];
@@ -119,7 +120,10 @@ const list = asyncHandler(async (req, res) => {
     if (from) where.date[Op.gte] = from;
     if (to) where.date[Op.lte] = to;
   }
-  const expenses = await Expense.findAll({ where, include: EXPENSE_INCLUDE, order: [['date', 'DESC']] });
+  // paranoid:false: un gasto anulado (ver remove, más abajo) debe seguir viéndose en el listado,
+  // marcado como tal (deletedAt != null, ver ExpensesPage.jsx) — solo se excluye automáticamente de
+  // sumas/balances/reportes (esos sí dejan el paranoid por defecto, ver cashBoxService.js, etc).
+  const expenses = await Expense.findAll({ where, include: EXPENSE_INCLUDE, order: [['date', 'DESC']], paranoid: false });
 
   // Abonos de la Orden de Compra de origen (ver purchaseOrderController.addPayment): nunca se
   // mueven ni se duplican al convertir a gasto, quedan trazables por Expense.sourceId = order.id.
@@ -390,14 +394,65 @@ const summary = asyncHandler(async (req, res) => {
 // de "regenerar" nada a mano, y si la generación fallara en algún momento el gasto en sí nunca
 // estuvo en riesgo (se creó en su propia transacción, mucho antes de que alguien pida verlo).
 const exportReceiptPdf = asyncHandler(async (req, res) => {
-  const expense = await Expense.findOne({ where: scopeWhere(req), include: EXPENSE_INCLUDE });
+  // paranoid:false: un gasto anulado debe poder seguir viéndose (con el sello ANULADO, ver
+  // pdfService.js#drawVoidStamp) — es el comprobante que ya se había entregado, no algo que deba
+  // desaparecer solo porque el gasto se eliminó.
+  const expense = await Expense.findOne({ where: scopeWhere(req), include: EXPENSE_INCLUDE, paranoid: false });
   if (!expense) throw new ApiError(404, 'Gasto no encontrado');
   if (expense.expenseType === 'administrativo') assertCanManageAdminExpense(req, 'view');
 
   const company = await getLetterheadForProject(expense.projectId);
-  const doc = generateExpenseReceiptPdf({ expense, company });
+  const signatures = await VoucherSignature.findAll({ where: { voucherType: 'gasto', voucherId: expense.id } });
+  const doc = generateExpenseReceiptPdf({ expense, company, signatures: signatures.map((s) => s.toJSON()) });
   res.setHeader('Content-Type', 'application/pdf');
   doc.pipe(res);
 });
 
-module.exports = { list, create, update, remove, setBudget, summary, scan, exportReceiptPdf };
+// Firma digital de un rol del comprobante (ver voucherSignatureService.js): quien llama ya está
+// autenticado, así que firma de una vez, sin enlace ni correo — mismo permiso de edición que
+// actualizar el gasto, ya que firmar es parte de aprobarlo/registrar su entrega.
+const signReceipt = asyncHandler(async (req, res) => {
+  const expense = await Expense.findOne({ where: scopeWhere(req) });
+  if (!expense) throw new ApiError(404, 'Gasto no encontrado');
+  const signature = await voucherSignatureService.signInApp({
+    voucherType: 'gasto',
+    voucherId: expense.id,
+    role: req.params.role,
+    signatureDataUrl: req.body.signatureDataUrl,
+    signerName: req.body.signerName,
+    userId: req.user.id,
+    ip: req.ip,
+    userAgent: req.headers['user-agent'],
+  });
+  res.json(signature);
+});
+
+// Estado de firma de cada rol (para la sección "Firmas" del detalle de un gasto) — sin la imagen,
+// solo lo que la UI necesita para mostrar pendiente/firmado y ofrecer las acciones correspondientes.
+const listSignatures = asyncHandler(async (req, res) => {
+  const expense = await Expense.findOne({ where: scopeWhere(req), paranoid: false });
+  if (!expense) throw new ApiError(404, 'Gasto no encontrado');
+  const signatures = await VoucherSignature.findAll({ where: { voucherType: 'gasto', voucherId: expense.id } });
+  res.json(signatures);
+});
+
+// Genera (o regenera) el enlace público de firma de un rol y, si se dio un correo, lo envía — para
+// que firme alguien sin cuenta en la plataforma (p. ej. el proveedor/beneficiario de "Recibí
+// conforme"). Devuelve siempre signUrl para poder copiarlo a mano aunque el correo falle.
+const requestReceiptSignature = asyncHandler(async (req, res) => {
+  const expense = await Expense.findOne({ where: scopeWhere(req) });
+  if (!expense) throw new ApiError(404, 'Gasto no encontrado');
+  const result = await voucherSignatureService.requestExternalSignature({
+    voucherType: 'gasto',
+    voucherId: expense.id,
+    role: req.params.role,
+    email: req.body.email || null,
+    userId: req.user.id,
+  });
+  res.json(result);
+});
+
+module.exports = {
+  list, create, update, remove, setBudget, summary, scan, exportReceiptPdf, signReceipt, requestReceiptSignature,
+  listSignatures,
+};

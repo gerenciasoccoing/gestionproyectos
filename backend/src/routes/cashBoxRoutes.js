@@ -19,5 +19,8 @@ router.post('/:id/movements', requirePermission('cajas', 'edit'), uploadSupport.
 router.put('/:id/movements/:movementId', requirePermission('cajas', 'edit'), uploadSupport.single('support'), cashBoxController.updateMovement);
 router.delete('/:id/movements/:movementId', requirePermission('cajas', 'edit'), cashBoxController.removeMovement);
 router.get('/:id/movements/:movementId/pdf', requirePermission('cajas', 'view'), cashBoxController.exportMovementReceiptPdf);
+router.get('/:id/movements/:movementId/signatures', requirePermission('cajas', 'view'), cashBoxController.listMovementSignatures);
+router.post('/:id/movements/:movementId/signatures/:role', requirePermission('cajas', 'edit'), preventDuplicateSubmit, cashBoxController.signMovementReceipt);
+router.post('/:id/movements/:movementId/signatures/:role/request', requirePermission('cajas', 'edit'), cashBoxController.requestMovementReceiptSignature);
 
 module.exports = router;

@@ -89,6 +89,22 @@ async function sendContractSignatureEmail({ to, employeeName, documentLabel, pro
   return sendEmail({ to, subject: `Firma tu ${documentLabel} — ${projectName}`, html, text });
 }
 
+// Aviso de que hay un comprobante (de egreso o de ingreso) para firmar digitalmente (ver
+// voucherSignatureService.js#requestExternalSignature) — mismo criterio que
+// sendContractSignatureEmail: el link con token largo y de un solo uso ES la autenticación, sin
+// cuenta ni contraseña.
+async function sendVoucherSignatureEmail({ to, roleLabel, voucherLabel, signUrl }) {
+  const html = wrapHtml('Tienes un comprobante para firmar', `
+    <p style="color:#526082;font-size:14px;line-height:1.6;">Tienes un ${voucherLabel} listo para tu firma como "${roleLabel}".</p>
+    <p style="text-align:center;margin:28px 0;">
+      <a href="${signUrl}" style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Revisar y firmar</a>
+    </p>
+    <p style="color:#8792ab;font-size:12.5px;line-height:1.6;">Este enlace vence en 7 días.</p>
+  `);
+  const text = `Tienes un ${voucherLabel} listo para tu firma como "${roleLabel}".\n\nRevisar y firmar: ${signUrl}\n\nEste enlace vence en 7 días.`;
+  return sendEmail({ to, subject: `Firma el ${voucherLabel}`, html, text });
+}
+
 async function sendCompanyRejectedEmail({ to, companyName, reason }) {
   const html = wrapHtml('Tu solicitud no fue aprobada', `
     <p style="color:#526082;font-size:14px;line-height:1.6;">
@@ -103,4 +119,5 @@ async function sendCompanyRejectedEmail({ to, companyName, reason }) {
 
 module.exports = {
   sendEmail, sendPasswordResetEmail, sendCompanyRequestNotification, sendCompanyRejectedEmail, sendContractSignatureEmail,
+  sendVoucherSignatureEmail,
 };

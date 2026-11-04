@@ -28,6 +28,7 @@ router.use('/employee-contract-types', require('./employeeContractTypeRoutes'));
 router.use('/social-security-providers', require('./socialSecurityProviderRoutes'));
 router.use('/register-company', require('./companyRegistrationRoutes'));
 router.use('/contract-signature', require('./contractSignatureRoutes'));
+router.use('/voucher-signature', require('./voucherSignatureRoutes'));
 
 router.use('/projects', require('./projectRoutes'));
 router.use('/projects/:projectId/contracts', require('./contractRoutes'));

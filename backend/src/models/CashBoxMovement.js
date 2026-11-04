@@ -46,6 +46,12 @@ module.exports = (sequelize) => {
     // ingreso no tiene proyecto asociado o el proyecto no tiene número de contrato (mismo criterio
     // que Expense.contractPrefix).
     contractPrefix: { type: DataTypes.STRING(3), allowNull: true },
+  }, {
+    // Mismo criterio que Expense.js: eliminar un ingreso lo marca "anulado" (deletedAt) en vez de
+    // borrarlo — queda excluido automáticamente del balance de caja y de "Pagos al proyecto", pero
+    // conserva su incomeNumber y sigue pudiendo verse (marcado ANULADO) desde el historial de la
+    // caja (ver cashBoxController.js, que pasa paranoid:false en los puntos donde corresponde).
+    paranoid: true,
   });
 
   CashBoxMovement.associate = (models) => {

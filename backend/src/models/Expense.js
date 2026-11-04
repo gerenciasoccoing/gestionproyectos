@@ -67,6 +67,13 @@ module.exports = (sequelize) => {
     // proyecto no tenía número de contrato asignado en ese momento, o si el gasto no tiene proyecto.
     expenseNumber: { type: DataTypes.INTEGER, allowNull: true },
     contractPrefix: { type: DataTypes.STRING(3), allowNull: true },
+  }, {
+    // Al eliminar un gasto, en vez de borrar la fila, Sequelize pone deletedAt (paranoid) —
+    // "anulado". Esto excluye automáticamente al gasto de TODOS los findAll/sum existentes
+    // (balance de caja, presupuesto, reportes, EVM...) sin tocar ese código, y conserva el
+    // comprobante y su expenseNumber para trazabilidad (ver expenseController.js#remove/
+    // exportReceiptPdf, que sí pasan paranoid:false para poder seguir viéndolo marcado ANULADO).
+    paranoid: true,
   });
 
   Expense.associate = (models) => {

@@ -34,12 +34,18 @@ const scanUpload = multer({
 
 router.use(authenticate);
 
-const byIdParam = async (req) => Expense.findByPk(req.params.id);
+// paranoid:false: un gasto anulado debe poder seguir resolviéndose acá (ver pdf/signatures/update/
+// remove más abajo, que SÍ necesitan encontrarlo igual estando anulado) — sin esto, este chequeo de
+// acceso lo trataría como inexistente (404) antes de que el controlador alcance a decidir nada.
+const byIdParam = async (req) => Expense.findByPk(req.params.id, { paranoid: false });
 
 router.get('/', requirePermission('gastos', 'view'), expenseController.list);
 router.post('/', requirePermission('gastos', 'create'), uploadFiles, preventDuplicateSubmit, expenseController.create);
 router.post('/scan', requirePermission('gastos', 'create'), scanUpload.single('file'), expenseController.scan);
 router.get('/:id/pdf', requirePermission('gastos', 'view'), requireOptionalProjectAccess(byIdParam), expenseController.exportReceiptPdf);
+router.get('/:id/signatures', requirePermission('gastos', 'view'), requireOptionalProjectAccess(byIdParam), expenseController.listSignatures);
+router.post('/:id/signatures/:role', requirePermission('gastos', 'edit'), requireOptionalProjectAccess(byIdParam), preventDuplicateSubmit, expenseController.signReceipt);
+router.post('/:id/signatures/:role/request', requirePermission('gastos', 'edit'), requireOptionalProjectAccess(byIdParam), expenseController.requestReceiptSignature);
 router.put('/:id', requirePermission('gastos', 'edit'), requireOptionalProjectAccess(byIdParam), uploadFiles, expenseController.update);
 router.delete('/:id', requirePermission('gastos', 'delete'), requireOptionalProjectAccess(byIdParam), expenseController.remove);
 

@@ -6,6 +6,13 @@ import { Card, Button, Input, Select, SearchSelect, TextArea, Table, Badge, Erro
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
 import useSubmitGuard from '../../hooks/useSubmitGuard';
+import VoucherSignaturePanel from '../../components/VoucherSignaturePanel';
+
+const SIGNATURE_ROLES = [
+  { role: 'elaboro', label: 'Elaboró' },
+  { role: 'aprobo', label: 'Aprobó' },
+  { role: 'recibi_conforme', label: 'Recibí conforme' },
+];
 
 const CATEGORIES = ['mano_obra', 'materiales', 'equipos', 'viaticos', 'imprevistos'];
 const emptyForm = {
@@ -43,6 +50,9 @@ export default function ExpensesPage() {
       remove: (id) => generalExpensesApi.remove(id),
       scan: (fd) => generalExpensesApi.scan(fd),
       receiptPdfUrl: (id) => generalExpensesApi.receiptPdfUrl(id),
+      signatures: (id) => generalExpensesApi.signatures(id),
+      sign: (id, role, data) => generalExpensesApi.sign(id, role, data),
+      requestSignature: (id, role, email) => generalExpensesApi.requestSignature(id, role, email),
     }
     : {
       list: () => expensesApi.list(projectId),
@@ -51,6 +61,9 @@ export default function ExpensesPage() {
       remove: (id) => expensesApi.remove(projectId, id),
       scan: (fd) => expensesApi.scan(projectId, fd),
       receiptPdfUrl: (id) => expensesApi.receiptPdfUrl(projectId, id),
+      signatures: (id) => expensesApi.signatures(projectId, id),
+      sign: (id, role, data) => expensesApi.sign(projectId, id, role, data),
+      requestSignature: (id, role, email) => expensesApi.requestSignature(projectId, id, role, email),
     };
 
   const [expenses, setExpenses] = useState([]);
@@ -462,7 +475,7 @@ export default function ExpensesPage() {
             <Fragment key={e.id}>
               <tr className="border-b border-gray-100">
                 <td className="py-1 pr-3 text-gray-400 font-mono text-xs">{e.expenseNumber ? `${e.contractPrefix ? `${e.contractPrefix}-` : ''}${e.expenseNumber}` : '-'}</td>
-                <td className="py-1 pr-3">{formatDate(e.date)}</td>
+                <td className="py-1 pr-3">{formatDate(e.date)}{e.deletedAt && <Badge color="red">{t('expenses.voided')}</Badge>}</td>
                 <td className="py-1 pr-3">{e.expenseType === 'administrativo' ? (e.adminCategory?.name || '-') : LABELS[e.category]}</td>
                 <td className="py-1 pr-3">{e.vendorName || '-'}</td>
                 {isGeneral && (
@@ -476,13 +489,11 @@ export default function ExpensesPage() {
                   </>
                 )}
                 <td className="py-1 pr-3">
-                  {(e.items?.length || e.taxes?.length || e.vendorNit || e.vendorPhone || e.vendorEmail || e.description) ? (
-                    <button type="button" className="text-blue-600 hover:underline text-xs" onClick={() => setExpandedId(expandedId === e.id ? null : e.id)}>
-                      {expandedId === e.id ? t('expenses.hideDetail') : t('expenses.viewDetail', { count: e.items?.length || 0 })}
-                    </button>
-                  ) : '-'}
+                  <button type="button" className="text-blue-600 hover:underline text-xs" onClick={() => setExpandedId(expandedId === e.id ? null : e.id)}>
+                    {expandedId === e.id ? t('expenses.hideDetail') : t('expenses.viewDetail', { count: e.items?.length || 0 })}
+                  </button>
                 </td>
-                <td className="py-1 pr-3">{money(e.amount)}</td>
+                <td className={`py-1 pr-3 ${e.deletedAt ? 'line-through text-gray-400' : ''}`}>{money(e.amount)}</td>
                 <td className="py-1 pr-3 text-xs text-gray-500">
                   {t(`expenses.sources.${e.source}`, e.source === 'manual' ? 'Manual' : e.source)}
                 </td>
@@ -508,7 +519,7 @@ export default function ExpensesPage() {
                   <a className="text-blue-600 hover:underline" href={api.receiptPdfUrl(e.id)} target="_blank" rel="noreferrer">{t('common.view')}</a>
                 </td>
                 <td className="py-1 pr-3 text-right">
-                  {e.source === 'manual' && (
+                  {e.source === 'manual' && !e.deletedAt && (
                     <Can module={e.expenseType === 'administrativo' ? 'gastos_admin' : 'gastos'} action="delete"><Button variant="danger" onClick={() => remove(e.id)}>{t('common.delete')}</Button></Can>
                   )}
                 </td>
@@ -521,6 +532,19 @@ export default function ExpensesPage() {
                       {e.vendorPhone && <span>{t('expenses.phone')}: {e.vendorPhone}</span>}
                       {e.vendorEmail && <span>{t('expenses.email')}: {e.vendorEmail}</span>}
                       {e.description && <span>{t('expenses.notesLabel')}: {e.description}</span>}
+                    </div>
+                    <div className="mb-3">
+                      <h5 className="text-xs font-semibold text-gray-600 mb-1">{t('voucherSignature.title')}</h5>
+                      <VoucherSignaturePanel
+                        roles={SIGNATURE_ROLES}
+                        api={{
+                          signatures: () => api.signatures(e.id),
+                          sign: (role, data) => api.sign(e.id, role, data),
+                          requestSignature: (role, email) => api.requestSignature(e.id, role, email),
+                        }}
+                        disabled={!!e.deletedAt}
+                        defaultEmail={e.supplierParty?.email || e.vendorEmail || ''}
+                      />
                     </div>
                     {e.items?.length > 0 && (
                       <Table columns={[t('expenses.itemsTable.description'), t('expenses.itemsTable.quantity'), t('expenses.itemsTable.unitValue'), t('expenses.itemsTable.total')]}>
