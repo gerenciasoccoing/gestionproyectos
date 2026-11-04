@@ -406,11 +406,12 @@ function CashBoxMovements({ cashBoxId, onChange }) {
         </div>
       )}
 
-      <Table columns={[t('cashBoxes.table.date'), t('cashBoxes.table.concept'), t('cashBoxes.movement.project'), t('cashBoxes.table.amount'), t('cashBoxes.movement.support'), '']}>
+      <Table columns={[t('cashBoxes.table.date'), t('cashBoxes.table.concept'), t('cashBoxes.movement.project'), t('cashBoxes.table.amount'), t('cashBoxes.movement.support'), t('cashBoxes.movement.voucher'), '']}>
         {visibleMovements.map((m) => (
           <MovementRow
             key={m.id}
             m={m}
+            cashBoxId={cashBox.id}
             expanded={expandedMovementId === m.id}
             onToggle={() => setExpandedMovementId(expandedMovementId === m.id ? null : m.id)}
             canEdit={canEdit}
@@ -418,13 +419,13 @@ function CashBoxMovements({ cashBoxId, onChange }) {
             onRemove={() => removeMovement(m)}
           />
         ))}
-        {visibleMovements.length === 0 && <tr><td colSpan={6} className="py-3 text-center text-gray-400">{t('cashBoxes.noMovements')}</td></tr>}
+        {visibleMovements.length === 0 && <tr><td colSpan={7} className="py-3 text-center text-gray-400">{t('cashBoxes.noMovements')}</td></tr>}
       </Table>
     </Card>
   );
 }
 
-function MovementRow({ m, expanded, onToggle, canEdit, onEdit, onRemove }) {
+function MovementRow({ m, cashBoxId, expanded, onToggle, canEdit, onEdit, onRemove }) {
   const { t } = useTranslation();
   const hasWithholdings = m.withholdings && m.withholdings.length > 0;
   return (
@@ -453,6 +454,9 @@ function MovementRow({ m, expanded, onToggle, canEdit, onEdit, onRemove }) {
             <a href={fileUrl(m.supportFilePath)} target="_blank" rel="noreferrer" title={t('cashBoxes.movement.viewCurrentSupport')}>📎</a>
           ) : '-'}
         </td>
+        <td className="py-1 pr-3">
+          <a className="text-blue-600 hover:underline" href={cashBoxesApi.movementReceiptPdfUrl(cashBoxId, m.id)} target="_blank" rel="noreferrer">{t('common.view')}</a>
+        </td>
         <td className="py-1 pr-3 text-right whitespace-nowrap">
           {canEdit && (
             <Can module="cajas" action="edit">
@@ -464,7 +468,7 @@ function MovementRow({ m, expanded, onToggle, canEdit, onEdit, onRemove }) {
       </tr>
       {expanded && hasWithholdings && (
         <tr className="border-b border-gray-100 bg-gray-50">
-          <td colSpan={6} className="py-2 px-3">
+          <td colSpan={7} className="py-2 px-3">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-gray-500">

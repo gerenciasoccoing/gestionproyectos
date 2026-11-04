@@ -1,5 +1,6 @@
 const ApiError = require('../utils/ApiError');
 const { sequelize, CashBoxMovement, CashBoxMovementWithholding, WithholdingType } = require('../models');
+const { nextIncomeNumber, contractPrefixForProject } = require('./numberingService');
 
 // Redondeo a pesos (sin centavos, criterio del negocio para este dinero) evitando el error clásico
 // de coma flotante de JS (0.1+0.2): siempre se calcula sobre el valor YA multiplicado por 100
@@ -126,6 +127,10 @@ async function createMovement({ cashBoxId, body, userId }) {
   if (!financials.isWithholdingReturn && (!concept || !concept.trim())) throw new ApiError(400, 'concept es obligatorio');
 
   return sequelize.transaction(async (transaction) => {
+    // Número de comprobante de ingreso: asignado SOLO acá (createMovement), nunca en
+    // updateMovement — ver el comentario de incomeNumber en CashBoxMovement.js.
+    const incomeNumber = await nextIncomeNumber(transaction);
+    const contractPrefix = await contractPrefixForProject(financials.projectId, transaction);
     const movement = await CashBoxMovement.create({
       cashBoxId,
       amount: financials.amount,
@@ -137,6 +142,8 @@ async function createMovement({ cashBoxId, body, userId }) {
       isWithholdingReturn: financials.isWithholdingReturn,
       returnsWithholdingId: financials.isWithholdingReturn ? financials.returnsWithholdingId : null,
       createdBy: userId,
+      incomeNumber,
+      contractPrefix,
     }, { transaction });
 
     if (financials.isWithholdingReturn) {

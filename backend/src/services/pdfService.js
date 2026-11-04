@@ -1,6 +1,7 @@
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const { UPLOAD_ROOT } = require('../middleware/upload');
+const { moneyToWords } = require('../utils/numberToWords');
 
 function money(n) {
   return `$ ${Number(n || 0).toLocaleString('es-CO', { maximumFractionDigits: 2 })}`;
@@ -1499,7 +1500,130 @@ function generateAdminExpenseReportPdf({ report, filters, company }) {
   return doc;
 }
 
+// Encabezado de membrete compartido por los dos comprobantes de abajo — mismo layout (logo +
+// nombre/NIT/dirección/teléfono a coordenadas fijas) que ya usan generateContractPdf y
+// generateLaborCalculationPdf, repetido acá en vez de extraído a un helper común para no tocar esos
+// generadores ya probados (ver el criterio de la tarea: no cambiar otros módulos si no hace falta).
+function drawReceiptLetterhead(doc, company, title) {
+  if (company && company.logoPath && require('fs').existsSync(company.logoPath)) {
+    try {
+      doc.image(company.logoPath, 50, 45, { width: 90 });
+    } catch (e) { /* si el logo no puede leerse, se omite sin romper la generación */ }
+  }
+  doc.fontSize(16).font('Helvetica-Bold').text(company ? company.companyName : 'Empresa', 160, 50);
+  doc.fontSize(9).font('Helvetica').fillColor('#555')
+    .text(company?.nit ? `NIT: ${company.nit}` : '', 160, 70)
+    .text(company?.address || '', 160, 84)
+    .text(company?.phone || '', 160, 98);
+  doc.fillColor('#000');
+
+  doc.moveDown(3);
+  doc.fontSize(15).font('Helvetica-Bold').text(title, { align: 'center' });
+  doc.moveDown(1);
+}
+
+// Tres líneas de firma en blanco (para firmar a mano sobre el PDF impreso, no e-firma) — mismo
+// trazo "_______________________" + rol que ya usa generateContractPdf para su bloque de firmas,
+// pero sin nombre/cédula (acá no hay una persona concreta asociada a cada rol, solo el cargo).
+function drawSignatureLines(doc, roles) {
+  if (doc.y > 650) doc.addPage();
+  doc.moveDown(2);
+  const totalWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const colWidth = totalWidth / roles.length;
+  const y = doc.y;
+  roles.forEach((role, i) => {
+    const x = doc.page.margins.left + i * colWidth;
+    doc.fontSize(10).font('Helvetica').text('_______________________', x, y, { width: colWidth, align: 'center' });
+    doc.font('Helvetica-Bold').text(role, x, y + 16, { width: colWidth, align: 'center' });
+  });
+  doc.y = y + 40;
+}
+
+// Comprobante de Egreso — se genera para CUALQUIER Expense recién creado, sin importar el punto de
+// entrada (gastos.js#create, "Pasar a Gastos" en Órdenes de Compra, nómina/liquidación de personal
+// administrativo): todos pasan por acá con los mismos datos ya persistidos en el registro, nunca
+// recalculados — así que un gasto editado después siempre produce un comprobante actualizado (no
+// hay ninguna copia cacheada del PDF que pueda quedar desincronizada, ver expenseController.js).
+// Cada fila de la tabla se omite si el dato no existe (ver la especificación: "cuando exista el
+// dato"), en vez de mostrar un "-" que no aporta nada en un comprobante formal.
+function generateExpenseReceiptPdf({ expense, company }) {
+  const doc = new PDFDocument({ margin: 50 });
+  const numberLabel = expense.expenseNumber
+    ? `${expense.contractPrefix ? `${expense.contractPrefix}-` : ''}${expense.expenseNumber}`
+    : expense.id.slice(0, 8).toUpperCase();
+  drawReceiptLetterhead(doc, company, `COMPROBANTE DE EGRESO No. ${numberLabel}`);
+
+  const beneficiary = expense.supplierParty?.name || expense.vendorName;
+  const categoryLabel = expense.expenseType === 'administrativo'
+    ? (expense.adminCategory?.name || null)
+    : (CATEGORY_LABELS_ES[expense.category] || expense.category || null);
+
+  const rows = [
+    { label: 'Fecha', value: expense.date },
+    beneficiary && { label: 'Beneficiario / Proveedor', value: beneficiary },
+    expense.vendorNit && { label: 'NIT', value: expense.vendorNit },
+    expense.description && { label: 'Concepto', value: expense.description },
+    categoryLabel && { label: 'Categoría', value: categoryLabel },
+    { label: 'Valor', value: money(expense.amount) },
+    { label: 'Valor en letras', value: moneyToWords(expense.amount) },
+    expense.CashBox?.name && { label: 'Caja de origen', value: expense.CashBox.name },
+    expense.Project?.name && { label: 'Proyecto', value: expense.Project.name },
+    expense.Project?.contractNumber && { label: 'No. de contrato', value: expense.Project.contractNumber },
+  ].filter(Boolean);
+
+  drawContractInfoTable(doc, rows);
+  drawSignatureLines(doc, ['Elaboró', 'Aprobó', 'Recibí conforme']);
+
+  doc.end();
+  return doc;
+}
+
+// Comprobante de Ingreso — se genera para CUALQUIER CashBoxMovement recién creado (ver
+// cashBoxController.js#addMovement). Mismo criterio que el de egreso: lee del registro ya
+// persistido, nunca de una copia cacheada, así que un ingreso editado después produce un
+// comprobante con los datos actuales — pero SIEMPRE conserva su número (ver
+// cashBoxMovementService.js#createMovement, que nunca lo reasigna al editar).
+function generateCashIncomeReceiptPdf({ movement, company }) {
+  const doc = new PDFDocument({ margin: 50 });
+  const numberLabel = movement.incomeNumber
+    ? `${movement.contractPrefix ? `${movement.contractPrefix}-` : ''}${movement.incomeNumber}`
+    : movement.id.slice(0, 8).toUpperCase();
+  drawReceiptLetterhead(doc, company, `COMPROBANTE DE INGRESO No. ${numberLabel}`);
+
+  const gross = movement.grossAmount != null ? Number(movement.grossAmount) : Number(movement.amount);
+  const hasWithholdings = gross !== Number(movement.amount);
+
+  const rows = [
+    { label: 'Fecha', value: movement.date },
+    movement.CashBox?.name && { label: 'Caja de destino', value: movement.CashBox.name },
+    { label: 'Concepto', value: movement.concept },
+    hasWithholdings && { label: 'Valor bruto', value: money(gross) },
+    { label: hasWithholdings ? 'Valor neto' : 'Valor', value: money(movement.amount) },
+    { label: 'Valor en letras', value: moneyToWords(movement.amount) },
+    movement.User?.name && { label: 'Registrado por', value: movement.User.name },
+    movement.Project?.name && { label: 'Proyecto', value: movement.Project.name },
+    movement.Project?.contractNumber && { label: 'No. de contrato', value: movement.Project.contractNumber },
+  ].filter(Boolean);
+
+  drawContractInfoTable(doc, rows);
+
+  if (movement.withholdings?.length) {
+    sectionTitle(doc, 'Retenciones registradas');
+    const whRows = movement.withholdings.map((w) => ({
+      label: w.typeName,
+      value: `Base ${money(w.base)} × ${Number(w.percent)}% = ${money(w.value)}${w.recoverable ? (w.returned ? ' (devuelta)' : ' (recuperable, pendiente)') : ''}`,
+    }));
+    drawContractInfoTable(doc, whRows);
+  }
+
+  drawSignatureLines(doc, ['Entregó', 'Recibió']);
+
+  doc.end();
+  return doc;
+}
+
 module.exports = {
   generateProjectReportPdf, generateQuotationPdf, generateApuPdf, generateBudgetWithApuAnnexPdf, generatePurchaseOrderPdf, generateContractPdf, generateLaborCalculationPdf,
   generateClientReportPdf, generateInternalReportPdf, generateResourceConsolidationPdf, generateSchedulePdf, generateProjectPaymentsPdf, generateAdminExpenseReportPdf, money,
+  generateExpenseReceiptPdf, generateCashIncomeReceiptPdf,
 };

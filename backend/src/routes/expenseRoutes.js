@@ -34,6 +34,7 @@ router.post('/budget', requirePermission('gastos', 'edit'), expenseController.se
 router.post('/scan', requirePermission('gastos', 'create'), scanUpload.single('file'), expenseController.scan);
 router.get('/', requirePermission('gastos', 'view'), expenseController.list);
 router.post('/', requirePermission('gastos', 'create'), uploadFiles, preventDuplicateSubmit, expenseController.create);
+router.get('/:id/pdf', requirePermission('gastos', 'view'), expenseController.exportReceiptPdf);
 router.put('/:id', requirePermission('gastos', 'edit'), uploadFiles, expenseController.update);
 router.delete('/:id', requirePermission('gastos', 'delete'), expenseController.remove);
 

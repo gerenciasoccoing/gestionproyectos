@@ -11,6 +11,8 @@ const { assertCashBoxUsable, overdraftWarning } = require('../services/cashBoxSe
 const aiVisionService = require('../services/aiVisionService');
 const { getExtractor } = require('../config/aiDocumentExtractors');
 const { nextExpenseNumber, contractPrefixForProject } = require('../services/numberingService');
+const { getLetterheadForProject } = require('../services/letterheadService');
+const { generateExpenseReceiptPdf } = require('../services/pdfService');
 
 // Estos controladores atienden DOS montajes de ruta: el anidado en proyecto
 // (/projects/:projectId/expenses, ver expenseRoutes.js — comportamiento sin cambios) y el global
@@ -382,4 +384,20 @@ const summary = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { list, create, update, remove, setBudget, summary, scan };
+// Comprobante de egreso — se genera SIEMPRE en vivo a partir del registro actual (nunca se guarda
+// una copia del PDF, mismo criterio que el resto de los reportes de este archivo de servicio): así
+// un gasto editado después de creado produce un comprobante con los datos vigentes, sin necesidad
+// de "regenerar" nada a mano, y si la generación fallara en algún momento el gasto en sí nunca
+// estuvo en riesgo (se creó en su propia transacción, mucho antes de que alguien pida verlo).
+const exportReceiptPdf = asyncHandler(async (req, res) => {
+  const expense = await Expense.findOne({ where: scopeWhere(req), include: EXPENSE_INCLUDE });
+  if (!expense) throw new ApiError(404, 'Gasto no encontrado');
+  if (expense.expenseType === 'administrativo') assertCanManageAdminExpense(req, 'view');
+
+  const company = await getLetterheadForProject(expense.projectId);
+  const doc = generateExpenseReceiptPdf({ expense, company });
+  res.setHeader('Content-Type', 'application/pdf');
+  doc.pipe(res);
+});
+
+module.exports = { list, create, update, remove, setBudget, summary, scan, exportReceiptPdf };

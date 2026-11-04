@@ -39,6 +39,7 @@ const byIdParam = async (req) => Expense.findByPk(req.params.id);
 router.get('/', requirePermission('gastos', 'view'), expenseController.list);
 router.post('/', requirePermission('gastos', 'create'), uploadFiles, preventDuplicateSubmit, expenseController.create);
 router.post('/scan', requirePermission('gastos', 'create'), scanUpload.single('file'), expenseController.scan);
+router.get('/:id/pdf', requirePermission('gastos', 'view'), requireOptionalProjectAccess(byIdParam), expenseController.exportReceiptPdf);
 router.put('/:id', requirePermission('gastos', 'edit'), requireOptionalProjectAccess(byIdParam), uploadFiles, expenseController.update);
 router.delete('/:id', requirePermission('gastos', 'delete'), requireOptionalProjectAccess(byIdParam), expenseController.remove);
 

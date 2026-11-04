@@ -4,6 +4,8 @@ const { CashBox, CashBoxMovement, CashBoxMovementWithholding, Project, User } = 
 const { getBalance, getBalancesForCashBoxes } = require('../services/cashBoxService');
 const { createMovement, updateMovement: updateMovementService, deleteMovement } = require('../services/cashBoxMovementService');
 const { relativePath } = require('../middleware/upload');
+const { getLetterheadForProject } = require('../services/letterheadService');
+const { generateCashIncomeReceiptPdf } = require('../services/pdfService');
 
 const MOVEMENT_INCLUDE = [
   { model: CashBoxMovementWithholding, as: 'withholdings' },
@@ -136,4 +138,22 @@ const removeMovement = asyncHandler(async (req, res) => {
   res.json({ ...cashBox.toJSON(), balance: await getBalance(cashBox.id) });
 });
 
-module.exports = { list, get, create, update, setStatus, addMovement, updateMovement, removeMovement };
+// Comprobante de ingreso — generado SIEMPRE en vivo a partir del movimiento actual (mismo criterio
+// que expenseController.js#exportReceiptPdf): editar el ingreso después de creado produce un
+// comprobante con los datos vigentes, conservando siempre el mismo incomeNumber.
+const exportMovementReceiptPdf = asyncHandler(async (req, res) => {
+  const cashBox = await CashBox.findByPk(req.params.id);
+  if (!cashBox) throw new ApiError(404, 'Caja no encontrada');
+  const movement = await CashBoxMovement.findOne({
+    where: { id: req.params.movementId, cashBoxId: cashBox.id },
+    include: MOVEMENT_INCLUDE,
+  });
+  if (!movement) throw new ApiError(404, 'Ingreso no encontrado');
+
+  const company = await getLetterheadForProject(movement.projectId);
+  const doc = generateCashIncomeReceiptPdf({ movement: { ...movement.toJSON(), CashBox: cashBox }, company });
+  res.setHeader('Content-Type', 'application/pdf');
+  doc.pipe(res);
+});
+
+module.exports = { list, get, create, update, setStatus, addMovement, updateMovement, removeMovement, exportMovementReceiptPdf };

@@ -319,6 +319,15 @@ export const contractSignatureApi = {
   sign: (token, data) => client.post(`/contract-signature/${token}`, data).then((r) => r.data),
 };
 
+// URL directa con el token en query string (el backend ya acepta ?token= en GET, ver
+// middleware/auth.js) — mismo patrón que scheduleApi.exportPdfUrl, para un link <a target="_blank">
+// en vez de una descarga por blob: el comprobante se puede VER inline, no solo descargar.
+function pdfUrlWithToken(path) {
+  const base = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api');
+  const token = localStorage.getItem('token');
+  return `${base}${path}?token=${encodeURIComponent(token)}`;
+}
+
 export const expensesApi = {
   list: (pid, params) => client.get(`/projects/${pid}/expenses`, { params }).then((r) => r.data),
   create: (pid, formData) => client.post(`/projects/${pid}/expenses`, formData).then((r) => r.data),
@@ -327,6 +336,9 @@ export const expensesApi = {
   setBudget: (pid, data) => client.post(`/projects/${pid}/expenses/budget`, data).then((r) => r.data),
   summary: (pid) => client.get(`/projects/${pid}/expenses/summary`).then((r) => r.data),
   scan: (pid, formData) => client.post(`/projects/${pid}/expenses/scan`, formData).then((r) => r.data),
+  // Comprobante de egreso — ver pdfService.js#generateExpenseReceiptPdf. Se genera en vivo en cada
+  // vista, así que siempre refleja el dato actual del gasto (no hay nada que "regenerar" a mano).
+  receiptPdfUrl: (pid, id) => pdfUrlWithToken(`/projects/${pid}/expenses/${id}/pdf`),
 };
 
 // Vista general de Gastos (sin proyecto fijo, ver backend/globalExpenseRoutes.js) — mismo modelo y
@@ -338,6 +350,7 @@ export const generalExpensesApi = {
   update: (id, formData) => client.put(`/expenses/${id}`, formData).then((r) => r.data),
   remove: (id) => client.delete(`/expenses/${id}`),
   scan: (formData) => client.post('/expenses/scan', formData).then((r) => r.data),
+  receiptPdfUrl: (id) => pdfUrlWithToken(`/expenses/${id}/pdf`),
 };
 
 export const cashBoxesApi = {
@@ -351,6 +364,9 @@ export const cashBoxesApi = {
   addMovement: (id, formData) => client.post(`/cash-boxes/${id}/movements`, formData).then((r) => r.data),
   updateMovement: (id, movementId, formData) => client.put(`/cash-boxes/${id}/movements/${movementId}`, formData).then((r) => r.data),
   removeMovement: (id, movementId) => client.delete(`/cash-boxes/${id}/movements/${movementId}`).then((r) => r.data),
+  // Comprobante de ingreso — ver pdfService.js#generateCashIncomeReceiptPdf. También se usa desde
+  // "Pagos al proyecto" (ProjectPaymentsPage.jsx): un pago ahí ES un CashBoxMovement, mismo id.
+  movementReceiptPdfUrl: (id, movementId) => pdfUrlWithToken(`/cash-boxes/${id}/movements/${movementId}/pdf`),
 };
 
 export const withholdingTypesApi = {

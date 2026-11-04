@@ -36,6 +36,16 @@ module.exports = (sequelize) => {
     // CashBoxMovementWithholding.returned/returnMovementId) — no lleva retenciones propias.
     isWithholdingReturn: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     returnsWithholdingId: { type: DataTypes.UUID, allowNull: true },
+    // Consecutivo del comprobante de ingreso (ver numberingService.js#nextIncomeNumber), asignado
+    // UNA SOLA VEZ al crear el movimiento — nunca se reasigna al editar, para que el comprobante
+    // conserve su número aunque cambien los demás datos (ver cashBoxMovementService.js). Los
+    // movimientos creados antes de este campo quedan sin número, no se les asigna nada retroactivo
+    // (mismo criterio ya usado para Expense.expenseNumber).
+    incomeNumber: { type: DataTypes.INTEGER, allowNull: true },
+    // Prefijo de 3 dígitos tomado de Project.contractNumber al momento de crearse — null si el
+    // ingreso no tiene proyecto asociado o el proyecto no tiene número de contrato (mismo criterio
+    // que Expense.contractPrefix).
+    contractPrefix: { type: DataTypes.STRING(3), allowNull: true },
   });
 
   CashBoxMovement.associate = (models) => {

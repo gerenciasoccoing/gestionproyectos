@@ -484,11 +484,18 @@ const convertToExpense = asyncHandler(async (req, res) => {
   const { subtotal: subtotalAmount, vatTotal, retentionAmount } = computeOrderTotals(order.items, order.retentionPercent);
   const totalAmount = subtotalAmount + vatTotal - retentionAmount;
 
+  // NIT del proveedor (para el comprobante de egreso, ver pdfService.js#generateExpenseReceiptPdf):
+  // solo se conoce si la orden está vinculada a un proveedor registrado en Terceros — order.supplier
+  // es texto libre y nunca trae NIT por sí mismo. Se omite sin error si no hay vínculo o el
+  // proveedor no tiene NIT cargado (el comprobante ya lo contempla como dato opcional).
+  const supplierParty = order.supplierId ? await ThirdParty.findByPk(order.supplierId) : null;
+
   const { expense, warning } = await sequelize.transaction(async (t) => {
     await assertCashBoxUsable(cashBoxId, { transaction: t });
     const expenseNumber = await nextExpenseNumber(t);
     const contractPrefix = await contractPrefixForProject(order.projectId, t);
     const created = await Expense.create({
+      expenseType: 'proyecto', // "Pasar a Gastos" siempre exige un proyecto asignado (validado arriba)
       projectId: order.projectId,
       cashBoxId,
       supplierId: order.supplierId,
@@ -497,6 +504,7 @@ const convertToExpense = asyncHandler(async (req, res) => {
       date: expenseDate,
       description: `Orden de compra a ${order.supplier}`,
       vendorName: order.supplier,
+      vendorNit: supplierParty?.nit || null,
       source: 'purchase_order',
       sourceId: order.id,
       createdBy: req.user.id,

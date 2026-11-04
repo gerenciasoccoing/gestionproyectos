@@ -285,7 +285,8 @@
       "status": "Estado",
       "returned": "Devuelta",
       "pendingReturn": "Pendiente de devolver",
-      "empty": "Sin pagos registrados."
+      "empty": "Sin pagos registrados.",
+      "voucher": "Comprobante"
     }
   },
   "execution": {
@@ -1061,7 +1062,8 @@
       "value": "Valor",
       "origin": "Origen",
       "invoice": "Factura",
-      "receipt": "Comprobante"
+      "receipt": "Comprobante",
+      "voucher": "Comprobante de Egreso"
     },
     "hideDetail": "Ocultar detalle",
     "viewDetail": "Ver detalle ({{count}})",
@@ -1231,7 +1233,8 @@
       "viewWithholdings": "Ver retenciones",
       "recoverableStatus": "Estado",
       "returned": "Devuelta",
-      "pendingReturn": "Pendiente de devolver"
+      "pendingReturn": "Pendiente de devolver",
+      "voucher": "Comprobante de Ingreso"
     }
   },
   "inventory": {

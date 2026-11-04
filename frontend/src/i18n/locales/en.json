@@ -285,7 +285,8 @@
       "status": "Status",
       "returned": "Returned",
       "pendingReturn": "Pending return",
-      "empty": "No payments registered."
+      "empty": "No payments registered.",
+      "voucher": "Voucher"
     }
   },
   "execution": {
@@ -1061,7 +1062,8 @@
       "value": "Value",
       "origin": "Origin",
       "invoice": "Invoice",
-      "receipt": "Receipt"
+      "receipt": "Receipt",
+      "voucher": "Expense Voucher"
     },
     "hideDetail": "Hide detail",
     "viewDetail": "View detail ({{count}})",
@@ -1231,7 +1233,8 @@
       "viewWithholdings": "View withholdings",
       "recoverableStatus": "Status",
       "returned": "Returned",
-      "pendingReturn": "Pending return"
+      "pendingReturn": "Pending return",
+      "voucher": "Income Voucher"
     }
   },
   "inventory": {

@@ -42,6 +42,7 @@ export default function ExpensesPage() {
       update: (id, fd) => generalExpensesApi.update(id, fd),
       remove: (id) => generalExpensesApi.remove(id),
       scan: (fd) => generalExpensesApi.scan(fd),
+      receiptPdfUrl: (id) => generalExpensesApi.receiptPdfUrl(id),
     }
     : {
       list: () => expensesApi.list(projectId),
@@ -49,6 +50,7 @@ export default function ExpensesPage() {
       update: (id, fd) => expensesApi.update(projectId, id, fd),
       remove: (id) => expensesApi.remove(projectId, id),
       scan: (fd) => expensesApi.scan(projectId, fd),
+      receiptPdfUrl: (id) => expensesApi.receiptPdfUrl(projectId, id),
     };
 
   const [expenses, setExpenses] = useState([]);
@@ -454,7 +456,7 @@ export default function ExpensesPage() {
         <Table columns={[
           t('expenses.list.number'), t('expenses.list.date'), t('expenses.list.category'), t('expenses.list.vendor'),
           ...(isGeneral ? [t('expenses.list.project'), t('expenses.list.cashBox')] : []),
-          t('expenses.list.items'), t('expenses.list.value'), t('expenses.list.origin'), t('expenses.list.invoice'), t('expenses.list.receipt'), '',
+          t('expenses.list.items'), t('expenses.list.value'), t('expenses.list.origin'), t('expenses.list.invoice'), t('expenses.list.receipt'), t('expenses.list.voucher'), '',
         ]}>
           {expenses.map((e) => (
             <Fragment key={e.id}>
@@ -502,6 +504,9 @@ export default function ExpensesPage() {
                     </label>
                   </Can>
                 </td>
+                <td className="py-1 pr-3">
+                  <a className="text-blue-600 hover:underline" href={api.receiptPdfUrl(e.id)} target="_blank" rel="noreferrer">{t('common.view')}</a>
+                </td>
                 <td className="py-1 pr-3 text-right">
                   {e.source === 'manual' && (
                     <Can module={e.expenseType === 'administrativo' ? 'gastos_admin' : 'gastos'} action="delete"><Button variant="danger" onClick={() => remove(e.id)}>{t('common.delete')}</Button></Can>
@@ -510,7 +515,7 @@ export default function ExpensesPage() {
               </tr>
               {expandedId === e.id && (
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  <td colSpan={isGeneral ? 12 : 10} className="py-3 px-3">
+                  <td colSpan={isGeneral ? 13 : 11} className="py-3 px-3">
                     <div className="text-xs text-gray-500 mb-2 flex flex-wrap gap-x-4 gap-y-1">
                       {e.vendorNit && <span>{t('expenses.nit')}: {e.vendorNit}</span>}
                       {e.vendorPhone && <span>{t('expenses.phone')}: {e.vendorPhone}</span>}
@@ -560,7 +565,7 @@ export default function ExpensesPage() {
               )}
             </Fragment>
           ))}
-          {expenses.length === 0 && <tr><td colSpan={isGeneral ? 12 : 10} className="py-3 text-center text-gray-400">{t('expenses.empty')}</td></tr>}
+          {expenses.length === 0 && <tr><td colSpan={isGeneral ? 13 : 11} className="py-3 text-center text-gray-400">{t('expenses.empty')}</td></tr>}
         </Table>
       </Card>
     </div>

@@ -65,6 +65,7 @@ const modelDefiners = [
   require('./LeaveType'),
   require('./EmployeeLeave'),
   require('./EmployeeDeduction'),
+  require('./VoucherCounter'),
 ];
 
 // Company (la tabla de empresas en sí), Permission (catálogo global fijo de permisos, no datos de

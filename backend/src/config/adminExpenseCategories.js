@@ -11,6 +11,7 @@ const DEFAULT_ADMIN_EXPENSE_CATEGORIES = [
   'Servicios públicos',
   'Arriendo',
   'Aseo y cafetería',
+  'Administrativo',
   'Otros',
 ];
 

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 // Conexión de administración: este archivo hace DDL (ALTER TABLE, políticas RLS, creación del rol
 // restringido) y backfills que cruzan empresas — todo eso exige el rol dueño de las tablas, no el
 // restringido que usa la app en tiempo real (ver models/adminModels.js).
@@ -320,6 +321,7 @@ async function applyPostSyncFixups() {
   await seedLeaveTypesForExistingCompanies();
   await seedPublicHolidaysForExistingCompanies();
   await backfillCashBoxMovementGrossAmount();
+  await seedExpenseVoucherCounterForExistingCompanies();
 
   await ensureAppDbRole();
   await applyRowLevelSecurity();
@@ -503,6 +505,31 @@ async function backfillExpenseType() {
 // que es idempotente y seguro de correr en cada arranque.
 async function backfillCashBoxMovementGrossAmount() {
   await sequelize.query('UPDATE "CashBoxMovements" SET "grossAmount" = "amount" WHERE "grossAmount" IS NULL;');
+}
+
+// Siembra el consecutivo atómico de comprobantes de egreso (ver VoucherCounter.js y
+// numberingService.js#nextVoucherNumber) con el expenseNumber más alto YA EXISTENTE por empresa,
+// para que el primer comprobante generado con el contador nuevo continúe la numeración en vez de
+// volver a empezar en 1 y colisionar con gastos ya existentes. GREATEST(...) hace que sea seguro
+// repetir en cada arranque: nunca retrocede el contador aunque ya haya avanzado más allá del
+// máximo histórico (lo normal después del primer arranque con este cambio). El consecutivo de
+// ingresos no necesita este backfill: CashBoxMovement.incomeNumber es un campo nuevo, no existía
+// ningún número que preservar.
+async function seedExpenseVoucherCounterForExistingCompanies() {
+  const companies = await Company.findAll();
+  for (const company of companies) {
+    // eslint-disable-next-line no-await-in-loop
+    await runInTransactionContext(company.id, null, async () => {
+      const maxExisting = await Expense.max('expenseNumber');
+      if (!maxExisting) return;
+      await sequelize.query(
+        `INSERT INTO "VoucherCounters" ("id", "companyId", "kind", "value", "createdAt", "updatedAt")
+         VALUES (:id, :companyId, 'egreso', :value, now(), now())
+         ON CONFLICT ("companyId", "kind") DO UPDATE SET "value" = GREATEST("VoucherCounters"."value", :value)`,
+        { replacements: { id: uuidv4(), companyId: company.id, value: maxExisting } }
+      );
+    });
+  }
 }
 
 // Migración de "caja por ítem" a "caja por orden" (corrección del bug de diseño reportado: antes

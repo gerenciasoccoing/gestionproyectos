@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { projectPaymentsApi, withholdingTypesApi } from '../../api';
+import { projectPaymentsApi, withholdingTypesApi, cashBoxesApi } from '../../api';
 import { Card, Button, Select, Table, Badge, ErrorText, extractError, money, formatDate, formatDateTime } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 
@@ -133,7 +133,7 @@ export default function ProjectPaymentsPage() {
         </div>
         <ErrorText>{error}</ErrorText>
 
-        <Table columns={[t('payments.list.date'), t('payments.list.concept'), t('payments.list.gross'), t('payments.list.withholdings'), t('payments.list.net'), t('payments.list.cashBox'), t('payments.list.user'), t('payments.list.support'), '']}>
+        <Table columns={[t('payments.list.date'), t('payments.list.concept'), t('payments.list.gross'), t('payments.list.withholdings'), t('payments.list.net'), t('payments.list.cashBox'), t('payments.list.user'), t('payments.list.support'), t('payments.list.voucher'), '']}>
           {payments.map((p) => (
             <Fragment key={p.id}>
               <tr className="border-b border-gray-100">
@@ -145,6 +145,9 @@ export default function ProjectPaymentsPage() {
                 <td className="py-1 pr-3">{p.CashBox?.name || '-'}</td>
                 <td className="py-1 pr-3">{p.User?.name || '-'}</td>
                 <td className="py-1 pr-3">{p.supportFilePath ? <a href={fileUrl(p.supportFilePath)} target="_blank" rel="noreferrer">📎</a> : '-'}</td>
+                <td className="py-1 pr-3">
+                  {p.CashBox?.id ? <a className="text-blue-600 hover:underline" href={cashBoxesApi.movementReceiptPdfUrl(p.CashBox.id, p.id)} target="_blank" rel="noreferrer">{t('common.view')}</a> : '-'}
+                </td>
                 <td className="py-1 pr-3 text-right">
                   {p.withholdings?.length > 0 && (
                     <button type="button" className="text-blue-600 hover:underline text-xs" onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}>
@@ -155,7 +158,7 @@ export default function ProjectPaymentsPage() {
               </tr>
               {expandedId === p.id && p.withholdings?.length > 0 && (
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  <td colSpan={9} className="py-2 px-3">
+                  <td colSpan={10} className="py-2 px-3">
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="text-left text-gray-500">
@@ -183,7 +186,7 @@ export default function ProjectPaymentsPage() {
               )}
             </Fragment>
           ))}
-          {payments.length === 0 && <tr><td colSpan={9} className="py-3 text-center text-gray-400">{t('payments.list.empty')}</td></tr>}
+          {payments.length === 0 && <tr><td colSpan={10} className="py-3 text-center text-gray-400">{t('payments.list.empty')}</td></tr>}
         </Table>
       </Card>
     </div>
