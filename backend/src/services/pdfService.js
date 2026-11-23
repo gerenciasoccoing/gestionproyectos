@@ -1,4 +1,5 @@
 const PDFDocument = require('pdfkit');
+const ExcelJS = require('exceljs');
 const path = require('path');
 const { UPLOAD_ROOT } = require('../middleware/upload');
 const { moneyToWords } = require('../utils/numberToWords');
@@ -379,7 +380,7 @@ function generateClientReportPdf({ draft, presentationPhotoAbsPath, locationMapA
 // desglosado por ítem/tipo de gasto comparado contra presupuesto, avance físico, y análisis
 // gerencial con desviación presupuestal — sí incluye cifras financieras reales, a diferencia del
 // Informe para Cliente.
-function generateInternalReportPdf({ project, snapshot, from, to, analysisText, company }) {
+function generateInternalReportPdf({ project, snapshot, from, to, analysisText, company, materialAnalysis }) {
   const doc = new PDFDocument({ margin: 50 });
 
   reportCoverHeading(doc, {
@@ -422,6 +423,22 @@ function generateInternalReportPdf({ project, snapshot, from, to, analysisText, 
     drawProgressBar(doc, { width: 220, height: 8, percent: item.percent, color: item.percent >= 100 ? '#16a34a' : '#2563eb' });
     doc.moveDown(0.2);
   });
+
+  // Resumen del Inventario de Materiales (Fase 7) — opcional: un contrato sin ningún movimiento de
+  // material firmado, o si el cálculo falla por cualquier motivo, simplemente no agrega esta
+  // sección (ver reportController.js#internalReportPdf, que la obtiene por fuera con try/catch para
+  // no arriesgar este informe ya en producción). Solo el resumen: el detalle completo por OC vive
+  // en la pestaña "Análisis de materiales" del proyecto / su propio PDF-Excel.
+  if (materialAnalysis && materialAnalysis.materials.length) {
+    sectionTitle(doc, 'Resumen de Inventario de Materiales');
+    doc.font('Helvetica').fontSize(10);
+    doc.text(`Consumo neto de materiales: ${Number(materialAnalysis.totals.netConsumption).toLocaleString('es-CO')} unidades`);
+    doc.text(`Costo real de materiales: ${money(materialAnalysis.totals.totalRealCost)}`);
+    doc.text(`Valor de venta registrado: ${money(materialAnalysis.totals.soldValue)}`);
+    doc.font('Helvetica-Bold').text(`Margen de materiales: ${money(materialAnalysis.totals.marginAmount)} (${pct(materialAnalysis.totals.marginPercent)})`);
+    doc.font('Helvetica').fontSize(9).fillColor('#555').text('Detalle completo por material y por orden de compra en la pestaña "Análisis de materiales" del proyecto.');
+    doc.fillColor('#000000').fontSize(10);
+  }
 
   sectionTitle(doc, 'Análisis gerencial');
   doc.font('Helvetica').fontSize(10).text(analysisText, { align: 'justify' });
@@ -1567,12 +1584,12 @@ function drawSignatureLines(doc, roles, signaturesByRole = new Map()) {
 // "anulado" = deletedAt, no un borrado real) — se superpone al final, sobre todo lo demás, para que
 // sea imposible no verlo sin tapar el contenido (opacity baja). Solo en la página donde se dibuja
 // (los comprobantes de este módulo nunca ocupan más de una), igual límite que el resto del archivo.
-function drawVoidStamp(doc) {
+function drawVoidStamp(doc, text = 'ANULADO') {
   const { width, height } = doc.page;
   doc.save();
   doc.rotate(-30, { origin: [width / 2, height / 2] });
   doc.fontSize(70).font('Helvetica-Bold').fillColor('#dc2626').opacity(0.25);
-  doc.text('ANULADO', 0, height / 2 - 35, { width, align: 'center' });
+  doc.text(text, 0, height / 2 - 35, { width, align: 'center' });
   doc.restore();
   doc.opacity(1).fillColor('#000');
 }
@@ -1671,8 +1688,244 @@ function generateCashIncomeReceiptPdf({ movement, company, signatures = [] }) {
   return doc;
 }
 
+const TRANSFER_STATUS_LABELS_ES = { en_transito: 'En tránsito', confirmado: 'Confirmado', rechazado: 'Rechazado' };
+
+// Acta de traslado (Inventario de Materiales, ver materialTransferService.js) — mismo membrete y
+// tabla de datos que los comprobantes de egreso/ingreso (drawReceiptLetterhead/drawContractInfoTable),
+// un solo firmante ("Recibió" — drawSignatureLines ya soporta N roles, acá se usa con uno solo).
+// `signature` es opcional — { status, signerName, signaturePath, signedAt } (ver
+// materialSignatureService.js) — si no está firmado, queda la línea en blanco.
+function generateMaterialTransferActaPdf({ transfer, company, signature }) {
+  const doc = new PDFDocument({ margin: 50 });
+  const numberLabel = transfer.transferNumber ? `TR-${transfer.transferNumber}` : transfer.id.slice(0, 8).toUpperCase();
+  drawReceiptLetterhead(doc, company, `ACTA DE TRASLADO No. ${numberLabel}`);
+
+  const rows = [
+    { label: 'Fecha', value: transfer.date },
+    { label: 'Bodega de origen', value: transfer.fromWarehouse?.name },
+    { label: 'Bodega de destino', value: transfer.toWarehouse?.name },
+    { label: 'Estado', value: TRANSFER_STATUS_LABELS_ES[transfer.status] || transfer.status },
+    transfer.observations && { label: 'Observaciones', value: transfer.observations },
+    transfer.shortageObservation && { label: 'Observación del faltante', value: transfer.shortageObservation },
+    transfer.rejectionReason && { label: 'Motivo de rechazo', value: transfer.rejectionReason },
+  ].filter(Boolean);
+  drawContractInfoTable(doc, rows);
+
+  sectionTitle(doc, 'Ítems');
+  const lineRows = (transfer.lines || []).map((l) => ({
+    label: l.Material?.name || '-',
+    value: `Enviado ${Number(l.quantitySent)}${l.quantityReceived != null ? ` · Recibido ${Number(l.quantityReceived)}` : ''} · Costo unit. ${money(l.unitCost)}`,
+  }));
+  drawContractInfoTable(doc, lineRows);
+
+  const signaturesByRole = new Map();
+  if (signature?.status === 'firmado') signaturesByRole.set('recibio', signature);
+  drawSignatureLines(doc, [{ role: 'recibio', label: 'Recibió' }], signaturesByRole);
+
+  doc.end();
+  return doc;
+}
+
+// Recibo de entrega de material (salida, ver materialIssueService.js) — mismo membrete/tabla que el
+// resto de comprobantes de este archivo. numberLabel usa el prefijo del contrato del proyecto
+// destino, igual criterio que los comprobantes de egreso/ingreso (expense.contractPrefix). El
+// receptor es un trabajador de Personal o una persona externa (nombre/cédula/celular/correo),
+// nunca los dos — se arma una sola fila "Recibió" con los datos que apliquen.
+function generateMaterialIssuePdf({ issue, company, signature }) {
+  const doc = new PDFDocument({ margin: 50 });
+  const numberLabel = issue.issueNumber
+    ? `${issue.contractPrefix ? `${issue.contractPrefix}-` : ''}${issue.issueNumber}`
+    : issue.id.slice(0, 8).toUpperCase();
+  drawReceiptLetterhead(doc, company, `RECIBO DE ENTREGA DE MATERIAL No. ${numberLabel}`);
+
+  const receiverLabel = issue.receiverType === 'empleado'
+    ? (issue.receiverEmployee?.name || '-')
+    : [issue.receiverExternalName, issue.receiverExternalCedula && `C.C. ${issue.receiverExternalCedula}`].filter(Boolean).join(' — ');
+
+  const rows = [
+    { label: 'Fecha', value: issue.date },
+    { label: 'Bodega de origen', value: issue.fromWarehouse?.name },
+    { label: 'Destino', value: issue.Project?.name || issue.freeTextDestination },
+    issue.Project?.contractNumber && { label: 'No. de contrato', value: issue.Project.contractNumber },
+    { label: 'Recibe', value: receiverLabel },
+    issue.receiverExternalPhone && { label: 'Celular', value: issue.receiverExternalPhone },
+    issue.rejectionReason && { label: 'Motivo de rechazo', value: issue.rejectionReason },
+  ].filter(Boolean);
+  drawContractInfoTable(doc, rows);
+
+  sectionTitle(doc, 'Ítems');
+  const lineRows = (issue.lines || []).map((l) => ({
+    label: l.Material?.name || '-',
+    value: `Cantidad ${Number(l.quantity)} · Costo unit. ${money(l.unitCost)}${l.salePriceUnit != null ? ` · Precio de venta unit. ${money(l.salePriceUnit)}` : ''}`,
+  }));
+  drawContractInfoTable(doc, lineRows);
+
+  const signaturesByRole = new Map();
+  if (signature?.status === 'firmado') signaturesByRole.set('recibio', signature);
+  drawSignatureLines(doc, [{ role: 'recibio', label: 'Recibí conforme' }], signaturesByRole);
+  if (issue.status === 'rechazado') drawVoidStamp(doc, 'RECHAZADO');
+
+  doc.end();
+  return doc;
+}
+
+const RETURN_STATUS_LABELS_ES = { pendiente_firma: 'Pendiente de firma', firmado: 'Firmado', rechazado: 'Rechazado' };
+
+// Acta de devolución de material (ver materialReturnService.js) — mismo patrón que los demás
+// comprobantes de este archivo, un solo firmante ("Entregó": quien hace la devolución).
+function generateMaterialReturnPdf({ materialReturn, company, signature }) {
+  const doc = new PDFDocument({ margin: 50 });
+  const numberLabel = materialReturn.returnNumber
+    ? `${materialReturn.contractPrefix ? `${materialReturn.contractPrefix}-` : ''}${materialReturn.returnNumber}`
+    : materialReturn.id.slice(0, 8).toUpperCase();
+  drawReceiptLetterhead(doc, company, `ACTA DE DEVOLUCIÓN DE MATERIAL No. ${numberLabel}`);
+
+  const rows = [
+    { label: 'Fecha', value: materialReturn.date },
+    { label: 'Bodega que recibe', value: materialReturn.toWarehouse?.name },
+    materialReturn.Project?.name && { label: 'Proyecto', value: materialReturn.Project.name },
+    materialReturn.Project?.contractNumber && { label: 'No. de contrato', value: materialReturn.Project.contractNumber },
+    { label: 'Estado', value: RETURN_STATUS_LABELS_ES[materialReturn.status] || materialReturn.status },
+    materialReturn.rejectionReason && { label: 'Motivo de rechazo', value: materialReturn.rejectionReason },
+  ].filter(Boolean);
+  drawContractInfoTable(doc, rows);
+
+  sectionTitle(doc, 'Ítems');
+  const lineRows = (materialReturn.lines || []).map((l) => ({
+    label: l.Material?.name || '-',
+    value: `Cantidad ${Number(l.quantity)} · Costo unit. ${money(l.unitCost)}`,
+  }));
+  drawContractInfoTable(doc, lineRows);
+
+  const signaturesByRole = new Map();
+  if (signature?.status === 'firmado') signaturesByRole.set('entrego', signature);
+  drawSignatureLines(doc, [{ role: 'entrego', label: 'Entregó' }], signaturesByRole);
+  if (materialReturn.status === 'rechazado') drawVoidStamp(doc, 'RECHAZADO');
+
+  doc.end();
+  return doc;
+}
+
+function pct(n) {
+  return n == null ? 'N/A' : `${Number(n).toFixed(1)}%`;
+}
+
+// Análisis de material por contrato (Fase 7, ver materialContractAnalysisService.js) — informativo:
+// cantidad entregada/devuelta/consumo neto, costo real (con detalle por OC), valor de venta (solo
+// donde hay precio de venta registrado) y margen, con los ítems SIN precio de venta separados aparte
+// para no distorsionar el margen. Mismo estilo de "lista con ensureSpace" que
+// generateAdminExpenseReportPdf, no una grilla dibujada a mano: es un reporte de texto estructurado,
+// no un comprobante formal con casillas.
+function generateMaterialContractAnalysisPdf({ analysis, company }) {
+  const doc = new PDFDocument({ margin: 50 });
+  reportCoverHeading(doc, {
+    company,
+    title: 'Análisis de Material por Contrato',
+    project: analysis.project,
+    subtitle: analysis.project.contractNumber ? `Contrato No. ${analysis.project.contractNumber}` : undefined,
+  });
+
+  sectionTitle(doc, 'Totales del contrato');
+  doc.font('Helvetica').fontSize(10);
+  doc.text(`Consumo neto (entregado - devuelto): ${Number(analysis.totals.netConsumption).toLocaleString('es-CO')}`);
+  doc.text(`Costo real total (trazado a las OC de origen): ${money(analysis.totals.totalRealCost)}`);
+  doc.text(`  - De los cuales con precio de venta registrado: ${money(analysis.totals.pricedCost)}`);
+  doc.text(`  - De los cuales SIN precio de venta registrado (no entran al margen): ${money(analysis.totals.unpricedCost)}`);
+  doc.text(`Valor de venta (solo ítems con precio registrado): ${money(analysis.totals.soldValue)}`);
+  doc.font('Helvetica-Bold');
+  doc.fillColor(analysis.totals.marginAmount < 0 ? '#dc2626' : '#000000');
+  doc.text(`Margen: ${money(analysis.totals.marginAmount)} (${pct(analysis.totals.marginPercent)})`);
+  doc.fillColor('#000000').font('Helvetica');
+
+  sectionTitle(doc, 'Detalle por material');
+  if (!analysis.materials.length) doc.text('Sin movimientos de material firmados para este contrato.');
+  analysis.materials.forEach((m) => {
+    ensureSpace(doc, 70);
+    doc.font('Helvetica-Bold').fontSize(10).text(`${m.materialName}${m.unit ? ` (${m.unit})` : ''}`);
+    doc.font('Helvetica').fontSize(9).fillColor('#333')
+      .text(`Entregado: ${m.quantityIssued}  |  Devuelto: ${m.quantityReturned}  |  Consumo neto: ${m.netConsumption}`);
+    doc.text(`Costo real: ${money(m.totalRealCost)}  (con precio de venta: ${money(m.pricedCost)}  |  sin precio de venta: ${money(m.unpricedCost)})`);
+    if (m.pricedQuantity > 0 || m.soldValue > 0) {
+      doc.text(`Valor de venta: ${money(m.soldValue)}  |  Margen: ${money(m.marginAmount)} (${pct(m.marginPercent)})`);
+    } else {
+      doc.fillColor('#b45309').text('Sin precio de venta registrado — no se calcula margen para este material.');
+      doc.fillColor('#333');
+    }
+    m.byPurchaseOrder.forEach((po) => {
+      ensureSpace(doc, 12);
+      doc.fontSize(8).text(`  · ${po.purchaseOrderNumber ? `OC-${po.purchaseOrderNumber}` : 'Sin OC (traslado/devolución sin trazar)'}: cantidad neta ${po.quantity} — costo ${money(po.cost)}`);
+    });
+    doc.fillColor('#000000').fontSize(10);
+    doc.moveDown(0.4);
+  });
+
+  doc.end();
+  return doc;
+}
+
+// Mismo análisis en Excel, una fila por material + su desglose por OC indentado — para que el
+// usuario pueda filtrar/sumar en una hoja de cálculo sin tener que leer el PDF. Hoja plana simple
+// (sin fórmulas ni plantilla), a diferencia de apuExcelExportService.js: acá no hay un formato
+// oficial que replicar.
+async function generateMaterialContractAnalysisExcel({ analysis }) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Análisis de materiales');
+  sheet.columns = [
+    { header: 'Material', key: 'material', width: 28 },
+    { header: 'OC', key: 'po', width: 12 },
+    { header: 'Entregado', key: 'issued', width: 12 },
+    { header: 'Devuelto', key: 'returned', width: 12 },
+    { header: 'Consumo neto', key: 'net', width: 14 },
+    { header: 'Costo real', key: 'cost', width: 16 },
+    { header: 'Con precio de venta', key: 'pricedCost', width: 18 },
+    { header: 'Sin precio de venta', key: 'unpricedCost', width: 18 },
+    { header: 'Valor de venta', key: 'soldValue', width: 16 },
+    { header: 'Margen $', key: 'marginAmount', width: 16 },
+    { header: 'Margen %', key: 'marginPercent', width: 12 },
+  ];
+  sheet.getRow(1).font = { bold: true };
+
+  analysis.materials.forEach((m) => {
+    sheet.addRow({
+      material: `${m.materialName}${m.unit ? ` (${m.unit})` : ''}`,
+      po: '',
+      issued: m.quantityIssued,
+      returned: m.quantityReturned,
+      net: m.netConsumption,
+      cost: m.totalRealCost,
+      pricedCost: m.pricedCost,
+      unpricedCost: m.unpricedCost,
+      soldValue: m.soldValue,
+      marginAmount: m.marginAmount,
+      marginPercent: m.marginPercent != null ? m.marginPercent / 100 : null,
+    }).font = { bold: true };
+    m.byPurchaseOrder.forEach((po) => {
+      sheet.addRow({
+        material: '', po: po.purchaseOrderNumber ? `OC-${po.purchaseOrderNumber}` : 'Sin OC', issued: '', returned: '', net: po.quantity, cost: po.cost,
+      });
+    });
+  });
+
+  const totalsRow = sheet.addRow({
+    material: 'TOTAL CONTRATO', po: '', issued: analysis.totals.quantityIssued, returned: analysis.totals.quantityReturned,
+    net: analysis.totals.netConsumption, cost: analysis.totals.totalRealCost, pricedCost: analysis.totals.pricedCost,
+    unpricedCost: analysis.totals.unpricedCost, soldValue: analysis.totals.soldValue, marginAmount: analysis.totals.marginAmount,
+    marginPercent: analysis.totals.marginPercent != null ? analysis.totals.marginPercent / 100 : null,
+  });
+  totalsRow.font = { bold: true };
+
+  ['cost', 'pricedCost', 'unpricedCost', 'soldValue', 'marginAmount'].forEach((key) => {
+    const col = sheet.getColumn(key);
+    col.numFmt = '"$" #,##0';
+  });
+  sheet.getColumn('marginPercent').numFmt = '0.0%';
+
+  return workbook;
+}
+
 module.exports = {
   generateProjectReportPdf, generateQuotationPdf, generateApuPdf, generateBudgetWithApuAnnexPdf, generatePurchaseOrderPdf, generateContractPdf, generateLaborCalculationPdf,
   generateClientReportPdf, generateInternalReportPdf, generateResourceConsolidationPdf, generateSchedulePdf, generateProjectPaymentsPdf, generateAdminExpenseReportPdf, money,
-  generateExpenseReceiptPdf, generateCashIncomeReceiptPdf,
+  generateExpenseReceiptPdf, generateCashIncomeReceiptPdf, generateMaterialTransferActaPdf, generateMaterialIssuePdf, generateMaterialReturnPdf,
+  generateMaterialContractAnalysisPdf, generateMaterialContractAnalysisExcel,
 };

@@ -14,6 +14,18 @@ const MODULES = [
   'cotizaciones',
   'terceros',
   'inventario',
+  // Inventario de Materiales (bodegas/lotes/traslados/salidas/devoluciones) — módulo aparte de
+  // 'inventario' (que sigue siendo solo Equipos y Herramientas, sin cambios). 'bodegas' administra
+  // el catálogo de bodegas; 'traslados_material' cubre registrar Y confirmar/rechazar un traslado
+  // (create=registrar, edit=confirmar/rechazar — mismo criterio que 'ordenes_compra', una sola
+  // acción 'edit' para "modificar el estado"); 'salidas_material'/'devoluciones_material' solo
+  // necesitan view/create en la práctica pero se dan los 4 verbos estándar por consistencia con el
+  // resto de MODULES (ver ACTIONS más abajo).
+  'inventario_materiales',
+  'bodegas',
+  'traslados_material',
+  'salidas_material',
+  'devoluciones_material',
   'cajas',
   'entrega_final',
   // Gasto Administrativo General (crear/editar gastos sin proyecto y ver su reporte) — módulo
@@ -52,6 +64,15 @@ const DEFAULT_ROLE_PERMISSIONS = {
     'inventario:view',
     'inventario:create',
     'inventario:edit',
+    'inventario_materiales:view',
+    'bodegas:view',
+    'traslados_material:view',
+    'traslados_material:create',
+    'traslados_material:edit',
+    'salidas_material:view',
+    'salidas_material:create',
+    'devoluciones_material:view',
+    'devoluciones_material:create',
     'cajas:view',
     'entrega_final:view',
     'entrega_final:create',
@@ -73,6 +94,8 @@ const DEFAULT_ROLE_PERMISSIONS = {
     'cajas:view',
     'cajas:create',
     'cajas:edit',
+    'inventario_materiales:view',
+    'bodegas:view',
     'entrega_final:view',
     'entrega_final:create',
     'entrega_final:edit',

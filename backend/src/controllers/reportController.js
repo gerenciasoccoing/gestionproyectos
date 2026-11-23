@@ -7,6 +7,7 @@ const { getPurchaseReport } = require('../services/purchaseOrderService');
 const { generateProjectReportPdf, generateClientReportPdf, generateInternalReportPdf } = require('../services/pdfService');
 const { getLetterheadForProject } = require('../services/letterheadService');
 const { getClientReportDraft, applyClientReportOverrides, getInternalReportData } = require('../services/reportEngineService');
+const { getContractAnalysis } = require('../services/materialContractAnalysisService');
 const { UPLOAD_ROOT } = require('../middleware/upload');
 
 const evm = asyncHandler(async (req, res) => {
@@ -101,9 +102,12 @@ const internalReportPdf = asyncHandler(async (req, res) => {
   const { from, to } = req.query;
   const data = await getInternalReportData(req.params.projectId, { from, to });
   const company = await getLetterheadForProject(req.params.projectId);
+  // Resumen de materiales (Fase 7): se obtiene por fuera y con try/catch propio — un error acá
+  // nunca debe tumbar el Informe Interno, que ya está en producción desde antes de este módulo.
+  const materialAnalysis = await getContractAnalysis(req.params.projectId).catch(() => null);
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="informe-interno-${data.project.name.replace(/\s+/g, '_')}.pdf"`);
-  const doc = generateInternalReportPdf({ ...data, company });
+  const doc = generateInternalReportPdf({ ...data, company, materialAnalysis });
   doc.pipe(res);
 });
 

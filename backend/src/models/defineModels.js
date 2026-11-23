@@ -67,6 +67,17 @@ const modelDefiners = [
   require('./EmployeeDeduction'),
   require('./VoucherCounter'),
   require('./VoucherSignature'),
+  require('./Warehouse'),
+  require('./Material'),
+  require('./MaterialLot'),
+  require('./MaterialTransfer'),
+  require('./MaterialTransferLine'),
+  require('./MaterialMovementSignature'),
+  require('./MaterialIssue'),
+  require('./MaterialIssueLine'),
+  require('./MaterialReturn'),
+  require('./MaterialReturnLine'),
+  require('./MaterialMovementAudit'),
 ];
 
 // Company (la tabla de empresas en sí), Permission (catálogo global fijo de permisos, no datos de

@@ -38,6 +38,9 @@ export default function ProjectLayout() {
     ...(hasFeature('estudio_mercado') && (isAdmin || can('estudio_mercado', 'view'))
       ? [{ to: 'market-study', label: t('projects.tabs.marketStudy') }]
       : []),
+    ...(isAdmin || can('inventario_materiales', 'view')
+      ? [{ to: 'materials', label: t('projects.tabs.materials') }]
+      : []),
     { to: 'delivery', label: t('projects.tabs.delivery') },
     { to: 'reports', label: t('projects.tabs.reports') },
   ];

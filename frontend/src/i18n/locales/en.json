@@ -28,6 +28,7 @@
     "notAvailable": "-",
     "create": "Create",
     "selectPlaceholder": "-- select --",
+    "all": "All",
     "noResults": "No results.",
     "showingResults": "Showing {{shown}} of {{total}} results — keep typing to filter further.",
     "unexpectedError": "An unexpected error occurred",
@@ -41,7 +42,8 @@
     "thirdParties": "Suppliers and Clients",
     "suppliers": "Suppliers",
     "clients": "Clients",
-    "inventory": "Inventory",
+    "inventory": "Equipment and Tools",
+    "materialsInventory": "Materials Inventory",
     "purchaseOrders": "Purchase Orders",
     "personnel": "Personnel",
     "expenses": "Expenses",
@@ -149,7 +151,8 @@
       "payments": "Project Payments",
       "delivery": "Final Delivery",
       "reports": "Reports",
-      "marketStudy": "Market Study"
+      "marketStudy": "Market Study",
+      "materials": "Materials"
     },
     "consortium": {
       "label": "Contracting entity",
@@ -449,6 +452,7 @@
       "budgetItem": "Budget item (optional)",
       "budgetItemPlain": "Budget item",
       "nonePlaceholder": "-- none --",
+      "inventariable": "Goes into warehouse stock (Materials Inventory)",
       "removeRow": "Remove",
       "addRow": "+ Add item",
       "createOrder": "Create order",
@@ -1241,8 +1245,154 @@
       "voucher": "Income Voucher"
     }
   },
+  "materialsInventory": {
+    "title": "Materials Inventory",
+    "tabs": {
+      "stock": "Stock",
+      "transfers": "Transfers",
+      "issues": "Issues",
+      "returns": "Returns",
+      "kardex": "Kardex",
+      "warehouses": "Warehouses",
+      "catalog": "Materials"
+    },
+    "transfers": {
+      "title": "Transfers between warehouses",
+      "newTransfer": "New transfer",
+      "from": "Source warehouse",
+      "to": "Destination warehouse",
+      "date": "Date",
+      "items": "Items",
+      "quantity": "Quantity",
+      "addItem": "Add item",
+      "observations": "Observations",
+      "detail": "View detail",
+      "empty": "No transfers registered.",
+      "status": {
+        "en_transito": "In transit",
+        "confirmado": "Confirmed",
+        "rechazado": "Rejected"
+      },
+      "sent": "Sent",
+      "received": "Received",
+      "shortageObservation": "Shortage note",
+      "rejectReason": "Rejection reason",
+      "rejectReasonRequired": "Enter the rejection reason.",
+      "confirmNow": "Confirm receipt",
+      "rejectAction": "Reject",
+      "alreadyRejected": "This movement was already rejected.",
+      "acceptAndSign": "Accept and sign"
+    },
+    "issues": {
+      "title": "Material issues",
+      "newIssue": "New issue",
+      "destination": "Destination",
+      "destinationProject": "Contract/project",
+      "destinationOther": "Other destination",
+      "receiver": "Receiver",
+      "receiverEmployee": "Personnel worker",
+      "receiverExternal": "External person",
+      "receiverName": "Name",
+      "receiverCedula": "ID number",
+      "receiverPhone": "Phone",
+      "receiverEmail": "Email",
+      "salePrice": "Sale price (optional)",
+      "status": {
+        "pendiente_firma": "Pending signature",
+        "firmado": "Signed",
+        "rechazado": "Rejected"
+      },
+      "signNow": "Sign now",
+      "empty": "No issues registered."
+    },
+    "returns": {
+      "title": "Material returns",
+      "newReturn": "New return",
+      "originIssue": "Source issue",
+      "returnable": "Returnable",
+      "empty": "No returns registered."
+    },
+    "catalog": {
+      "title": "Materials catalog",
+      "newMaterial": "New material",
+      "name": "Name",
+      "unit": "Unit",
+      "status": "Status",
+      "active": "Active",
+      "inactive": "Inactive",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "empty": "No materials registered."
+    },
+    "warehouses": {
+      "title": "Warehouses",
+      "newWarehouse": "New warehouse",
+      "name": "Name",
+      "location": "Location",
+      "managerName": "Manager",
+      "managerPhone": "Manager's phone",
+      "managerEmail": "Manager's email",
+      "status": "Status",
+      "active": "Active",
+      "inactive": "Inactive",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "default": "Main",
+      "empty": "No warehouses registered."
+    },
+    "stock": {
+      "title": "Stock by warehouse",
+      "available": "Available",
+      "viewLots": "View lots",
+      "hideLots": "Hide lots",
+      "purchaseOrder": "Source PO",
+      "supplier": "Supplier",
+      "receivedDate": "Received date",
+      "unitCost": "Unit cost",
+      "returnOrigin": "Return",
+      "empty": "This warehouse has no stock."
+    },
+    "kardex": {
+      "title": "Materials kardex",
+      "contract": "Contract/project",
+      "purchaseOrder": "Purchase order",
+      "movementType": "Movement type",
+      "person": "Person",
+      "user": "Registered by",
+      "quantity": "Quantity",
+      "from": "From",
+      "to": "To",
+      "empty": "No movements match these filters.",
+      "type": {
+        "entrada": "Entry (PO)",
+        "traslado_salida": "Transfer - out",
+        "traslado_entrada": "Transfer - in",
+        "salida": "Issue",
+        "devolucion": "Return"
+      }
+    },
+    "audit": {
+      "voidAction": "Void (Administrator only)",
+      "observation": "Observation (required)",
+      "observationRequired": "Enter the observation for the void."
+    },
+    "analysis": {
+      "title": "Material cost analysis by contract",
+      "issued": "Issued",
+      "returned": "Returned",
+      "netConsumption": "Net consumption",
+      "realCost": "Real cost",
+      "soldValue": "Sold value",
+      "margin": "Margin",
+      "byPurchaseOrder": "View breakdown by PO",
+      "noSalePrice": "No sale price",
+      "unpricedWarning": "{{cost}} in issued material has no recorded sale price — not included in the margin.",
+      "unpricedDetail": "{{quantity}} units ({{cost}}) with no recorded sale price, excluded from the margin.",
+      "empty": "No signed material movements for this contract."
+    }
+  },
   "inventory": {
-    "title": "Inventory",
+    "title": "Equipment and Tools",
     "tabs": {
       "catalog": "Catalog",
       "checkouts": "Checkouts and Returns"

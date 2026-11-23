@@ -34,6 +34,19 @@ async function nextIncomeNumber(transaction) {
   return nextVoucherNumber('ingreso', transaction);
 }
 
+// Consecutivos del Inventario de Materiales (ver materialTransferService.js/materialIssueService.js/
+// materialReturnService.js) — mismo contador atómico, kind nuevo cada uno (ver VoucherCounter.js/
+// postSyncFixups.js#extendVoucherCounterKindEnum).
+async function nextTransferNumber(transaction) {
+  return nextVoucherNumber('traslado', transaction);
+}
+async function nextMaterialIssueNumber(transaction) {
+  return nextVoucherNumber('salida_material', transaction);
+}
+async function nextMaterialReturnNumber(transaction) {
+  return nextVoucherNumber('devolucion_material', transaction);
+}
+
 // Primeros 3 dígitos de Project.contractNumber, para usar como prefijo visual en gastos/órdenes
 // de compra/contratos laborales/ingresos de caja AL MOMENTO DE CREARSE cada uno — null si el
 // proyecto no tiene número de contrato asignado (comportamiento sin cambios: se crea igual, solo
@@ -46,4 +59,7 @@ async function contractPrefixForProject(projectId, transaction) {
   return project.contractNumber.slice(0, 3);
 }
 
-module.exports = { nextExpenseNumber, nextIncomeNumber, contractPrefixForProject };
+module.exports = {
+  nextExpenseNumber, nextIncomeNumber, contractPrefixForProject,
+  nextTransferNumber, nextMaterialIssueNumber, nextMaterialReturnNumber,
+};

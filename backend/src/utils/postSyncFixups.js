@@ -10,6 +10,7 @@ const {
   Contract, Employee, Expense, ExpenseItem, ExpenseTax, InventoryItem, Minute, PaymentReceipt, Policy,
   ProgressPhoto, PurchaseReceipt, Severance, SocialSecurityDocument,
   SocialSecurityProvider, ThirdParty, WithholdingType, AdminExpenseCategory, PublicHoliday, LeaveType,
+  Warehouse, Permission, Role,
 } = require('../models/adminModels');
 const { TENANT_SCOPING_EXCLUDED } = require('../models/defineModels');
 const { runInTransactionContext } = require('../utils/tenantContext');
@@ -324,6 +325,9 @@ async function applyPostSyncFixups() {
   await backfillCashBoxMovementGrossAmount();
   await seedExpenseVoucherCounterForExistingCompanies();
   await backfillVoucherNumbersForExistingRecords();
+  await extendVoucherCounterKindEnum();
+  await seedDefaultWarehouseForExistingCompanies();
+  await backfillMaterialsInventoryPermissions();
 
   await ensureAppDbRole();
   await applyRowLevelSecurity();
@@ -605,6 +609,84 @@ async function backfillVoucherNumbersForExistingRecords() {
       // eslint-disable-next-line no-await-in-loop
       await CashBoxMovement.update({ incomeNumber, contractPrefix }, { where: { id: movement.id }, hooks: false, paranoid: false });
     }
+  }
+}
+
+// VoucherCounter.kind (ver VoucherCounter.js) ya existía en producción con solo 'egreso'/'ingreso'
+// (comprobantes de Gastos/Cajas) — sequelize.sync({alter:true}) no agrega valores nuevos a un ENUM
+// de Postgres ya creado, así que se agregan a mano acá para los nuevos consecutivos del Inventario
+// de Materiales (traslados/salidas/devoluciones). ADD VALUE IF NOT EXISTS es idempotente (Postgres
+// 9.6+), así que es seguro repetir esto en cada arranque, incluido el primer arranque de una
+// instalación nueva (donde el tipo ya se crea completo desde el modelo, y este ALTER no hace nada).
+async function extendVoucherCounterKindEnum() {
+  await sequelize.query(`
+    ALTER TYPE "enum_VoucherCounters_kind" ADD VALUE IF NOT EXISTS 'traslado';
+    ALTER TYPE "enum_VoucherCounters_kind" ADD VALUE IF NOT EXISTS 'salida_material';
+    ALTER TYPE "enum_VoucherCounters_kind" ADD VALUE IF NOT EXISTS 'devolucion_material';
+  `);
+}
+
+// Bodega Principal del Inventario de Materiales: se crea al aprovisionar una empresa nueva (ver
+// companyProvisioningService.js), pero las empresas que ya existían antes de este módulo nunca
+// pasaron por ahí — mismo criterio que seedAdminExpenseCategoriesForExistingCompanies. findOrCreate
+// por isDefault:true, así que es idempotente y seguro de repetir en cada arranque.
+async function seedDefaultWarehouseForExistingCompanies() {
+  const companies = await Company.findAll();
+  for (const company of companies) {
+    // eslint-disable-next-line no-await-in-loop
+    await runInTransactionContext(company.id, null, async () => {
+      await Warehouse.findOrCreate({ where: { isDefault: true }, defaults: { name: 'Bodega Principal', active: true } });
+    });
+  }
+}
+
+// Los módulos de permiso del Inventario de Materiales ('inventario_materiales', 'bodegas',
+// 'traslados_material', 'salidas_material', 'devoluciones_material') son nuevos en config/
+// permissions.js — una empresa nueva los recibe automáticamente vía companyProvisioningService.js
+// (que siembra TODOS los módulos de MODULES para TODOS los roles por defecto), pero una empresa ya
+// existente no: sus filas de Role ya existían antes de que estos módulos aparecieran en MODULES, así
+// que nunca se les asignó nada. A diferencia de otros módulos agregados antes en este proyecto (ver
+// backend/src/scripts/backfillEntregaFinalPermissions.js, un script manual de una sola vez), este
+// backfill corre en CADA arranque — más seguro para no depender de que alguien recuerde ejecutar un
+// script aparte después del deploy. role.addPermissions(...) no duplica si la permission ya estaba
+// asociada (la tabla intermedia tiene PK compuesta), así que repetirlo en cada arranque es inofensivo.
+// Si una empresa renombró/eliminó alguno de estos roles por defecto, ese rol puntual se omite (mismo
+// criterio que el script manual) — nunca se le pisa nada a un rol personalizado existente, solo se
+// AGREGAN permisos nuevos.
+async function backfillMaterialsInventoryPermissions() {
+  const NEW_MODULES = ['inventario_materiales', 'bodegas', 'traslados_material', 'salidas_material', 'devoluciones_material'];
+  const ALL_ACTIONS = ['view', 'create', 'edit', 'delete'];
+  const ROLE_ACTIONS = {
+    admin: { inventario_materiales: ALL_ACTIONS, bodegas: ALL_ACTIONS, traslados_material: ALL_ACTIONS, salidas_material: ALL_ACTIONS, devoluciones_material: ALL_ACTIONS },
+    gerente_proyecto: { inventario_materiales: ALL_ACTIONS, bodegas: ALL_ACTIONS, traslados_material: ALL_ACTIONS, salidas_material: ALL_ACTIONS, devoluciones_material: ALL_ACTIONS },
+    residente_obra: {
+      inventario_materiales: ['view'], bodegas: ['view'],
+      traslados_material: ['view', 'create', 'edit'], salidas_material: ['view', 'create'], devoluciones_material: ['view', 'create'],
+    },
+    financiero: { inventario_materiales: ['view'], bodegas: ['view'] },
+  };
+
+  const companies = await Company.findAll();
+  for (const company of companies) {
+    // eslint-disable-next-line no-await-in-loop
+    await runInTransactionContext(company.id, null, async () => {
+      const permByKey = {};
+      for (const moduleName of NEW_MODULES) {
+        for (const action of ALL_ACTIONS) {
+          // eslint-disable-next-line no-await-in-loop
+          const [perm] = await Permission.findOrCreate({ where: { module: moduleName, action } });
+          permByKey[`${moduleName}:${action}`] = perm;
+        }
+      }
+      for (const [roleName, moduleActions] of Object.entries(ROLE_ACTIONS)) {
+        // eslint-disable-next-line no-await-in-loop
+        const role = await Role.findOne({ where: { name: roleName, companyId: company.id } });
+        if (!role) continue;
+        const perms = Object.entries(moduleActions).flatMap(([moduleName, actions]) => actions.map((a) => permByKey[`${moduleName}:${a}`]));
+        // eslint-disable-next-line no-await-in-loop
+        await role.addPermissions(perms);
+      }
+    });
   }
 }
 

@@ -119,6 +119,15 @@ export function PurchaseOrdersIcon(props) {
   );
 }
 
+export function WarehouseIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" {...common} {...props}>
+      <path d="M3 10.5L12 4l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V10.5z" />
+      <path d="M9 21v-7h6v7" />
+    </svg>
+  );
+}
+
 export function CashBoxIcon(props) {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" {...common} {...props}>

@@ -1,6 +1,7 @@
 const { DataTypes } = require('sequelize');
 
-// Consecutivo atómico, por empresa, de los comprobantes de egreso (Gastos) e ingreso (Cajas) — ver
+// Consecutivo atómico, por empresa, de los comprobantes de egreso (Gastos), ingreso (Cajas) y los
+// movimientos del Inventario de Materiales (traslado/salida_material/devolucion_material) — ver
 // numberingService.js#nextVoucherNumber. Tabla dedicada en vez del patrón MAX(columna)+1 que
 // todavía usa el resto de la app (órdenes de compra, el expenseNumber "interno" de Gastos): un
 // UPSERT con ON CONFLICT DO UPDATE es atómico en una sola ida a la base de datos — dos peticiones
@@ -13,7 +14,7 @@ module.exports = (sequelize) => {
     // Aislamiento multi-tenant (ver applyTenantScoping.js): asignado automáticamente por los
     // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
     companyId: { type: DataTypes.UUID, allowNull: true },
-    kind: { type: DataTypes.ENUM('egreso', 'ingreso'), allowNull: false },
+    kind: { type: DataTypes.ENUM('egreso', 'ingreso', 'traslado', 'salida_material', 'devolucion_material'), allowNull: false },
     value: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
   }, {
     indexes: [{ unique: true, fields: ['companyId', 'kind'] }],

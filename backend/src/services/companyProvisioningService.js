@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const ApiError = require('../utils/ApiError');
-const { Company, User, Role, Permission, LaborParameters, CashBox, SocialSecurityProvider, WithholdingType, AdminExpenseCategory, PublicHoliday, LeaveType } = require('../models');
+const { Company, User, Role, Permission, LaborParameters, CashBox, SocialSecurityProvider, WithholdingType, AdminExpenseCategory, PublicHoliday, LeaveType, Warehouse } = require('../models');
 const { DEFAULT_SOCIAL_SECURITY_PROVIDERS } = require('../config/socialSecurityProviders');
 const { DEFAULT_WITHHOLDING_TYPES } = require('../config/withholdingTypes');
 const { DEFAULT_ADMIN_EXPENSE_CATEGORIES } = require('../config/adminExpenseCategories');
@@ -66,6 +66,14 @@ async function seedDefaultsForCompany(company, { adminName, adminEmail, adminPas
     await CashBox.findOrCreate({
       where: { name: 'Caja general' },
       defaults: { initialBalance: 0, status: 'activa' },
+    });
+
+    // Bodega Principal del Inventario de Materiales: destino por defecto de toda recepción de OC
+    // (ver purchaseOrderController.js#addReceipt) e indestructible (ver warehouseController.js) —
+    // así la empresa siempre tiene dónde recibir material desde el primer día.
+    await Warehouse.findOrCreate({
+      where: { isDefault: true },
+      defaults: { name: 'Bodega Principal', active: true },
     });
 
     for (const [type, names] of Object.entries(DEFAULT_SOCIAL_SECURITY_PROVIDERS)) {

@@ -28,6 +28,7 @@
     "notAvailable": "-",
     "create": "Crear",
     "selectPlaceholder": "-- seleccionar --",
+    "all": "Todos",
     "noResults": "Sin resultados.",
     "showingResults": "Mostrando {{shown}} de {{total}} resultados — sigue escribiendo para filtrar más.",
     "unexpectedError": "Ocurrió un error inesperado",
@@ -41,7 +42,8 @@
     "thirdParties": "Proveedores y Clientes",
     "suppliers": "Proveedores",
     "clients": "Clientes",
-    "inventory": "Inventario",
+    "inventory": "Equipos y Herramientas",
+    "materialsInventory": "Inventario de Materiales",
     "purchaseOrders": "Órdenes de Compra",
     "personnel": "Personal",
     "expenses": "Gastos",
@@ -149,7 +151,8 @@
       "payments": "Pagos al proyecto",
       "delivery": "Entrega Final",
       "reports": "Informes",
-      "marketStudy": "Estudio de Mercado"
+      "marketStudy": "Estudio de Mercado",
+      "materials": "Materiales"
     },
     "consortium": {
       "label": "Entidad contratante",
@@ -449,6 +452,7 @@
       "budgetItem": "Ítem presupuesto (opcional)",
       "budgetItemPlain": "Ítem presupuesto",
       "nonePlaceholder": "-- ninguno --",
+      "inventariable": "Entra a bodega (Inventario de Materiales)",
       "removeRow": "Quitar",
       "addRow": "+ Agregar ítem",
       "createOrder": "Crear orden",
@@ -1241,8 +1245,154 @@
       "voucher": "Comprobante de Ingreso"
     }
   },
+  "materialsInventory": {
+    "title": "Inventario de Materiales",
+    "tabs": {
+      "stock": "Existencias",
+      "transfers": "Traslados",
+      "issues": "Salidas",
+      "returns": "Devoluciones",
+      "kardex": "Kardex",
+      "warehouses": "Bodegas",
+      "catalog": "Materiales"
+    },
+    "transfers": {
+      "title": "Traslados entre bodegas",
+      "newTransfer": "Nuevo traslado",
+      "from": "Bodega de origen",
+      "to": "Bodega de destino",
+      "date": "Fecha",
+      "items": "Ítems",
+      "quantity": "Cantidad",
+      "addItem": "Agregar ítem",
+      "observations": "Observaciones",
+      "detail": "Ver detalle",
+      "empty": "No hay traslados registrados.",
+      "status": {
+        "en_transito": "En tránsito",
+        "confirmado": "Confirmado",
+        "rechazado": "Rechazado"
+      },
+      "sent": "Enviado",
+      "received": "Recibido",
+      "shortageObservation": "Observación del faltante",
+      "rejectReason": "Motivo de rechazo",
+      "rejectReasonRequired": "Escribe el motivo del rechazo.",
+      "confirmNow": "Confirmar recepción",
+      "rejectAction": "Rechazar",
+      "alreadyRejected": "Este movimiento ya fue rechazado.",
+      "acceptAndSign": "Aceptar y firmar"
+    },
+    "issues": {
+      "title": "Salidas de material",
+      "newIssue": "Nueva salida",
+      "destination": "Destino",
+      "destinationProject": "Contrato/proyecto",
+      "destinationOther": "Otro destino",
+      "receiver": "Recibe",
+      "receiverEmployee": "Trabajador de Personal",
+      "receiverExternal": "Persona externa",
+      "receiverName": "Nombre",
+      "receiverCedula": "Cédula",
+      "receiverPhone": "Celular",
+      "receiverEmail": "Correo",
+      "salePrice": "Precio de venta (opcional)",
+      "status": {
+        "pendiente_firma": "Pendiente de firma",
+        "firmado": "Firmado",
+        "rechazado": "Rechazado"
+      },
+      "signNow": "Firmar ahora",
+      "empty": "No hay salidas registradas."
+    },
+    "returns": {
+      "title": "Devoluciones de material",
+      "newReturn": "Nueva devolución",
+      "originIssue": "Salida de origen",
+      "returnable": "Devolvible",
+      "empty": "No hay devoluciones registradas."
+    },
+    "catalog": {
+      "title": "Catálogo de materiales",
+      "newMaterial": "Nuevo material",
+      "name": "Nombre",
+      "unit": "Unidad",
+      "status": "Estado",
+      "active": "Activo",
+      "inactive": "Inactivo",
+      "deactivate": "Desactivar",
+      "activate": "Activar",
+      "empty": "No hay materiales registrados."
+    },
+    "warehouses": {
+      "title": "Bodegas",
+      "newWarehouse": "Nueva bodega",
+      "name": "Nombre",
+      "location": "Ubicación",
+      "managerName": "Responsable",
+      "managerPhone": "Celular del responsable",
+      "managerEmail": "Correo del responsable",
+      "status": "Estado",
+      "active": "Activa",
+      "inactive": "Inactiva",
+      "deactivate": "Desactivar",
+      "activate": "Activar",
+      "default": "Principal",
+      "empty": "No hay bodegas registradas."
+    },
+    "stock": {
+      "title": "Existencias por bodega",
+      "available": "Disponible",
+      "viewLots": "Ver lotes",
+      "hideLots": "Ocultar lotes",
+      "purchaseOrder": "OC de origen",
+      "supplier": "Proveedor",
+      "receivedDate": "Fecha de ingreso",
+      "unitCost": "Costo unitario",
+      "returnOrigin": "Devolución",
+      "empty": "Esta bodega no tiene existencias."
+    },
+    "kardex": {
+      "title": "Kardex de materiales",
+      "contract": "Contrato/proyecto",
+      "purchaseOrder": "Orden de compra",
+      "movementType": "Tipo de movimiento",
+      "person": "Persona",
+      "user": "Registrado por",
+      "quantity": "Cantidad",
+      "from": "Desde",
+      "to": "Hasta",
+      "empty": "No hay movimientos con estos filtros.",
+      "type": {
+        "entrada": "Entrada (OC)",
+        "traslado_salida": "Traslado - salida",
+        "traslado_entrada": "Traslado - entrada",
+        "salida": "Salida",
+        "devolucion": "Devolución"
+      }
+    },
+    "audit": {
+      "voidAction": "Anular (solo Administrador)",
+      "observation": "Observación (obligatoria)",
+      "observationRequired": "Escribe la observación de la anulación."
+    },
+    "analysis": {
+      "title": "Análisis de material por contrato",
+      "issued": "Entregado",
+      "returned": "Devuelto",
+      "netConsumption": "Consumo neto",
+      "realCost": "Costo real",
+      "soldValue": "Valor de venta",
+      "margin": "Margen",
+      "byPurchaseOrder": "Ver detalle por OC",
+      "noSalePrice": "Sin precio de venta",
+      "unpricedWarning": "Hay {{cost}} en material entregado sin precio de venta registrado — no se incluye en el margen.",
+      "unpricedDetail": "{{quantity}} unidades ({{cost}}) sin precio de venta registrado, no incluidas en el margen.",
+      "empty": "No hay movimientos de material firmados para este contrato."
+    }
+  },
   "inventory": {
-    "title": "Inventario",
+    "title": "Equipos y Herramientas",
     "tabs": {
       "catalog": "Catálogo",
       "checkouts": "Salidas y Entradas"

@@ -2,11 +2,15 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const {
   sequelize, PurchaseOrder, PurchaseOrderItem, PurchaseReceipt, PurchaseOrderPayment, Expense, ExpenseItem, BudgetItem, APU, Project, ThirdParty, User,
+  Material,
 } = require('../models');
 const {
   getOrderItemsWithDelivery, getItemWithDelivery, isOrderFullyDelivered, getPurchaseReport, nextOrderNumber,
   computeOrderTotals,
 } = require('../services/purchaseOrderService');
+const {
+  findOrCreateMaterialByName, getDefaultWarehouse, assertWarehouseUsable, createLotFromReceipt, adjustLotForReceiptCorrection,
+} = require('../services/materialLotService');
 const { generatePurchaseOrderPdf } = require('../services/pdfService');
 const { getLetterheadForProject } = require('../services/letterheadService');
 const { assertCashBoxUsable, overdraftWarning } = require('../services/cashBoxService');
@@ -47,6 +51,25 @@ function withPaymentTotals(orderJson, totalPaid) {
 // casos: cuando la ruta trae :projectId se usa como filtro estricto (igual que antes); cuando no,
 // se opera sobre la orden por su id sin esa restricción. Así no se duplica el modelo de negocio
 // entre los dos puntos de entrada.
+
+// Resuelve inventariable/materialId de un ítem NUEVO (ver Inventario de Materiales): inventariable
+// por defecto true (la mayoría de ítems de una OC de obra SÍ es material) — si viene en false
+// (servicios/transporte), nunca se le asigna material. Si trae materialId explícito, se usa tal
+// cual (validado contra el catálogo de la empresa vía Capa 1); si no, se deriva por nombre
+// (findOrCreate, ver materialLotService.js) para no obligar a elegir de un catálogo vacío la
+// primera vez. Solo se llama al CREAR el ítem — editarlo después nunca re-deriva el material a
+// partir de un nombre cambiado (ver updateItem), para no desalinear los lotes ya generados.
+async function resolveNewItemMaterial(it, transaction) {
+  const inventariable = it.inventariable !== false;
+  if (!inventariable) return { inventariable: false, materialId: null };
+  if (it.materialId) {
+    const material = await Material.findByPk(it.materialId, { transaction });
+    if (!material) throw new ApiError(400, `Material ${it.materialId} no encontrado`);
+    return { inventariable: true, materialId: material.id };
+  }
+  const material = await findOrCreateMaterialByName(it.name, it.unit, transaction);
+  return { inventariable: true, materialId: material.id };
+}
 
 // projectId a validar contra la orden: el de la URL si la ruta es anidada, o el que ya tiene
 // guardado la orden si es la ruta global (para no forzar mismatch cuando no aplica).
@@ -174,8 +197,13 @@ const create = asyncHandler(async (req, res) => {
       contractPrefix,
     }, { transaction: t });
 
-    await PurchaseOrderItem.bulkCreate(
-      items.map((it) => ({
+    // Secuencial, no Promise.all: todas comparten la MISMA transacción/conexión (t), y dos
+    // consultas concurrentes sobre una sola conexión de Postgres no son seguras.
+    const itemRows = [];
+    for (const it of items) {
+      // eslint-disable-next-line no-await-in-loop
+      const { inventariable, materialId } = await resolveNewItemMaterial(it, t);
+      itemRows.push({
         purchaseOrderId: created.id,
         budgetItemId: it.budgetItemId || null,
         name: it.name,
@@ -184,9 +212,11 @@ const create = asyncHandler(async (req, res) => {
         unitPrice: it.unitPrice,
         totalValue: Number(it.quantityOrdered) * Number(it.unitPrice),
         vatPercent: it.vatPercent !== undefined ? it.vatPercent : 19,
-      })),
-      { transaction: t }
-    );
+        inventariable,
+        materialId,
+      });
+    }
+    await PurchaseOrderItem.bulkCreate(itemRows, { transaction: t });
     return created;
   });
 
@@ -239,7 +269,7 @@ const updateItem = asyncHandler(async (req, res) => {
   const item = await PurchaseOrderItem.findOne({ where: { id: req.params.itemId, purchaseOrderId: order.id } });
   if (!item) throw new ApiError(404, 'Ítem de orden de compra no encontrado');
 
-  const { name, unit, quantityOrdered, unitPrice, budgetItemId, vatPercent } = req.body;
+  const { name, unit, quantityOrdered, unitPrice, budgetItemId, vatPercent, inventariable, materialId } = req.body;
   const nextQuantity = quantityOrdered !== undefined ? Number(quantityOrdered) : Number(item.quantityOrdered);
   const nextUnitPrice = unitPrice !== undefined ? Number(unitPrice) : Number(item.unitPrice);
   if (nextQuantity < 0 || nextUnitPrice < 0) throw new ApiError(400, 'Cantidad y precio unitario no pueden ser negativos');
@@ -250,6 +280,26 @@ const updateItem = asyncHandler(async (req, res) => {
   const { delivered } = await getItemWithDelivery(item.id);
   if (nextQuantity < delivered) {
     throw new ApiError(400, `La cantidad ordenada (${nextQuantity}) no puede ser menor a la cantidad ya entregada (${delivered})`);
+  }
+
+  // inventariable/materialId solo se pueden tocar ANTES de la primera recepción (ver Inventario de
+  // Materiales): ya recibido, cada lote generado quedó atado al materialId de ese momento — cambiarlo
+  // después desalinearía las recepciones futuras del mismo ítem contra las ya hechas.
+  if ((inventariable !== undefined || materialId !== undefined) && delivered > 0) {
+    throw new ApiError(400, 'No se puede cambiar si el ítem es inventariable ni su material: ya tiene recepciones registradas.');
+  }
+  if (inventariable !== undefined) {
+    item.inventariable = Boolean(inventariable);
+    if (!item.inventariable) item.materialId = null;
+  }
+  if (materialId !== undefined && item.inventariable) {
+    if (materialId) {
+      const material = await Material.findByPk(materialId);
+      if (!material) throw new ApiError(400, `Material ${materialId} no encontrado`);
+      item.materialId = material.id;
+    } else {
+      item.materialId = null;
+    }
   }
 
   if (budgetItemId !== undefined) {
@@ -388,6 +438,9 @@ const updateOrder = asyncHandler(async (req, res) => {
           existing.totalValue = totalValue;
           await existing.save({ transaction: t });
         } else {
+          // eslint-disable-next-line no-await-in-loop
+          const { inventariable, materialId } = await resolveNewItemMaterial(it, t);
+          // eslint-disable-next-line no-await-in-loop
           await PurchaseOrderItem.create({
             purchaseOrderId: order.id,
             budgetItemId: it.budgetItemId || null,
@@ -397,6 +450,8 @@ const updateOrder = asyncHandler(async (req, res) => {
             unitPrice: it.unitPrice,
             totalValue,
             vatPercent: it.vatPercent !== undefined ? it.vatPercent : 19,
+            inventariable,
+            materialId,
           }, { transaction: t });
         }
       }
@@ -587,7 +642,7 @@ const addReceipt = asyncHandler(async (req, res) => {
   const item = await PurchaseOrderItem.findOne({ where: { id: req.params.itemId, purchaseOrderId: order.id } });
   if (!item) throw new ApiError(404, 'Ítem de orden de compra no encontrado');
 
-  const { date, quantityReceived, notes } = req.body;
+  const { date, quantityReceived, notes, warehouseId } = req.body;
   if (!date || quantityReceived === undefined) throw new ApiError(400, 'date y quantityReceived son obligatorios');
   if (Number(quantityReceived) < 0) throw new ApiError(400, 'La cantidad recibida no puede ser negativa');
 
@@ -598,7 +653,7 @@ const addReceipt = asyncHandler(async (req, res) => {
     ? `La cantidad entregada acumulada (${deliveredAfter}) supera la cantidad ordenada (${item.quantityOrdered}).`
     : null;
 
-  const receipt = await sequelize.transaction(async (t) => {
+  const { receipt, lot } = await sequelize.transaction(async (t) => {
     const receiptCreated = await PurchaseReceipt.create({
       purchaseOrderItemId: item.id,
       date,
@@ -612,10 +667,23 @@ const addReceipt = asyncHandler(async (req, res) => {
       await order.save({ transaction: t });
     }
 
-    return receiptCreated;
+    // Inventario de Materiales: un ítem inventariable crea su lote en la bodega destino (por
+    // defecto la Bodega Principal) en la MISMA transacción que la recepción — nunca genera un
+    // gasto (ver comentario de addReceipt más arriba, sigue siendo cierto).
+    let lotCreated = null;
+    if (item.inventariable) {
+      const warehouse = warehouseId
+        ? await assertWarehouseUsable(warehouseId, { transaction: t })
+        : await getDefaultWarehouse(t);
+      lotCreated = await createLotFromReceipt({
+        item, order, receipt: receiptCreated, warehouse, date, quantityReceived, userId: req.user.id, transaction: t,
+      });
+    }
+
+    return { receipt: receiptCreated, lot: lotCreated };
   });
 
-  res.status(201).json({ receipt, warning });
+  res.status(201).json({ receipt, lot, warning });
 });
 
 // Corrige la cantidad recibida de una recepción ya registrada (ej. el usuario puso 3 cuando la
@@ -644,12 +712,19 @@ const updateReceipt = asyncHandler(async (req, res) => {
   if (quantityReceived === undefined) throw new ApiError(400, 'quantityReceived es obligatorio');
   if (Number(quantityReceived) < 0) throw new ApiError(400, 'La cantidad recibida no puede ser negativa');
 
-  receipt.quantityReceived = quantityReceived;
-  if (date !== undefined) receipt.date = date;
-  if (notes !== undefined) receipt.notes = notes;
-  receipt.editedBy = req.user.id;
-  receipt.editedAt = new Date();
-  await receipt.save();
+  await sequelize.transaction(async (t) => {
+    // Ajusta primero el lote (puede lanzar 400 si ya salió más de lo que quedaría recibido, ver
+    // materialLotService.js) — si falla, la recepción tampoco se corrige: no puede quedar el lote
+    // desalineado contra PurchaseReceipt.quantityReceived.
+    await adjustLotForReceiptCorrection({ receiptId: receipt.id, newQuantityReceived: quantityReceived, transaction: t });
+
+    receipt.quantityReceived = quantityReceived;
+    if (date !== undefined) receipt.date = date;
+    if (notes !== undefined) receipt.notes = notes;
+    receipt.editedBy = req.user.id;
+    receipt.editedAt = new Date();
+    await receipt.save({ transaction: t });
+  });
 
   const items = await getOrderItemsWithDelivery(order.id);
   const totals = computeOrderTotals(items, order.retentionPercent);

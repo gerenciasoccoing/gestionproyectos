@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { purchaseOrdersApi, budgetApi, thirdPartiesApi, cashBoxesApi } from '../../api';
+import { purchaseOrdersApi, budgetApi, thirdPartiesApi, cashBoxesApi, warehousesApi } from '../../api';
 import { Card, Button, Input, Select, SearchSelect, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { purchaseOrderPdfUrl, fileUrl } from '../../api/client';
 import Can from '../../components/Can';
@@ -17,7 +17,7 @@ const STATUS_COLORS = {
 
 const CATEGORIES = ['mano_obra', 'materiales', 'equipos', 'viaticos', 'imprevistos'];
 
-function emptyOrderLine() { return { name: '', unit: '', quantityOrdered: '', unitPrice: '', budgetItemId: '', vatPercent: 19 }; }
+function emptyOrderLine() { return { name: '', unit: '', quantityOrdered: '', unitPrice: '', budgetItemId: '', vatPercent: 19, inventariable: true }; }
 
 export default function PurchaseOrdersPage() {
   const { t, i18n } = useTranslation();
@@ -208,7 +208,7 @@ export default function PurchaseOrdersPage() {
             </div>
             <p className="text-sm font-medium text-gray-600 mb-2">{t('execution.purchaseOrders.items')}</p>
             {form.items.map((it, idx) => (
-              <div key={idx} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 mb-2 items-end">
+              <div key={idx} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 gap-2 mb-2 items-end">
                 <Input label={t('execution.purchaseOrders.itemName')} value={it.name} onChange={(e) => updateItemRow(idx, 'name', e.target.value)} required />
                 <Input label={t('execution.purchaseOrders.unit')} value={it.unit} onChange={(e) => updateItemRow(idx, 'unit', e.target.value)} required />
                 <Input label={t('execution.purchaseOrders.orderedQty')} type="number" min="0" step="0.01" value={it.quantityOrdered} onChange={(e) => updateItemRow(idx, 'quantityOrdered', e.target.value)} required />
@@ -221,6 +221,10 @@ export default function PurchaseOrdersPage() {
                   onChange={(v) => updateItemRow(idx, 'budgetItemId', v)}
                   placeholder={t('execution.purchaseOrders.nonePlaceholder')}
                 />
+                <label className="flex items-center gap-1.5 text-xs text-gray-600 mb-1.5">
+                  <input type="checkbox" checked={it.inventariable !== false} onChange={(e) => updateItemRow(idx, 'inventariable', e.target.checked)} />
+                  {t('execution.purchaseOrders.inventariable')}
+                </label>
                 <Button type="button" variant="danger" onClick={() => removeRow(idx)}>{t('execution.purchaseOrders.removeRow')}</Button>
               </div>
             ))}
@@ -349,6 +353,7 @@ function OrderDetail({ projectId, orderId, budgetItems, cashBoxes, onChange }) {
   const { t } = useTranslation();
   const { isAdmin } = useAuth();
   const [order, setOrder] = useState(null);
+  const [warehouses, setWarehouses] = useState([]);
   const [receiptForms, setReceiptForms] = useState({});
   const [closureReason, setClosureReason] = useState('');
   const [editingId, setEditingId] = useState(null);
@@ -365,6 +370,7 @@ function OrderDetail({ projectId, orderId, budgetItems, cashBoxes, onChange }) {
 
   const load = () => purchaseOrdersApi.get(projectId, orderId).then(setOrder);
   useEffect(() => { load(); }, [projectId, orderId]);
+  useEffect(() => { warehousesApi.list().then(setWarehouses); }, []);
 
   const assignedCashBox = order && cashBoxes.find((cb) => cb.id === order.cashBoxId);
 
@@ -579,6 +585,11 @@ function OrderDetail({ projectId, orderId, budgetItems, cashBoxes, onChange }) {
                       <div className="flex flex-wrap gap-2">
                         <Input type="date" value={receiptForms[it.id]?.date || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], date: e.target.value } }))} />
                         <Input type="number" min="0" step="0.01" placeholder={t('execution.purchaseOrders.receiptQty')} value={receiptForms[it.id]?.quantityReceived || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], quantityReceived: e.target.value } }))} />
+                        {it.inventariable !== false && warehouses.length > 0 && (
+                          <Select value={receiptForms[it.id]?.warehouseId || ''} onChange={(e) => setReceiptForms((f) => ({ ...f, [it.id]: { ...f[it.id], warehouseId: e.target.value } }))}>
+                            {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}{w.isDefault ? ` (${t('materialsInventory.warehouses.default')})` : ''}</option>)}
+                          </Select>
+                        )}
                         <Button onClick={() => submitReceiptFor(it.id)} loading={submittingReceipt}>{t('execution.purchaseOrders.register')}</Button>
                       </div>
                     )}

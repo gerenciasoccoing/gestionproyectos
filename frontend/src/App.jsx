@@ -52,6 +52,17 @@ import InventoryLayout from './pages/inventory/InventoryLayout';
 import InventoryCatalogPage from './pages/inventory/InventoryCatalogPage';
 import InventoryCheckoutsPage from './pages/inventory/InventoryCheckoutsPage';
 
+import MaterialsInventoryLayout from './pages/materials/MaterialsInventoryLayout';
+import MaterialStockPage from './pages/materials/MaterialStockPage';
+import WarehousesPage from './pages/materials/WarehousesPage';
+import MaterialCatalogPage from './pages/materials/MaterialCatalogPage';
+import MaterialTransfersPage from './pages/materials/MaterialTransfersPage';
+import MaterialIssuesPage from './pages/materials/MaterialIssuesPage';
+import MaterialReturnsPage from './pages/materials/MaterialReturnsPage';
+import MaterialKardexPage from './pages/materials/MaterialKardexPage';
+import ProjectMaterialAnalysisPage from './pages/materials/ProjectMaterialAnalysisPage';
+import SignMaterialPage from './pages/public/SignMaterialPage';
+
 import AdminLayout from './pages/admin/AdminLayout';
 import UsersPage from './pages/admin/UsersPage';
 import RolesPage from './pages/admin/RolesPage';
@@ -75,6 +86,7 @@ export default function App() {
       <Route path="/confirm/:token" element={<ConfirmationPage />} />
       <Route path="/sign-contract/:token" element={<SignContractPage />} />
       <Route path="/sign-voucher/:token" element={<SignVoucherPage />} />
+      <Route path="/sign-material/:token" element={<SignMaterialPage />} />
       <Route path="/platform-admin/login" element={<PlatformAdminLoginPage />} />
       <Route path="/platform-admin" element={<PlatformAdminDashboardPage />} />
 
@@ -103,6 +115,17 @@ export default function App() {
           <Route index element={<Navigate to="catalog" replace />} />
           <Route path="catalog" element={<InventoryCatalogPage />} />
           <Route path="checkouts" element={<InventoryCheckoutsPage />} />
+        </Route>
+
+        <Route path="materials-inventory" element={<ProtectedRoute module="inventario_materiales" action="view"><MaterialsInventoryLayout /></ProtectedRoute>}>
+          <Route index element={<Navigate to="stock" replace />} />
+          <Route path="stock" element={<MaterialStockPage />} />
+          <Route path="transfers" element={<MaterialTransfersPage />} />
+          <Route path="issues" element={<MaterialIssuesPage />} />
+          <Route path="returns" element={<MaterialReturnsPage />} />
+          <Route path="kardex" element={<MaterialKardexPage />} />
+          <Route path="warehouses" element={<WarehousesPage />} />
+          <Route path="catalog" element={<MaterialCatalogPage />} />
         </Route>
 
         <Route path="admin" element={<ProtectedRoute module="admin" action="view"><AdminLayout /></ProtectedRoute>}>
@@ -141,6 +164,7 @@ export default function App() {
           <Route path="payments" element={<ProjectPaymentsPage />} />
           <Route path="market-study" element={<ProtectedRoute feature="estudio_mercado" module="estudio_mercado" action="view"><MarketStudiesPage /></ProtectedRoute>} />
           <Route path="market-study/:studyId" element={<ProtectedRoute feature="estudio_mercado" module="estudio_mercado" action="view"><MarketStudyDetailPage /></ProtectedRoute>} />
+          <Route path="materials" element={<ProtectedRoute module="inventario_materiales" action="view"><ProjectMaterialAnalysisPage /></ProtectedRoute>} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="reports/client-preview" element={<ClientReportPreviewPage />} />
         </Route>

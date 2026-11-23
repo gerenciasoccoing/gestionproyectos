@@ -29,6 +29,13 @@ router.use('/social-security-providers', require('./socialSecurityProviderRoutes
 router.use('/register-company', require('./companyRegistrationRoutes'));
 router.use('/contract-signature', require('./contractSignatureRoutes'));
 router.use('/voucher-signature', require('./voucherSignatureRoutes'));
+router.use('/warehouses', require('./warehouseRoutes'));
+router.use('/materials', require('./materialRoutes'));
+router.use('/material-transfers', require('./materialTransferRoutes'));
+router.use('/material-issues', require('./materialIssueRoutes'));
+router.use('/material-returns', require('./materialReturnRoutes'));
+router.use('/material-kardex', require('./materialKardexRoutes'));
+router.use('/sign-material', require('./materialSignatureRoutes'));
 
 router.use('/projects', require('./projectRoutes'));
 router.use('/projects/:projectId/contracts', require('./contractRoutes'));
@@ -44,6 +51,7 @@ router.use('/projects/:projectId/employees', require('./employeeRoutes'));
 router.use('/projects/:projectId/expenses', require('./expenseRoutes'));
 router.use('/projects/:projectId/risks', require('./riskRoutes'));
 router.use('/projects/:projectId/reports', require('./reportRoutes'));
+router.use('/projects/:projectId/material-analysis', require('./materialContractAnalysisRoutes'));
 router.use('/projects/:projectId/execution', require('./executionRoutes'));
 router.use('/projects/:projectId/delivery-documents', require('./projectDeliveryDocumentRoutes'));
 router.use('/projects/:projectId/payments', require('./projectPaymentsRoutes'));

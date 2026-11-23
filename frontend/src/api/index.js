@@ -518,6 +518,80 @@ export const inventoryConfirmationsApi = {
   confirm: (token) => client.post(`/inventory-confirmations/${token}/confirm`).then((r) => r.data),
 };
 
+// Inventario de Materiales — módulo aparte de inventoryItemsApi/inventoryCheckoutsApi (que siguen
+// siendo solo Equipos y Herramientas, sin cambios).
+export const warehousesApi = {
+  list: () => client.get('/warehouses').then((r) => r.data),
+  get: (id) => client.get(`/warehouses/${id}`).then((r) => r.data),
+  create: (data) => client.post('/warehouses', data).then((r) => r.data),
+  update: (id, data) => client.put(`/warehouses/${id}`, data).then((r) => r.data),
+};
+
+export const materialsApi = {
+  list: () => client.get('/materials').then((r) => r.data),
+  create: (data) => client.post('/materials', data).then((r) => r.data),
+  update: (id, data) => client.put(`/materials/${id}`, data).then((r) => r.data),
+  setStatus: (id, active) => client.post(`/materials/${id}/status`, { active }).then((r) => r.data),
+};
+
+export const materialTransfersApi = {
+  list: (warehouseId) => client.get('/material-transfers', { params: warehouseId ? { warehouseId } : {} }).then((r) => r.data),
+  get: (id) => client.get(`/material-transfers/${id}`).then((r) => r.data),
+  create: (data) => client.post('/material-transfers', data).then((r) => r.data),
+  confirm: (id, data) => client.post(`/material-transfers/${id}/confirm`, data).then((r) => r.data),
+  reject: (id, rejectionReason) => client.post(`/material-transfers/${id}/reject`, { rejectionReason }).then((r) => r.data),
+  voidSigned: (id, observation) => client.post(`/material-transfers/${id}/void`, { observation }).then((r) => r.data),
+  requestSignature: (id, data) => client.post(`/material-transfers/${id}/request-signature`, data).then((r) => r.data),
+  getSignature: (id) => client.get(`/material-transfers/${id}/signature`).then((r) => r.data),
+  pdfUrl: (id) => pdfUrlWithToken(`/material-transfers/${id}/pdf`),
+};
+
+export const materialIssuesApi = {
+  list: (params) => client.get('/material-issues', { params }).then((r) => r.data),
+  get: (id) => client.get(`/material-issues/${id}`).then((r) => r.data),
+  create: (data) => client.post('/material-issues', data).then((r) => r.data),
+  sign: (id, data) => client.post(`/material-issues/${id}/sign`, data).then((r) => r.data),
+  reject: (id, rejectionReason) => client.post(`/material-issues/${id}/reject`, { rejectionReason }).then((r) => r.data),
+  voidSigned: (id, observation) => client.post(`/material-issues/${id}/void`, { observation }).then((r) => r.data),
+  requestSignature: (id, data) => client.post(`/material-issues/${id}/request-signature`, data).then((r) => r.data),
+  getSignature: (id) => client.get(`/material-issues/${id}/signature`).then((r) => r.data),
+  pdfUrl: (id) => pdfUrlWithToken(`/material-issues/${id}/pdf`),
+};
+
+export const materialReturnsApi = {
+  list: (params) => client.get('/material-returns', { params }).then((r) => r.data),
+  get: (id) => client.get(`/material-returns/${id}`).then((r) => r.data),
+  returnable: (issueId) => client.get(`/material-returns/returnable/${issueId}`).then((r) => r.data),
+  create: (data) => client.post('/material-returns', data).then((r) => r.data),
+  sign: (id, data) => client.post(`/material-returns/${id}/sign`, data).then((r) => r.data),
+  reject: (id, rejectionReason) => client.post(`/material-returns/${id}/reject`, { rejectionReason }).then((r) => r.data),
+  voidSigned: (id, observation) => client.post(`/material-returns/${id}/void`, { observation }).then((r) => r.data),
+  requestSignature: (id, data) => client.post(`/material-returns/${id}/request-signature`, data).then((r) => r.data),
+  pdfUrl: (id) => pdfUrlWithToken(`/material-returns/${id}/pdf`),
+};
+
+// Kardex: histórico unificado de movimientos (Fase 6) — puramente de lectura, filtros vía query
+// params (ver materialKardexController.js).
+export const materialKardexApi = {
+  list: (params) => client.get('/material-kardex', { params }).then((r) => r.data),
+};
+
+// Análisis de material por contrato (Fase 7) — ver materialContractAnalysisController.js.
+export const materialContractAnalysisApi = {
+  get: (projectId) => client.get(`/projects/${projectId}/material-analysis`).then((r) => r.data),
+  pdfUrl: (projectId) => pdfUrlWithToken(`/projects/${projectId}/material-analysis/pdf`),
+  excelUrl: (projectId) => pdfUrlWithToken(`/projects/${projectId}/material-analysis/excel`),
+};
+
+// Flujo PÚBLICO de firma/rechazo de movimientos del Inventario de Materiales (traslados/salidas/
+// devoluciones, sin sesión, ver materialSignatureRoutes.js) — mismo criterio que voucherSignatureApi.
+export const materialSignatureApi = {
+  get: (token) => client.get(`/sign-material/${token}`).then((r) => r.data),
+  documentUrl: (token) => `${(import.meta.env.VITE_API_URL || 'http://localhost:4000/api')}/sign-material/${token}/document`,
+  sign: (token, data) => client.post(`/sign-material/${token}/sign`, data).then((r) => r.data),
+  reject: (token, rejectionReason) => client.post(`/sign-material/${token}/reject`, { rejectionReason }).then((r) => r.data),
+};
+
 export const risksApi = {
   list: (pid) => client.get(`/projects/${pid}/risks`).then((r) => r.data),
   create: (pid, data) => client.post(`/projects/${pid}/risks`, data).then((r) => r.data),

@@ -19,11 +19,20 @@ module.exports = (sequelize) => {
     // % de IVA de este ítem (Colombia: 19% general). Editable por ítem porque una misma orden
     // puede mezclar productos gravados a distinta tarifa (ej. exentos al 0%).
     vatPercent: { type: DataTypes.DECIMAL(5, 2), allowNull: false, defaultValue: 19, validate: { min: 0, max: 100 } },
+    // Inventario de Materiales (ver materialLotService.js): si es true (default — la mayoría de
+    // ítems de una OC de construcción SON material), cada recepción de este ítem crea un lote en
+    // bodega. false para servicios/transporte/mano de obra, que nunca deben entrar a bodega.
+    // materialId se resuelve automáticamente por nombre al crear/editar el ítem (ver
+    // purchaseOrderController.js) — nunca en el momento de la recepción, para que todas sus
+    // recepciones usen siempre el mismo material del catálogo.
+    inventariable: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+    materialId: { type: DataTypes.UUID, allowNull: true },
   });
 
   PurchaseOrderItem.associate = (models) => {
     PurchaseOrderItem.belongsTo(models.PurchaseOrder, { foreignKey: 'purchaseOrderId' });
     PurchaseOrderItem.belongsTo(models.BudgetItem, { foreignKey: 'budgetItemId' });
+    PurchaseOrderItem.belongsTo(models.Material, { foreignKey: 'materialId' });
     PurchaseOrderItem.hasMany(models.PurchaseReceipt, { foreignKey: 'purchaseOrderItemId', as: 'receipts', onDelete: 'CASCADE' });
   };
 
