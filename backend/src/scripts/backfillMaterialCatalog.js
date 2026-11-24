@@ -22,7 +22,7 @@
 // Uso: node src/scripts/backfillMaterialCatalog.js
 require('dotenv').config();
 const { Company, PurchaseOrderItem, PurchaseOrder, Material, MaterialCategory } = require('../models');
-const { runWithCompany } = require('../utils/tenantContext');
+const { runWithCompany, getCurrentTransaction } = require('../utils/tenantContext');
 const { findOrCreateMaterial } = require('../services/materialCatalogService');
 const { normalizeMaterialText } = require('../utils/textNormalize');
 
@@ -54,9 +54,15 @@ async function run() {
             console.log(`[${company.companyName}] Ítem ${item.id} (OC-${item.PurchaseOrder?.orderNumber}) sin nombre o unidad — se omite, revisar a mano.`);
             continue;
           }
+          // findOrCreateMaterial puede necesitar asignar un código nuevo (ver numberingService.js#
+          // nextMaterialCode), que hace una consulta SQL cruda fuera del alcance de
+          // applyTenantScoping.js — necesita la transacción que runWithCompany ya abrió (con el GUC
+          // de RLS seteado) pasada A MANO, o la política de Postgres rechaza el INSERT en
+          // VoucherCounters (visto en producción: "new row violates row-level security policy").
           // eslint-disable-next-line no-await-in-loop
           const material = await findOrCreateMaterial({
             name: item.name, unit: item.unit, origin: 'orden_compra', originPurchaseOrderId: item.purchaseOrderId,
+            transaction: getCurrentTransaction(),
           });
           item.materialId = material.id;
           // eslint-disable-next-line no-await-in-loop
