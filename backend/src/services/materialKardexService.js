@@ -70,7 +70,13 @@ async function getEntries({ warehouseId, materialId, projectId, purchaseOrderId,
         { model: User, as: 'creator', attributes: ['id', 'name'] },
         {
           model: MaterialTransferLine, as: 'lines',
-          include: [{ model: Material, attributes: ['id', 'name', 'unit'] }, { model: MaterialLot, as: 'sourceLot', attributes: ['id', 'purchaseOrderId'] }],
+          include: [
+            { model: Material, attributes: ['id', 'name', 'unit'] },
+            {
+              model: MaterialLot, as: 'sourceLot', attributes: ['id', 'purchaseOrderId'],
+              include: [{ model: PurchaseOrder, attributes: ['id', 'orderNumber'] }],
+            },
+          ],
         },
       ],
     });
@@ -83,7 +89,7 @@ async function getEntries({ warehouseId, materialId, projectId, purchaseOrderId,
             type: 'traslado_salida', date: tr.date, warehouseId: tr.fromWarehouseId, warehouseName: tr.fromWarehouse?.name,
             materialId: line.materialId, materialName: line.Material?.name, unit: line.Material?.unit,
             quantity: Number(line.quantitySent), direction: 'out', unitCost: Number(line.unitCost),
-            purchaseOrderId: line.sourceLot?.purchaseOrderId || null, purchaseOrderNumber: null,
+            purchaseOrderId: line.sourceLot?.purchaseOrderId || null, purchaseOrderNumber: line.sourceLot?.PurchaseOrder?.orderNumber || null,
             person: null, userName: tr.creator?.name || null, movementId: tr.id, pdfType: 'traslado', pdfId: tr.id, status: tr.status,
           });
         }
@@ -92,7 +98,7 @@ async function getEntries({ warehouseId, materialId, projectId, purchaseOrderId,
             type: 'traslado_entrada', date: tr.date, warehouseId: tr.toWarehouseId, warehouseName: tr.toWarehouse?.name,
             materialId: line.materialId, materialName: line.Material?.name, unit: line.Material?.unit,
             quantity: Number(line.quantityReceived), direction: 'in', unitCost: Number(line.unitCost),
-            purchaseOrderId: line.sourceLot?.purchaseOrderId || null, purchaseOrderNumber: null,
+            purchaseOrderId: line.sourceLot?.purchaseOrderId || null, purchaseOrderNumber: line.sourceLot?.PurchaseOrder?.orderNumber || null,
             person: null, userName: tr.creator?.name || null, movementId: tr.id, pdfType: 'traslado', pdfId: tr.id, status: tr.status,
           });
         }
@@ -113,7 +119,13 @@ async function getEntries({ warehouseId, materialId, projectId, purchaseOrderId,
         { model: User, as: 'creator', attributes: ['id', 'name'] },
         {
           model: MaterialIssueLine, as: 'lines',
-          include: [{ model: Material, attributes: ['id', 'name', 'unit'] }, { model: MaterialLot, as: 'sourceLot', attributes: ['id', 'purchaseOrderId'] }],
+          include: [
+            { model: Material, attributes: ['id', 'name', 'unit'] },
+            {
+              model: MaterialLot, as: 'sourceLot', attributes: ['id', 'purchaseOrderId'],
+              include: [{ model: PurchaseOrder, attributes: ['id', 'orderNumber'] }],
+            },
+          ],
         },
       ],
     });
@@ -126,7 +138,7 @@ async function getEntries({ warehouseId, materialId, projectId, purchaseOrderId,
           type: 'salida', date: is.date, warehouseId: is.fromWarehouseId, warehouseName: is.fromWarehouse?.name,
           materialId: line.materialId, materialName: line.Material?.name, unit: line.Material?.unit,
           quantity: Number(line.quantity), direction: 'out', unitCost: Number(line.unitCost),
-          purchaseOrderId: line.sourceLot?.purchaseOrderId || null, purchaseOrderNumber: null,
+          purchaseOrderId: line.sourceLot?.purchaseOrderId || null, purchaseOrderNumber: line.sourceLot?.PurchaseOrder?.orderNumber || null,
           person: personLabel, userName: is.creator?.name || null, movementId: is.id, pdfType: 'salida', pdfId: is.id, status: is.status,
         });
       }

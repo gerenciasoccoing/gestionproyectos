@@ -68,6 +68,7 @@ const modelDefiners = [
   require('./VoucherCounter'),
   require('./VoucherSignature'),
   require('./Warehouse'),
+  require('./MaterialCategory'),
   require('./Material'),
   require('./MaterialLot'),
   require('./MaterialTransfer'),

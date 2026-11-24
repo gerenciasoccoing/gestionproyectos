@@ -18,6 +18,13 @@ const corsOrigins = !process.env.CORS_ORIGIN || process.env.CORS_ORIGIN === '*'
 // header en una respuesta cross-origin, así que las descargas armadas por el frontend (blob +
 // nombre de archivo tomado de este header) caían al nombre genérico de reserva.
 app.use(cors({ origin: corsOrigins, exposedHeaders: ['Content-Disposition'] }));
+// La importación masiva de materiales (ver materialImportController.js) puede traer miles de filas
+// en la vista previa de ida y vuelta (parse -> confirmar en el frontend -> commit) — el límite
+// general de 2mb de abajo se queda corto para eso. body-parser no vuelve a parsear un request cuyo
+// body ya quedó parseado (marca req._body), así que mientras este middleware más permisivo quede
+// ANTES del genérico y solo apunte a estas rutas puntuales, el resto de la API no se ve afectado.
+app.use('/api/materials/import/commit', express.json({ limit: '25mb' }));
+app.use('/api/materials/import/export-errors', express.json({ limit: '25mb' }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 

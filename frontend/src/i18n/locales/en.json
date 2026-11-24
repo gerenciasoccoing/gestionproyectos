@@ -1254,7 +1254,8 @@
       "returns": "Returns",
       "kardex": "Kardex",
       "warehouses": "Warehouses",
-      "catalog": "Materials"
+      "catalog": "Materials",
+      "categories": "Categories"
     },
     "transfers": {
       "title": "Transfers between warehouses",
@@ -1322,7 +1323,25 @@
       "inactive": "Inactive",
       "deactivate": "Deactivate",
       "activate": "Activate",
-      "empty": "No materials registered."
+      "empty": "No materials registered.",
+      "code": "Code",
+      "codeAuto": "Automatic if left blank",
+      "description": "Description",
+      "lastCost": "Last cost",
+      "createdAt": "Created",
+      "origin": "Origin",
+      "originLabels": {
+        "purchaseOrder": "Purchase order",
+        "manual": "Manual",
+        "excelImport": "Excel import"
+      },
+      "searchPlaceholder": "Search by name or code...",
+      "selectedCount": "{{count}} material(s) selected",
+      "bulkRecategorizeTo": "Change category to...",
+      "applyBulkRecategorize": "Apply to selected",
+      "mergeSurvivor": "Keep...",
+      "applyMerge": "Merge selected",
+      "confirmDelete": "Delete material \"{{name}}\"? This cannot be undone."
     },
     "warehouses": {
       "title": "Warehouses",
@@ -1389,6 +1408,62 @@
       "unpricedWarning": "{{cost}} in issued material has no recorded sale price — not included in the margin.",
       "unpricedDetail": "{{quantity}} units ({{cost}}) with no recorded sale price, excluded from the margin.",
       "empty": "No signed material movements for this contract."
+    },
+    "categories": {
+      "title": "Material categories",
+      "newCategory": "New category",
+      "name": "Name",
+      "default": "Default",
+      "defaultHint": "Materials (default)",
+      "materialCount": "Materials",
+      "empty": "No categories registered.",
+      "confirmDelete": "Delete category \"{{name}}\"?"
+    },
+    "import": {
+      "title": "Import materials from Excel",
+      "openWizard": "Import from Excel",
+      "downloadTemplate": "Download template",
+      "analyze": "Analyze file",
+      "mappingHint": "We couldn't automatically recognize every column in the file. Confirm or correct which field each column maps to before continuing.",
+      "noColumn": "-- not in the file --",
+      "fields": {
+        "code": "Code",
+        "name": "Name",
+        "unit": "Unit",
+        "category": "Category",
+        "description": "Description",
+        "referenceCost": "Reference cost"
+      },
+      "summaryNew": "New: {{count}}",
+      "summaryExisting": "Already exist: {{count}}",
+      "summaryDuplicate": "Duplicates in file: {{count}}",
+      "summaryError": "With errors: {{count}}",
+      "allSkip": "Skip all 'already exists'",
+      "allUpdate": "Update all 'already exists'",
+      "decision": "Action",
+      "decisionSkip": "Skip",
+      "decisionUpdate": "Update data",
+      "decisionImport": "Import",
+      "newCategory": "new category",
+      "status": {
+        "nuevo": "New",
+        "existe": "Already exists",
+        "duplicado_archivo": "Duplicate in file",
+        "error": "Error"
+      },
+      "confirmImport": "Confirm import ({{count}} row(s))",
+      "resultCreated": "Created",
+      "resultUpdated": "Updated",
+      "resultSkipped": "Skipped",
+      "resultErrors": "With errors",
+      "downloadErrors": "Download error rows",
+      "importAnother": "Import another file",
+      "steps": {
+        "upload": "Upload",
+        "mapping": "Columns",
+        "preview": "Preview",
+        "result": "Result"
+      }
     }
   },
   "inventory": {

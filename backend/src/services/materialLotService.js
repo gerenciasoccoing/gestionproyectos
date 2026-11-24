@@ -1,20 +1,16 @@
 const ApiError = require('../utils/ApiError');
 const { Material, MaterialLot, Warehouse } = require('../models');
+const { findOrCreateMaterial } = require('./materialCatalogService');
 
-// Resuelve el Material del catálogo a partir del nombre del ítem de la OC — se auto-crea por
-// nombre (findOrCreate) la primera vez que se usa, así nunca hay que pedirle al usuario que
-// mantenga un catálogo aparte antes de poder recibir algo (ver Material.js). Se llama al crear o
-// editar un ítem inventariable de una Orden de Compra (purchaseOrderController.js), no en cada
-// recepción: el ítem ya "sabe" su materialId para cuando llegue a recibirse.
-async function findOrCreateMaterialByName(name, unit, transaction) {
-  const trimmed = String(name || '').trim();
-  if (!trimmed) throw new ApiError(400, 'El nombre del material no puede estar vacío');
-  const [material] = await Material.findOrCreate({
-    where: { name: trimmed },
-    defaults: { unit: unit || null },
-    transaction,
-  });
-  return material;
+// Resuelve el Material del catálogo a partir del nombre del ítem de la OC — se auto-crea (o se
+// empareja por nombre+unidad normalizados, ver materialCatalogService.js#findOrCreateMaterial) la
+// primera vez que se usa, así nunca hay que pedirle al usuario que mantenga un catálogo aparte
+// antes de poder recibir algo. Se llama al crear o editar un ítem inventariable de una Orden de
+// Compra (purchaseOrderController.js#resolveNewItemMaterial), no en cada recepción: el ítem ya
+// "sabe" su materialId para cuando llegue a recibirse. Firma sin cambios a propósito (mismo call
+// site de siempre); la deduplicación real vive en materialCatalogService.js.
+async function findOrCreateMaterialByName(name, unit, transaction, originPurchaseOrderId = null) {
+  return findOrCreateMaterial({ name, unit, origin: 'orden_compra', originPurchaseOrderId, transaction });
 }
 
 async function getDefaultWarehouse(transaction) {

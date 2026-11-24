@@ -1254,7 +1254,8 @@
       "returns": "Devoluciones",
       "kardex": "Kardex",
       "warehouses": "Bodegas",
-      "catalog": "Materiales"
+      "catalog": "Materiales",
+      "categories": "Categorías"
     },
     "transfers": {
       "title": "Traslados entre bodegas",
@@ -1322,7 +1323,25 @@
       "inactive": "Inactivo",
       "deactivate": "Desactivar",
       "activate": "Activar",
-      "empty": "No hay materiales registrados."
+      "empty": "No hay materiales registrados.",
+      "code": "Código",
+      "codeAuto": "Automático si se deja vacío",
+      "description": "Descripción",
+      "lastCost": "Último costo",
+      "createdAt": "Creado",
+      "origin": "Origen",
+      "originLabels": {
+        "purchaseOrder": "Orden de compra",
+        "manual": "Manual",
+        "excelImport": "Importación Excel"
+      },
+      "searchPlaceholder": "Buscar por nombre o código...",
+      "selectedCount": "{{count}} material(es) seleccionado(s)",
+      "bulkRecategorizeTo": "Cambiar categoría a...",
+      "applyBulkRecategorize": "Aplicar a seleccionados",
+      "mergeSurvivor": "Conservar...",
+      "applyMerge": "Fusionar seleccionados",
+      "confirmDelete": "¿Eliminar el material \"{{name}}\"? Esta acción no se puede deshacer."
     },
     "warehouses": {
       "title": "Bodegas",
@@ -1389,6 +1408,62 @@
       "unpricedWarning": "Hay {{cost}} en material entregado sin precio de venta registrado — no se incluye en el margen.",
       "unpricedDetail": "{{quantity}} unidades ({{cost}}) sin precio de venta registrado, no incluidas en el margen.",
       "empty": "No hay movimientos de material firmados para este contrato."
+    },
+    "categories": {
+      "title": "Categorías de materiales",
+      "newCategory": "Nueva categoría",
+      "name": "Nombre",
+      "default": "Por defecto",
+      "defaultHint": "Materiales (por defecto)",
+      "materialCount": "Materiales",
+      "empty": "No hay categorías registradas.",
+      "confirmDelete": "¿Eliminar la categoría \"{{name}}\"?"
+    },
+    "import": {
+      "title": "Importar materiales desde Excel",
+      "openWizard": "Importar desde Excel",
+      "downloadTemplate": "Descargar plantilla",
+      "analyze": "Analizar archivo",
+      "mappingHint": "No reconocimos todas las columnas del archivo automáticamente. Confirma o corrige a qué campo corresponde cada columna antes de continuar.",
+      "noColumn": "-- no viene en el archivo --",
+      "fields": {
+        "code": "Código",
+        "name": "Nombre",
+        "unit": "Unidad",
+        "category": "Categoría",
+        "description": "Descripción",
+        "referenceCost": "Costo de referencia"
+      },
+      "summaryNew": "Nuevos: {{count}}",
+      "summaryExisting": "Ya existen: {{count}}",
+      "summaryDuplicate": "Duplicados en archivo: {{count}}",
+      "summaryError": "Con error: {{count}}",
+      "allSkip": "Omitir todos los 'ya existe'",
+      "allUpdate": "Actualizar todos los 'ya existe'",
+      "decision": "Acción",
+      "decisionSkip": "Omitir",
+      "decisionUpdate": "Actualizar datos",
+      "decisionImport": "Importar",
+      "newCategory": "categoría nueva",
+      "status": {
+        "nuevo": "Nuevo",
+        "existe": "Ya existe",
+        "duplicado_archivo": "Duplicado en archivo",
+        "error": "Error"
+      },
+      "confirmImport": "Confirmar importación ({{count}} fila(s))",
+      "resultCreated": "Creados",
+      "resultUpdated": "Actualizados",
+      "resultSkipped": "Omitidos",
+      "resultErrors": "Con error",
+      "downloadErrors": "Descargar filas con error",
+      "importAnother": "Importar otro archivo",
+      "steps": {
+        "upload": "Subir",
+        "mapping": "Columnas",
+        "preview": "Vista previa",
+        "result": "Resultado"
+      }
     }
   },
   "inventory": {

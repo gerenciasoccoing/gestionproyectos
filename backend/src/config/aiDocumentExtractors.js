@@ -64,6 +64,17 @@ const EXTRACTORS = {
     schemaDescription: '{ "supplierName": string|null, "deliveryTime": string|null, "validUntil": "YYYY-MM-DD"|null, "paymentTerms": string|null, "items": [ { "name": string, "unit": string|null, "quantity": number|null, "unitPrice": number|null, "totalPrice": number|null } ] }',
     maxTokens: 6000,
   },
+  // Mapeo de columnas para la importación masiva de materiales (ver materialImportService.js) —
+  // solo se llama cuando el archivo subido NO trae los encabezados de la plantilla oficial
+  // reconocibles por coincidencia de texto (ver detectColumnMapping). Recibe los encabezados reales
+  // del archivo + un puñado de filas de muestra (texto plano, nunca el archivo como documento: acá
+  // no hace falta visión) y debe decidir, para cada campo del material, cuál encabezado del archivo
+  // le corresponde (o null si ese campo no está presente en el archivo).
+  materialImportColumnMapping: {
+    instructions: 'Estas son las primeras filas (encabezados + algunas filas de datos de muestra, separadas por tabulador) de un archivo de materiales para importar a un catálogo. Los campos que se necesitan identificar son: "code" (código o referencia del material, opcional), "name" (nombre o descripción del material, obligatorio), "unit" (unidad de medida, obligatorio), "category" (categoría o grupo del material, opcional), "description" (descripción adicional u observaciones, opcional), "referenceCost" (costo, precio o valor de referencia, opcional). Para cada campo, identifica EXACTAMENTE cuál encabezado de columna del archivo le corresponde (usa el texto del encabezado tal como aparece, carácter por carácter) — si ese campo no tiene una columna correspondiente en el archivo, usa null. Un mismo encabezado nunca puede corresponder a dos campos distintos.',
+    schemaDescription: '{ "code": string|null, "name": string|null, "unit": string|null, "category": string|null, "description": string|null, "referenceCost": string|null }',
+    maxTokens: 500,
+  },
 };
 
 function getExtractor(key) {

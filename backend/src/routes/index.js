@@ -31,6 +31,8 @@ router.use('/contract-signature', require('./contractSignatureRoutes'));
 router.use('/voucher-signature', require('./voucherSignatureRoutes'));
 router.use('/warehouses', require('./warehouseRoutes'));
 router.use('/materials', require('./materialRoutes'));
+router.use('/material-categories', require('./materialCategoryRoutes'));
+router.use('/materials/import', require('./materialImportRoutes'));
 router.use('/material-transfers', require('./materialTransferRoutes'));
 router.use('/material-issues', require('./materialIssueRoutes'));
 router.use('/material-returns', require('./materialReturnRoutes'));

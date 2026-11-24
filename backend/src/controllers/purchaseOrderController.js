@@ -59,7 +59,7 @@ function withPaymentTotals(orderJson, totalPaid) {
 // (findOrCreate, ver materialLotService.js) para no obligar a elegir de un catálogo vacío la
 // primera vez. Solo se llama al CREAR el ítem — editarlo después nunca re-deriva el material a
 // partir de un nombre cambiado (ver updateItem), para no desalinear los lotes ya generados.
-async function resolveNewItemMaterial(it, transaction) {
+async function resolveNewItemMaterial(it, transaction, orderId = null) {
   const inventariable = it.inventariable !== false;
   if (!inventariable) return { inventariable: false, materialId: null };
   if (it.materialId) {
@@ -67,7 +67,7 @@ async function resolveNewItemMaterial(it, transaction) {
     if (!material) throw new ApiError(400, `Material ${it.materialId} no encontrado`);
     return { inventariable: true, materialId: material.id };
   }
-  const material = await findOrCreateMaterialByName(it.name, it.unit, transaction);
+  const material = await findOrCreateMaterialByName(it.name, it.unit, transaction, orderId);
   return { inventariable: true, materialId: material.id };
 }
 
@@ -202,7 +202,7 @@ const create = asyncHandler(async (req, res) => {
     const itemRows = [];
     for (const it of items) {
       // eslint-disable-next-line no-await-in-loop
-      const { inventariable, materialId } = await resolveNewItemMaterial(it, t);
+      const { inventariable, materialId } = await resolveNewItemMaterial(it, t, created.id);
       itemRows.push({
         purchaseOrderId: created.id,
         budgetItemId: it.budgetItemId || null,
@@ -439,7 +439,7 @@ const updateOrder = asyncHandler(async (req, res) => {
           await existing.save({ transaction: t });
         } else {
           // eslint-disable-next-line no-await-in-loop
-          const { inventariable, materialId } = await resolveNewItemMaterial(it, t);
+          const { inventariable, materialId } = await resolveNewItemMaterial(it, t, order.id);
           // eslint-disable-next-line no-await-in-loop
           await PurchaseOrderItem.create({
             purchaseOrderId: order.id,

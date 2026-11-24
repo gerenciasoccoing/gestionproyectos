@@ -47,6 +47,15 @@ async function nextMaterialReturnNumber(transaction) {
   return nextVoucherNumber('devolucion_material', transaction);
 }
 
+// Código consecutivo del Catálogo de Materiales (ver Material.js), formato "MAT-0001" — mismo
+// contador atómico, kind nuevo ('material_code', ver VoucherCounter.js/postSyncFixups.js#
+// extendVoucherCounterKindEnum). Editable después por el usuario (ver materialController.js):
+// esto solo fija el valor con el que nace.
+async function nextMaterialCode(transaction) {
+  const value = await nextVoucherNumber('material_code', transaction);
+  return `MAT-${String(value).padStart(4, '0')}`;
+}
+
 // Primeros 3 dígitos de Project.contractNumber, para usar como prefijo visual en gastos/órdenes
 // de compra/contratos laborales/ingresos de caja AL MOMENTO DE CREARSE cada uno — null si el
 // proyecto no tiene número de contrato asignado (comportamiento sin cambios: se crea igual, solo
@@ -61,5 +70,5 @@ async function contractPrefixForProject(projectId, transaction) {
 
 module.exports = {
   nextExpenseNumber, nextIncomeNumber, contractPrefixForProject,
-  nextTransferNumber, nextMaterialIssueNumber, nextMaterialReturnNumber,
+  nextTransferNumber, nextMaterialIssueNumber, nextMaterialReturnNumber, nextMaterialCode,
 };

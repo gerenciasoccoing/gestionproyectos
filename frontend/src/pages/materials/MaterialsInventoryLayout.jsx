@@ -15,6 +15,7 @@ export default function MaterialsInventoryLayout() {
     { to: 'kardex', label: t('materialsInventory.tabs.kardex') },
     { to: 'warehouses', label: t('materialsInventory.tabs.warehouses') },
     { to: 'catalog', label: t('materialsInventory.tabs.catalog') },
+    { to: 'categories', label: t('materialsInventory.tabs.categories') },
   ];
 
   return (

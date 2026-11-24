@@ -7,6 +7,7 @@ import { purchaseOrderPdfUrl, fileUrl } from '../../api/client';
 import Can from '../../components/Can';
 import { useAuth } from '../../context/AuthContext';
 import useSubmitGuard from '../../hooks/useSubmitGuard';
+import MaterialSearchSelect from '../../components/MaterialSearchSelect';
 
 const STATUS_COLORS = {
   abierta: 'yellow',
@@ -17,7 +18,7 @@ const STATUS_COLORS = {
 
 const CATEGORIES = ['mano_obra', 'materiales', 'equipos', 'viaticos', 'imprevistos'];
 
-function emptyOrderLine() { return { name: '', unit: '', quantityOrdered: '', unitPrice: '', budgetItemId: '', vatPercent: 19, inventariable: true }; }
+function emptyOrderLine() { return { name: '', unit: '', materialId: null, quantityOrdered: '', unitPrice: '', budgetItemId: '', vatPercent: 19, inventariable: true }; }
 
 export default function PurchaseOrdersPage() {
   const { t, i18n } = useTranslation();
@@ -51,6 +52,16 @@ export default function PurchaseOrdersPage() {
     setForm((f) => {
       const items = [...f.items];
       items[idx] = { ...items[idx], [field]: value };
+      return { ...f, items };
+    });
+  };
+  // Al elegir un material del catálogo en el selector con búsqueda, se copian su nombre/unidad al
+  // ítem (name/unit siguen siendo texto propio del ítem, ver MaterialSearchSelect.jsx) y se guarda
+  // su materialId — resolveNewItemMaterial() del backend lo usa tal cual, sin derivarlo por nombre.
+  const pickItemMaterial = (idx, material) => {
+    setForm((f) => {
+      const items = [...f.items];
+      items[idx] = { ...items[idx], name: material.name, unit: material.unit || items[idx].unit, materialId: material.id };
       return { ...f, items };
     });
   };
@@ -100,6 +111,11 @@ export default function PurchaseOrdersPage() {
   const updateEditItemRow = (idx, field, value) => setEditForm((f) => {
     const items = [...f.items];
     items[idx] = { ...items[idx], [field]: value };
+    return { ...f, items };
+  });
+  const pickEditItemMaterial = (idx, material) => setEditForm((f) => {
+    const items = [...f.items];
+    items[idx] = { ...items[idx], name: material.name, unit: material.unit || items[idx].unit, materialId: material.id };
     return { ...f, items };
   });
   const addEditRow = () => setEditForm((f) => ({ ...f, items: [...f.items, emptyOrderLine()] }));
@@ -209,7 +225,11 @@ export default function PurchaseOrdersPage() {
             <p className="text-sm font-medium text-gray-600 mb-2">{t('execution.purchaseOrders.items')}</p>
             {form.items.map((it, idx) => (
               <div key={idx} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 gap-2 mb-2 items-end">
-                <Input label={t('execution.purchaseOrders.itemName')} value={it.name} onChange={(e) => updateItemRow(idx, 'name', e.target.value)} required />
+                <MaterialSearchSelect
+                  value={it.name} materialId={it.materialId}
+                  onTextChange={(text) => updateItemRow(idx, 'name', text)}
+                  onPick={(material) => pickItemMaterial(idx, material)}
+                />
                 <Input label={t('execution.purchaseOrders.unit')} value={it.unit} onChange={(e) => updateItemRow(idx, 'unit', e.target.value)} required />
                 <Input label={t('execution.purchaseOrders.orderedQty')} type="number" min="0" step="0.01" value={it.quantityOrdered} onChange={(e) => updateItemRow(idx, 'quantityOrdered', e.target.value)} required />
                 <Input label={t('execution.purchaseOrders.unitValue')} type="number" min="0" step="0.01" value={it.unitPrice} onChange={(e) => updateItemRow(idx, 'unitPrice', e.target.value)} required />
@@ -250,7 +270,19 @@ export default function PurchaseOrdersPage() {
                   <p className="text-sm font-medium text-gray-600 mb-2">{t('execution.purchaseOrders.items')}</p>
                   {editForm.items.map((it, idx) => (
                     <div key={it.id || `new-${idx}`} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 mb-2 items-end">
-                      <Input label={t('execution.purchaseOrders.itemName')} value={it.name} onChange={(e) => updateEditItemRow(idx, 'name', e.target.value)} required />
+                      {it.id ? (
+                        // Ítem ya existente: renombrarlo acá nunca cambia su material vinculado
+                        // (ver purchaseOrderController.js#updateOrder), así que el selector con
+                        // catálogo solo aplica a renglones NUEVOS (sin id) — este sigue siendo
+                        // texto libre simple, igual que siempre.
+                        <Input label={t('execution.purchaseOrders.itemName')} value={it.name} onChange={(e) => updateEditItemRow(idx, 'name', e.target.value)} required />
+                      ) : (
+                        <MaterialSearchSelect
+                          value={it.name} materialId={it.materialId}
+                          onTextChange={(text) => updateEditItemRow(idx, 'name', text)}
+                          onPick={(material) => pickEditItemMaterial(idx, material)}
+                        />
+                      )}
                       <Input label={t('execution.purchaseOrders.unit')} value={it.unit} onChange={(e) => updateEditItemRow(idx, 'unit', e.target.value)} required />
                       <Input label={t('execution.purchaseOrders.orderedQty')} type="number" min={it.delivered || 0} step="0.01" value={it.quantityOrdered} onChange={(e) => updateEditItemRow(idx, 'quantityOrdered', e.target.value)} required />
                       <Input label={t('execution.purchaseOrders.unitValue')} type="number" min="0" step="0.01" value={it.unitPrice} onChange={(e) => updateEditItemRow(idx, 'unitPrice', e.target.value)} required />

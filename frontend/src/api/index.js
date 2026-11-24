@@ -528,10 +528,35 @@ export const warehousesApi = {
 };
 
 export const materialsApi = {
-  list: () => client.get('/materials').then((r) => r.data),
+  list: (categoryId) => client.get('/materials', { params: categoryId ? { categoryId } : {} }).then((r) => r.data),
+  search: (q, categoryId) => client.get('/materials/search', { params: { q, categoryId } }).then((r) => r.data),
   create: (data) => client.post('/materials', data).then((r) => r.data),
   update: (id, data) => client.put(`/materials/${id}`, data).then((r) => r.data),
   setStatus: (id, active) => client.post(`/materials/${id}/status`, { active }).then((r) => r.data),
+  bulkRecategorize: (materialIds, categoryId) => client.post('/materials/bulk-recategorize', { materialIds, categoryId }).then((r) => r.data),
+  merge: (id, intoMaterialId) => client.post(`/materials/${id}/merge`, { intoMaterialId }).then((r) => r.data),
+  remove: (id) => client.delete(`/materials/${id}`),
+};
+
+// Importación masiva de materiales desde Excel/CSV (ver materialImportController.js).
+export const materialImportApi = {
+  downloadTemplate: () => getAndDownload('/materials/import/template', {}, 'plantilla-materiales.xlsx'),
+  parse: (file, mapping) => {
+    const form = new FormData();
+    form.append('file', file);
+    if (mapping) form.append('mapping', JSON.stringify(mapping));
+    return client.post('/materials/import/parse', form, { headers: { 'Content-Type': 'multipart/form-data' } }).then((r) => r.data);
+  },
+  commit: (rows) => client.post('/materials/import/commit', { rows }).then((r) => r.data),
+  exportErrors: (errorRows) => postAndDownload('/materials/import/export-errors', { errorRows }, 'materiales-con-error.xlsx'),
+};
+
+export const materialCategoriesApi = {
+  list: () => client.get('/material-categories').then((r) => r.data),
+  create: (data) => client.post('/material-categories', data).then((r) => r.data),
+  update: (id, data) => client.put(`/material-categories/${id}`, data).then((r) => r.data),
+  setStatus: (id, active) => client.post(`/material-categories/${id}/status`, { active }).then((r) => r.data),
+  remove: (id) => client.delete(`/material-categories/${id}`),
 };
 
 export const materialTransfersApi = {

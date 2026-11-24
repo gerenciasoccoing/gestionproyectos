@@ -56,6 +56,7 @@ import MaterialsInventoryLayout from './pages/materials/MaterialsInventoryLayout
 import MaterialStockPage from './pages/materials/MaterialStockPage';
 import WarehousesPage from './pages/materials/WarehousesPage';
 import MaterialCatalogPage from './pages/materials/MaterialCatalogPage';
+import MaterialCategoriesPage from './pages/materials/MaterialCategoriesPage';
 import MaterialTransfersPage from './pages/materials/MaterialTransfersPage';
 import MaterialIssuesPage from './pages/materials/MaterialIssuesPage';
 import MaterialReturnsPage from './pages/materials/MaterialReturnsPage';
@@ -126,6 +127,7 @@ export default function App() {
           <Route path="kardex" element={<MaterialKardexPage />} />
           <Route path="warehouses" element={<WarehousesPage />} />
           <Route path="catalog" element={<MaterialCatalogPage />} />
+          <Route path="categories" element={<MaterialCategoriesPage />} />
         </Route>
 
         <Route path="admin" element={<ProtectedRoute module="admin" action="view"><AdminLayout /></ProtectedRoute>}>

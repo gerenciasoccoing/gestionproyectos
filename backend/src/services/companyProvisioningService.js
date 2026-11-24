@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const ApiError = require('../utils/ApiError');
-const { Company, User, Role, Permission, LaborParameters, CashBox, SocialSecurityProvider, WithholdingType, AdminExpenseCategory, PublicHoliday, LeaveType, Warehouse } = require('../models');
+const { Company, User, Role, Permission, LaborParameters, CashBox, SocialSecurityProvider, WithholdingType, AdminExpenseCategory, PublicHoliday, LeaveType, Warehouse, MaterialCategory } = require('../models');
 const { DEFAULT_SOCIAL_SECURITY_PROVIDERS } = require('../config/socialSecurityProviders');
 const { DEFAULT_WITHHOLDING_TYPES } = require('../config/withholdingTypes');
 const { DEFAULT_ADMIN_EXPENSE_CATEGORIES } = require('../config/adminExpenseCategories');
@@ -74,6 +74,14 @@ async function seedDefaultsForCompany(company, { adminName, adminEmail, adminPas
     await Warehouse.findOrCreate({
       where: { isDefault: true },
       defaults: { name: 'Bodega Principal', active: true },
+    });
+
+    // Categoría "Materiales" del Catálogo de Materiales: por defecto y no eliminable (ver
+    // Material.js/materialCategoryController.js) — a donde cae todo material creado desde una OC o
+    // importado sin categoría explícita.
+    await MaterialCategory.findOrCreate({
+      where: { isDefault: true },
+      defaults: { name: 'Materiales', active: true },
     });
 
     for (const [type, names] of Object.entries(DEFAULT_SOCIAL_SECURITY_PROVIDERS)) {

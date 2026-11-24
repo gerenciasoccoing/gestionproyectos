@@ -10,7 +10,7 @@ const {
   Contract, Employee, Expense, ExpenseItem, ExpenseTax, InventoryItem, Minute, PaymentReceipt, Policy,
   ProgressPhoto, PurchaseReceipt, Severance, SocialSecurityDocument,
   SocialSecurityProvider, ThirdParty, WithholdingType, AdminExpenseCategory, PublicHoliday, LeaveType,
-  Warehouse, Permission, Role,
+  Warehouse, Permission, Role, Material, MaterialCategory,
 } = require('../models/adminModels');
 const { TENANT_SCOPING_EXCLUDED } = require('../models/defineModels');
 const { runInTransactionContext } = require('../utils/tenantContext');
@@ -328,6 +328,9 @@ async function applyPostSyncFixups() {
   await extendVoucherCounterKindEnum();
   await seedDefaultWarehouseForExistingCompanies();
   await backfillMaterialsInventoryPermissions();
+  await dropLegacyMaterialNameUniqueIndex();
+  await seedDefaultMaterialCategoryForExistingCompanies();
+  await backfillMaterialCatalogDefaults();
 
   await ensureAppDbRole();
   await applyRowLevelSecurity();
@@ -618,12 +621,100 @@ async function backfillVoucherNumbersForExistingRecords() {
 // de Materiales (traslados/salidas/devoluciones). ADD VALUE IF NOT EXISTS es idempotente (Postgres
 // 9.6+), así que es seguro repetir esto en cada arranque, incluido el primer arranque de una
 // instalación nueva (donde el tipo ya se crea completo desde el modelo, y este ALTER no hace nada).
+// El índice único viejo de Material (companyId, name) quedó obsoleto con el Catálogo de Materiales
+// por categorías: ahora dos materiales pueden compartir nombre si su UNIDAD es distinta (ver
+// Material.js: la deduplicación real es (companyId, normalizedName, normalizedUnit)) — pero
+// sync({alter:true}) agrega el índice nuevo sin eliminar el viejo, así que sigue bloqueando
+// justo el caso que la especificación pide permitir ("si el nombre es igual pero la unidad es
+// distinta, se crea como material diferente"). DROP ... IF EXISTS es idempotente.
+async function dropLegacyMaterialNameUniqueIndex() {
+  await sequelize.query('DROP INDEX IF EXISTS "materials_company_id_name";');
+}
+
 async function extendVoucherCounterKindEnum() {
   await sequelize.query(`
     ALTER TYPE "enum_VoucherCounters_kind" ADD VALUE IF NOT EXISTS 'traslado';
     ALTER TYPE "enum_VoucherCounters_kind" ADD VALUE IF NOT EXISTS 'salida_material';
     ALTER TYPE "enum_VoucherCounters_kind" ADD VALUE IF NOT EXISTS 'devolucion_material';
+    ALTER TYPE "enum_VoucherCounters_kind" ADD VALUE IF NOT EXISTS 'material_code';
   `);
+}
+
+// Categoría "Materiales" (Catálogo de Materiales por categorías): se crea al aprovisionar una
+// empresa nueva (ver companyProvisioningService.js), pero las empresas que ya existían antes de
+// este módulo nunca pasaron por ahí — mismo criterio que seedDefaultWarehouseForExistingCompanies.
+// findOrCreate por (companyId, isDefault:true) la hace idempotente.
+async function seedDefaultMaterialCategoryForExistingCompanies() {
+  const companies = await Company.findAll();
+  for (const company of companies) {
+    // eslint-disable-next-line no-await-in-loop
+    await runInTransactionContext(company.id, null, async () => {
+      await MaterialCategory.findOrCreate({ where: { isDefault: true }, defaults: { name: 'Materiales', active: true } });
+    });
+  }
+}
+
+// Asigna el siguiente código consecutivo de un material (MAT-0001), sobre la conexión de
+// ADMINISTRACIÓN (este archivo entero corre ahí, fuera de RLS) — mismo contador atómico
+// ("VoucherCounters", kind 'material_code') que numberingService.js#nextMaterialCode usa desde la
+// conexión restringida en tiempo real, pero sin pasar por esa, para no depender del GUC de RLS que
+// este backfill (como el resto de postSyncFixups.js) nunca setea.
+async function nextMaterialCodeAdmin(companyId) {
+  const [row] = await sequelize.query(
+    `INSERT INTO "VoucherCounters" ("id", "companyId", "kind", "value", "createdAt", "updatedAt")
+     VALUES (:id, :companyId, 'material_code', 1, now(), now())
+     ON CONFLICT ("companyId", "kind") DO UPDATE SET "value" = "VoucherCounters"."value" + 1, "updatedAt" = now()
+     RETURNING "value"`,
+    { replacements: { id: uuidv4(), companyId }, type: QueryTypes.SELECT }
+  );
+  return `MAT-${String(row.value).padStart(4, '0')}`;
+}
+
+// Backfill de los materiales que ya existían ANTES de agregarse code/normalizedName/normalizedUnit/
+// categoryId (Catálogo de Materiales por categorías): a cualquier material sin categoría se le
+// asigna la categoría "Materiales" por defecto de su empresa, y a cualquiera sin código se le asigna
+// el siguiente consecutivo. normalizedName/normalizedUnit los recalcula solo el hook beforeValidate
+// del modelo (ver Material.js) con solo tocar `save()`, así que no hace falta repetir esa lógica acá.
+// Solo toca filas que de verdad les falta el dato, así que es seguro repetir esto en cada arranque.
+async function backfillMaterialCatalogDefaults() {
+  const { normalizeMaterialText } = require('./textNormalize');
+  const companies = await Company.findAll();
+  for (const company of companies) {
+    // eslint-disable-next-line no-await-in-loop
+    await runInTransactionContext(company.id, null, async () => {
+      const [defaultCategory] = await MaterialCategory.findOrCreate({ where: { isDefault: true }, defaults: { name: 'Materiales', active: true } });
+      const materials = await Material.findAll({ where: {} });
+      for (const material of materials) {
+        let dirty = false;
+        if (!material.categoryId) { material.categoryId = defaultCategory.id; dirty = true; }
+        if (!material.code) {
+          // eslint-disable-next-line no-await-in-loop
+          material.code = await nextMaterialCodeAdmin(company.id);
+          dirty = true;
+        }
+        // Autocurativo ante un cambio futuro de la fórmula de normalización (ver
+        // utils/textNormalize.js): no solo rellena los NULL de materiales viejos, también
+        // recalcula cualquier valor que haya quedado desactualizado por una versión anterior del
+        // algoritmo, para que la deduplicación/búsqueda nunca quede comparando contra un valor
+        // obsoleto.
+        const expectedNormalizedName = normalizeMaterialText(material.name);
+        const expectedNormalizedUnit = normalizeMaterialText(material.unit || '');
+        if (material.normalizedName !== expectedNormalizedName) { material.normalizedName = expectedNormalizedName; dirty = true; }
+        if (material.normalizedUnit !== expectedNormalizedUnit) { material.normalizedUnit = expectedNormalizedUnit; dirty = true; }
+        if (dirty) {
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            await material.save();
+          } catch (err) {
+            // Si recalcular la normalización hiciera que dos materiales viejos (de antes de esta
+            // fórmula) colisionaran en la misma clave, se deja ese caso puntual para revisión
+            // manual (fusionar duplicados desde el catálogo) en vez de tumbar el arranque entero.
+            if (err.name !== 'SequelizeUniqueConstraintError') throw err;
+          }
+        }
+      }
+    });
+  }
 }
 
 // Bodega Principal del Inventario de Materiales: se crea al aprovisionar una empresa nueva (ver
