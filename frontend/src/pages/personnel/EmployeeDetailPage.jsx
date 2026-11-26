@@ -1,9 +1,9 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useOutletContext, useParams, useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { employeeContractsApi, cashBoxesApi, laborParamsApi, leaveTypesApi } from '../../api';
+import { employeeContractsApi, cashBoxesApi, laborParamsApi, leaveTypesApi, projectsApi } from '../../api';
 import { buildEmployeeApi } from './employeeApiFactory';
-import { Card, Button, Input, Select, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
+import { Card, Button, Input, Select, SearchSelect, Table, Badge, ErrorText, extractError, money, formatDate } from '../../components/ui';
 import { fileUrl } from '../../api/client';
 import Can from '../../components/Can';
 import ProviderSelect from '../../components/ProviderSelect';
@@ -60,6 +60,7 @@ export default function EmployeeDetailPage() {
       <ErrorText>{deleteError}</ErrorText>
 
       <BasicDataSection api={api} employee={employee} onChange={load} />
+      <AssignmentsSection api={api} employee={employee} isGeneral={isGeneral} />
       <ContractsSection api={api} project={project} employee={employee} onChange={load} />
       <SocialSecuritySection api={api} employee={employee} onChange={load} />
       {IS_NOMINA_ELIGIBLE(employee.contractType) ? (
@@ -281,6 +282,22 @@ function ContractsSection({ api, project, employee, onChange }) {
   const [sendingSignatureId, setSendingSignatureId] = useState(null);
   const [signatureNotes, setSignatureNotes] = useState({});
 
+  // Si el trabajador tiene varias asignaciones activas, el backend rechaza generar/subir un
+  // contrato sin saber a cuál corresponde (ver employeeContractController.js#resolveContractAssignment)
+  // y devuelve la lista para elegir — se guarda acá y se reintenta la MISMA acción con assignmentId.
+  const [assignmentChoices, setAssignmentChoices] = useState(null);
+  const [chosenAssignmentId, setChosenAssignmentId] = useState('');
+  const [pendingAction, setPendingAction] = useState(null);
+  const handleAssignmentAmbiguity = (err, action) => {
+    const choices = err?.response?.data?.details?.assignments;
+    if (choices && choices.length) {
+      setAssignmentChoices(choices);
+      setPendingAction(action);
+      return true;
+    }
+    return false;
+  };
+
   // --- Subir contrato externo (segunda opción de "Generar contrato") ---
   const [showExternalForm, setShowExternalForm] = useState(false);
   const [externalForm, setExternalForm] = useState(emptyExternalForm);
@@ -303,9 +320,11 @@ function ContractsSection({ api, project, employee, onChange }) {
   const [generate, generating] = useSubmitGuard(async () => {
     setError(''); setMissingFields([]);
     try {
-      await api.contracts.generate(employee.id);
+      await api.contracts.generate(employee.id, chosenAssignmentId ? { assignmentId: chosenAssignmentId } : undefined);
+      setAssignmentChoices(null); setChosenAssignmentId(''); setPendingAction(null);
       load();
     } catch (err) {
+      if (handleAssignmentAmbiguity(err, 'generate')) return;
       setError(extractError(err));
       setMissingFields(err?.response?.data?.details?.missingFields || []);
     }
@@ -389,7 +408,7 @@ function ContractsSection({ api, project, employee, onChange }) {
   };
 
   const [submitExternal, submittingExternal] = useSubmitGuard(async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     setError('');
     if (!externalFile) { setError(t('personnel.contract.external.fileRequired')); return; }
     if (!externalForm.contractType) { setError(t('personnel.contract.external.typeRequired')); return; }
@@ -402,13 +421,16 @@ function ContractsSection({ api, project, employee, onChange }) {
       if (externalForm.salaryValue) fd.append('salaryValue', externalForm.salaryValue);
       fd.append('alreadySigned', String(externalForm.alreadySigned));
       if (externalForm.notes) fd.append('notes', externalForm.notes);
+      if (chosenAssignmentId) fd.append('assignmentId', chosenAssignmentId);
       fd.append('file', externalFile);
       await api.contracts.uploadExternal(employee.id, fd);
+      setAssignmentChoices(null); setChosenAssignmentId(''); setPendingAction(null);
       resetExternalForm();
       setShowExternalForm(false);
       load();
       onChange();
     } catch (err) {
+      if (handleAssignmentAmbiguity(err, 'external')) return;
       setError(extractError(err));
     }
   });
@@ -504,6 +526,27 @@ function ContractsSection({ api, project, employee, onChange }) {
       <ErrorText>{error}</ErrorText>
       {missingFields.length > 0 && (
         <p className="text-sm text-yellow-700 mb-2">{t('personnel.contract.missingFields')}: {missingFields.join(', ')}</p>
+      )}
+      {assignmentChoices && (
+        <div className="flex flex-wrap items-end gap-3 mb-3 border-b pb-3">
+          <Select
+            label={t('personnel.contract.chooseAssignment')}
+            value={chosenAssignmentId}
+            onChange={(e) => setChosenAssignmentId(e.target.value)}
+          >
+            <option value="">{t('common.selectPlaceholder')}</option>
+            {assignmentChoices.map((a) => (
+              <option key={a.id} value={a.id}>{a.project ? `${a.project.name}${a.project.contractNumber ? ` (${a.project.contractNumber})` : ''}` : a.projectId}</option>
+            ))}
+          </Select>
+          <Button
+            disabled={!chosenAssignmentId}
+            onClick={() => (pendingAction === 'generate' ? generate() : submitExternal())}
+          >
+            {t('common.continue')}
+          </Button>
+          <Button variant="secondary" onClick={() => { setAssignmentChoices(null); setChosenAssignmentId(''); setPendingAction(null); }}>{t('common.cancel')}</Button>
+        </div>
       )}
       {employee.projectId && !project?.contractNumber && (
         <p className="text-xs text-yellow-700 mb-2">{t('contractual.contractNumber.warning')}</p>
@@ -715,6 +758,166 @@ function SocialSecuritySection({ api, employee, onChange }) {
         {(!employee.socialSecurityDocuments || employee.socialSecurityDocuments.length === 0) && (
           <tr><td colSpan={3} className="py-2 text-center text-gray-400">{t('personnel.detail.socialSecurity.empty')}</td></tr>
         )}
+      </Table>
+    </Card>
+  );
+}
+
+const emptyAssignmentForm = { projectId: '', startDate: '', position: '', observations: '' };
+
+// Historial de asignaciones a contratos/proyectos (ver EmployeeAssignment.js/
+// employeeAssignmentController.js) — un trabajador puede estar activo en varios a la vez sin que
+// esto cambie su vinculación principal (administrativo/de proyecto, editable en BasicDataSection
+// más arriba). Desde dentro de un proyecto, "asignar" fija ese proyecto automáticamente (igual que
+// crear un trabajador por la ruta anidada); desde el menú principal, hay que elegirlo.
+function AssignmentsSection({ api, employee, isGeneral }) {
+  const { t } = useTranslation();
+  const [assignments, setAssignments] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(emptyAssignmentForm);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ position: '', observations: '' });
+  const [error, setError] = useState('');
+  const [busyId, setBusyId] = useState(null);
+
+  const load = () => api.assignments.list(employee.id).then(setAssignments);
+  useEffect(() => { load(); }, [employee.id]);
+  useEffect(() => { if (isGeneral) projectsApi.list().then(setProjects); }, [isGeneral]);
+
+  const startCreate = () => { setForm({ ...emptyAssignmentForm, startDate: new Date().toISOString().slice(0, 10) }); setError(''); setShowForm(true); };
+
+  const [submit, submitting] = useSubmitGuard(async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      const data = { startDate: form.startDate, position: form.position || undefined, observations: form.observations || undefined };
+      if (isGeneral) data.projectId = form.projectId;
+      await api.assignments.create(employee.id, data);
+      setForm(emptyAssignmentForm);
+      setShowForm(false);
+      load();
+    } catch (err) {
+      setError(extractError(err));
+    }
+  });
+
+  const startEdit = (a) => { setEditingId(a.id); setEditForm({ position: a.position || '', observations: a.observations || '' }); };
+
+  const saveEdit = async (a) => {
+    setError('');
+    setBusyId(a.id);
+    try {
+      await api.assignments.update(employee.id, a.id, editForm);
+      setEditingId(null);
+      load();
+    } catch (err) {
+      setError(extractError(err));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const finalize = async (a) => {
+    if (!window.confirm(t('personnel.detail.assignments.confirmFinalize'))) return;
+    setError('');
+    setBusyId(a.id);
+    try {
+      await api.assignments.finalize(employee.id, a.id, {});
+      load();
+    } catch (err) {
+      setError(extractError(err));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const remove = async (a) => {
+    if (!window.confirm(t('personnel.detail.assignments.confirmDelete'))) return;
+    setError('');
+    setBusyId(a.id);
+    try {
+      await api.assignments.remove(employee.id, a.id);
+      load();
+    } catch (err) {
+      setError(extractError(err));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <Card title={t('personnel.detail.assignments.title')} actions={
+      <Can module="personal" action="edit">
+        <Button onClick={() => (showForm ? setShowForm(false) : startCreate())}>
+          {showForm ? t('common.cancel') : t('personnel.detail.assignments.newAssignment')}
+        </Button>
+      </Can>
+    }>
+      <p className="text-sm text-gray-500 mb-3">{t('personnel.detail.assignments.help')}</p>
+      {showForm && (
+        <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4 items-end">
+          {isGeneral && (
+            <SearchSelect
+              label={t('personnel.list.filters.project')}
+              options={projects.map((p) => ({ value: p.id, label: p.name }))}
+              value={form.projectId}
+              onChange={(v) => setForm((f) => ({ ...f, projectId: v }))}
+              placeholder={t('common.selectPlaceholder')}
+            />
+          )}
+          <Input label={t('personnel.detail.assignments.startDate')} type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} required />
+          <Input label={t('personnel.detail.assignments.position')} value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} placeholder={employee.position} />
+          <Input label={t('personnel.detail.assignments.observations')} value={form.observations} onChange={(e) => setForm({ ...form, observations: e.target.value })} className="lg:col-span-2" />
+          <Button type="submit" className="col-span-full" loading={submitting} disabled={isGeneral && !form.projectId}>{t('common.save')}</Button>
+          <div className="col-span-full"><ErrorText>{error}</ErrorText></div>
+        </form>
+      )}
+      {!showForm && <ErrorText>{error}</ErrorText>}
+      <Table columns={[
+        t('personnel.detail.assignments.table.project'), t('personnel.detail.assignments.table.position'),
+        t('personnel.detail.assignments.table.startDate'), t('personnel.detail.assignments.table.endDate'),
+        t('personnel.detail.assignments.table.status'), t('personnel.detail.assignments.table.observations'), '',
+      ]}>
+        {assignments.map((a) => (
+          <tr key={a.id} className="border-b border-gray-100">
+            <td className="py-1 pr-3">{a.Project ? `${a.Project.name}${a.Project.contractNumber ? ` (${a.Project.contractNumber})` : ''}` : '-'}</td>
+            <td className="py-1 pr-3">
+              {editingId === a.id
+                ? <Input value={editForm.position} onChange={(e) => setEditForm({ ...editForm, position: e.target.value })} />
+                : (a.position || '-')}
+            </td>
+            <td className="py-1 pr-3">{formatDate(a.startDate)}</td>
+            <td className="py-1 pr-3">{a.endDate ? formatDate(a.endDate) : '-'}</td>
+            <td className="py-1 pr-3"><Badge color={a.status === 'activo' ? 'green' : 'gray'}>{t(`personnel.detail.assignments.status.${a.status}`)}</Badge></td>
+            <td className="py-1 pr-3">
+              {editingId === a.id
+                ? <Input value={editForm.observations} onChange={(e) => setEditForm({ ...editForm, observations: e.target.value })} />
+                : (a.observations || '-')}
+            </td>
+            <td className="py-1 pr-3 text-right whitespace-nowrap">
+              <Can module="personal" action="edit">
+                {editingId === a.id ? (
+                  <>
+                    <button type="button" className="text-blue-600 hover:underline text-xs" disabled={busyId === a.id} onClick={() => saveEdit(a)}>{t('common.save')}</button>
+                    <button type="button" className="text-gray-500 hover:underline text-xs ml-2" onClick={() => setEditingId(null)}>{t('common.cancel')}</button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" className="text-blue-600 hover:underline text-xs" onClick={() => startEdit(a)}>{t('common.edit')}</button>
+                    {a.status === 'activo' && (
+                      <button type="button" className="text-amber-600 hover:underline text-xs ml-2" disabled={busyId === a.id} onClick={() => finalize(a)}>{t('personnel.detail.assignments.finalize')}</button>
+                    )}
+                  </>
+                )}
+              </Can>
+              <Can module="personal" action="delete">
+                <button type="button" className="text-red-600 hover:underline text-xs ml-2" disabled={busyId === a.id} onClick={() => remove(a)}>{t('common.delete')}</button>
+              </Can>
+            </td>
+          </tr>
+        ))}
+        {assignments.length === 0 && <tr><td colSpan={7} className="py-2 text-center text-gray-400">{t('personnel.detail.assignments.empty')}</td></tr>}
       </Table>
     </Card>
   );

@@ -3,6 +3,7 @@
     "save": "Save",
     "saveChanges": "Save changes",
     "cancel": "Cancel",
+    "continue": "Continue",
     "edit": "Edit",
     "delete": "Delete",
     "remove": "Remove",
@@ -899,6 +900,30 @@
         "indefinite": "Indefinite",
         "empty": "No deductions registered.",
         "confirmDelete": "Delete this deduction? If any installment was already applied, deactivate it instead."
+      },
+      "assignments": {
+        "title": "Contract assignments",
+        "help": "Contracts/projects this worker is (or was) assigned to. This doesn't replace the main link (administrative/project-based) above: a worker can have several assignments without losing that status.",
+        "newAssignment": "+ New assignment",
+        "startDate": "Start date",
+        "position": "Position on this contract",
+        "observations": "Notes",
+        "finalize": "Finalize",
+        "confirmFinalize": "Finalize this assignment? It will stay in the history with today as its end date.",
+        "confirmDelete": "Delete this assignment? This action cannot be undone.",
+        "table": {
+          "project": "Contract / project",
+          "position": "Position",
+          "startDate": "Start",
+          "endDate": "End",
+          "status": "Status",
+          "observations": "Notes"
+        },
+        "status": {
+          "activo": "Active",
+          "finalizado": "Finalized"
+        },
+        "empty": "No assignments registered."
       }
     },
     "contract": {
@@ -913,6 +938,7 @@
       "generate": "Generate contract",
       "generating": "Generating...",
       "missingFields": "Missing data to generate this contract",
+      "chooseAssignment": "This worker has several active assignments — choose which one this document is for",
       "newOtrosi": "+ Amendment",
       "newObject": "New object (optional)",
       "newEndDate": "New end date (optional)",

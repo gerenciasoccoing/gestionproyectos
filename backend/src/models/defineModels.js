@@ -36,6 +36,7 @@ const modelDefiners = [
   require('./MarketStudyQuotation'),
   require('./MarketStudyQuotationItem'),
   require('./Employee'),
+  require('./EmployeeAssignment'),
   require('./EmployeeContractDocument'),
   require('./SocialSecurityDocument'),
   require('./SocialSecurityProvider'),

@@ -1,4 +1,4 @@
-const { DataTypes } = require('sequelize');
+const { DataTypes, Op } = require('sequelize');
 
 module.exports = (sequelize) => {
   const Employee = sequelize.define('Employee', {
@@ -67,9 +67,28 @@ module.exports = (sequelize) => {
     // pedir al generar el contrato. Trabajadores creados antes de este campo se backfillean en
     // postSyncFixups.js.
     nationality: { type: DataTypes.STRING, allowNull: true, defaultValue: 'Colombiana' },
+
+    // Lista de personal de ingreso (HSEQ, ver la especificación) — nullable a propósito, mismo
+    // criterio que el resto de campos de esta ficha: no se exige al crear, solo cuando haga falta
+    // (al generar ese formato).
+    emergencyContactPhone: { type: DataTypes.STRING, allowNull: true },
+    emergencyContactRelationship: { type: DataTypes.STRING, allowNull: true },
+  }, {
+    indexes: [
+      // "único por número de cédula dentro de cada empresa; bloquea duplicados" (ver la
+      // especificación) — parcial (WHERE "documentNumber" IS NOT NULL): un trabajador puede
+      // crearse sin documento todavía (ver documentType/documentNumber arriba, ambos nullable) sin
+      // que el índice choque entre varios NULL, pero en cuanto dos SÍ tienen el mismo número, sí
+      // colisiona.
+      { unique: true, fields: ['companyId', 'documentNumber'], where: { documentNumber: { [Op.not]: null } } },
+    ],
   });
 
   Employee.associate = (models) => {
+    // belongsTo Project (vía projectId) se mantiene como la asignación PRINCIPAL/actual del
+    // trabajador (ver EmployeeAssignment.js para el historial completo multi-contrato) — los
+    // generadores de contrato/nómina que ya leían este campo siguen funcionando igual sin cambios;
+    // nunca se vuelve a usar como la única fuente de verdad de "a qué proyectos está asignado".
     Employee.belongsTo(models.Project, { foreignKey: 'projectId' });
     Employee.hasMany(models.SocialSecurityDocument, { foreignKey: 'employeeId', as: 'socialSecurityDocuments' });
     Employee.hasMany(models.PaymentReceipt, { foreignKey: 'employeeId', as: 'paymentReceipts' });
@@ -77,6 +96,7 @@ module.exports = (sequelize) => {
     Employee.hasMany(models.EmployeeContractDocument, { foreignKey: 'employeeId', as: 'contractDocuments' });
     Employee.hasMany(models.EmployeeLeave, { foreignKey: 'employeeId', as: 'leaves' });
     Employee.hasMany(models.EmployeeDeduction, { foreignKey: 'employeeId', as: 'deductions' });
+    Employee.hasMany(models.EmployeeAssignment, { foreignKey: 'employeeId', as: 'assignments' });
   };
 
   return Employee;

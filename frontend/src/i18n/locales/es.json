@@ -3,6 +3,7 @@
     "save": "Guardar",
     "saveChanges": "Guardar cambios",
     "cancel": "Cancelar",
+    "continue": "Continuar",
     "edit": "Editar",
     "delete": "Eliminar",
     "remove": "Quitar",
@@ -899,6 +900,30 @@
         "indefinite": "Indefinido",
         "empty": "Sin descuentos registrados.",
         "confirmDelete": "¿Eliminar este descuento? Si ya se aplicó alguna cuota, desactívalo en vez de eliminarlo."
+      },
+      "assignments": {
+        "title": "Asignaciones a contratos",
+        "help": "Contratos/proyectos a los que este trabajador está (o estuvo) asignado. No reemplaza la vinculación principal (administrativo/de proyecto) de arriba: un trabajador puede sumar varias asignaciones sin perder esa condición.",
+        "newAssignment": "+ Nueva asignación",
+        "startDate": "Fecha de inicio",
+        "position": "Cargo en este contrato",
+        "observations": "Observaciones",
+        "finalize": "Finalizar",
+        "confirmFinalize": "¿Finalizar esta asignación? Quedará en el historial con la fecha de hoy como fin.",
+        "confirmDelete": "¿Eliminar esta asignación? Esta acción no se puede deshacer.",
+        "table": {
+          "project": "Contrato / proyecto",
+          "position": "Cargo",
+          "startDate": "Inicio",
+          "endDate": "Fin",
+          "status": "Estado",
+          "observations": "Observaciones"
+        },
+        "status": {
+          "activo": "Activa",
+          "finalizado": "Finalizada"
+        },
+        "empty": "Sin asignaciones registradas."
       }
     },
     "contract": {
@@ -913,6 +938,7 @@
       "generate": "Generar contrato",
       "generating": "Generando...",
       "missingFields": "Faltan datos para generar este contrato",
+      "chooseAssignment": "Este trabajador tiene varias asignaciones activas — elige a cuál corresponde este documento",
       "newOtrosi": "+ Otrosí",
       "newObject": "Nuevo objeto (opcional)",
       "newEndDate": "Nueva fecha de terminación (opcional)",

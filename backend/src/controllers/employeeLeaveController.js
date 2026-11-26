@@ -5,20 +5,15 @@
 const { Op } = require('sequelize');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { Employee, EmployeeLeave, LeaveType } = require('../models');
+const { Employee, EmployeeAssignment, EmployeeLeave, LeaveType } = require('../models');
 const { relativePath } = require('../middleware/upload');
 const { getVacationBalance } = require('../services/laborCalculations');
+const { loadScopedEmployee } = require('../utils/employeeProjectAccess');
 
 const LEAVE_TYPES = ['incapacidad_general', 'incapacidad_laboral', 'vacaciones', 'licencia_remunerada', 'licencia_no_remunerada'];
 
-function employeeScopeWhere(req) {
-  const where = { id: req.params.id };
-  if (req.params.projectId) where.projectId = req.params.projectId;
-  return where;
-}
-
 async function loadEmployee(req) {
-  const employee = await Employee.findOne({ where: employeeScopeWhere(req) });
+  const employee = await loadScopedEmployee({ Employee, EmployeeAssignment }, req);
   if (!employee) throw new ApiError(404, 'Empleado no encontrado');
   return employee;
 }

@@ -6,6 +6,7 @@ const { requirePermission, requireProjectAccess } = require('../middleware/autho
 const { makeUploader } = require('../middleware/upload');
 const { preventDuplicateSubmit } = require('../middleware/idempotency');
 const employeeController = require('../controllers/employeeController');
+const employeeAssignmentController = require('../controllers/employeeAssignmentController');
 const severanceController = require('../controllers/severanceController');
 const employeeContractController = require('../controllers/employeeContractController');
 const aiDocumentController = require('../controllers/aiDocumentController');
@@ -52,6 +53,12 @@ router.post('/:id/payments', requirePermission('personal', 'edit'), uploadPaymen
 router.post('/:id/payroll/preview', requirePermission('personal', 'edit'), payrollController.preview);
 router.post('/:id/payroll/confirm', requirePermission('personal', 'edit'), preventDuplicateSubmit, payrollController.confirm);
 router.post('/:id/cedula', requirePermission('personal', 'edit'), uploadCedula.single('file'), employeeController.uploadCedula);
+
+router.get('/:id/assignments', requirePermission('personal', 'view'), employeeAssignmentController.list);
+router.post('/:id/assignments', requirePermission('personal', 'edit'), preventDuplicateSubmit, employeeAssignmentController.create);
+router.put('/:id/assignments/:assignmentId', requirePermission('personal', 'edit'), employeeAssignmentController.update);
+router.post('/:id/assignments/:assignmentId/finalize', requirePermission('personal', 'edit'), employeeAssignmentController.finalize);
+router.delete('/:id/assignments/:assignmentId', requirePermission('personal', 'delete'), employeeAssignmentController.remove);
 
 router.post('/:id/severance/preview', requirePermission('personal', 'edit'), severanceController.preview);
 router.post('/:id/severance', requirePermission('personal', 'edit'), preventDuplicateSubmit, severanceController.confirmRetirement);

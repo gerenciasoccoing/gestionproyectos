@@ -14,6 +14,12 @@ module.exports = (sequelize) => {
     // hooks de Sequelize a partir del usuario autenticado, nunca a mano en un controlador.
     companyId: { type: DataTypes.UUID, allowNull: true },
     employeeId: { type: DataTypes.UUID, allowNull: false },
+    // A qué asignación/contrato corresponde este documento (ver EmployeeAssignment.js) — necesario
+    // desde que un trabajador puede tener varias asignaciones activas a la vez: sin esto, no habría
+    // forma de saber para cuál se generó. Null en documentos generados ANTES de este campo (se
+    // resuelven igual que siempre, leyendo Employee.projectId al momento de usarlos — ver
+    // employeeContractController.js/contractSignatureService.js, ambos con ese fallback).
+    projectId: { type: DataTypes.UUID, allowNull: true },
     parentDocumentId: { type: DataTypes.UUID, allowNull: true },
     kind: { type: DataTypes.ENUM('contrato', 'otrosi'), allowNull: false },
     // 'generado': minuta producida por el sistema a partir de contractTemplates.js (comportamiento
@@ -73,6 +79,7 @@ module.exports = (sequelize) => {
 
   EmployeeContractDocument.associate = (models) => {
     EmployeeContractDocument.belongsTo(models.Employee, { foreignKey: 'employeeId' });
+    EmployeeContractDocument.belongsTo(models.Project, { foreignKey: 'projectId' });
     EmployeeContractDocument.belongsTo(models.EmployeeContractDocument, { foreignKey: 'parentDocumentId', as: 'parentDocument' });
   };
 

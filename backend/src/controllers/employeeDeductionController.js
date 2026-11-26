@@ -5,8 +5,9 @@
 // proyecto como la global del menú principal.
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { Employee, EmployeeDeduction } = require('../models');
+const { Employee, EmployeeAssignment, EmployeeDeduction } = require('../models');
 const { relativePath } = require('../middleware/upload');
+const { loadScopedEmployee } = require('../utils/employeeProjectAccess');
 
 const DEDUCTION_TYPES = ['prestamo', 'libranza', 'embargo', 'otro'];
 // Préstamo/libranza/otro son autorizados por el trabajador (requieren su autorización escrita
@@ -14,14 +15,8 @@ const DEDUCTION_TYPES = ['prestamo', 'libranza', 'embargo', 'otro'];
 // es recomendado (la orden misma) pero no se bloquea la creación si todavía no se tiene a mano.
 const REQUIRES_AUTHORIZATION_FILE = new Set(['prestamo', 'libranza', 'otro']);
 
-function employeeScopeWhere(req) {
-  const where = { id: req.params.id };
-  if (req.params.projectId) where.projectId = req.params.projectId;
-  return where;
-}
-
 async function loadEmployee(req) {
-  const employee = await Employee.findOne({ where: employeeScopeWhere(req) });
+  const employee = await loadScopedEmployee({ Employee, EmployeeAssignment }, req);
   if (!employee) throw new ApiError(404, 'Empleado no encontrado');
   return employee;
 }

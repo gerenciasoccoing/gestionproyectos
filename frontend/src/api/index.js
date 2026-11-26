@@ -254,10 +254,29 @@ export const generalEmployeeDeductionsApi = {
   remove: (employeeId, deductionId) => client.delete(`/employees/${employeeId}/deductions/${deductionId}`).then((r) => r.data),
 };
 
+// Asignaciones trabajador↔contrato (ver EmployeeAssignment.js/employeeAssignmentController.js): un
+// trabajador puede estar asignado a varios proyectos/contratos a la vez, sin que esto cambie su
+// vinculación principal (administrativo/de proyecto, ver employeesApi.update más arriba).
+export const employeeAssignmentsApi = {
+  list: (pid, employeeId) => client.get(`/projects/${pid}/employees/${employeeId}/assignments`).then((r) => r.data),
+  create: (pid, employeeId, data) => client.post(`/projects/${pid}/employees/${employeeId}/assignments`, data).then((r) => r.data),
+  update: (pid, employeeId, assignmentId, data) => client.put(`/projects/${pid}/employees/${employeeId}/assignments/${assignmentId}`, data).then((r) => r.data),
+  finalize: (pid, employeeId, assignmentId, data) => client.post(`/projects/${pid}/employees/${employeeId}/assignments/${assignmentId}/finalize`, data).then((r) => r.data),
+  remove: (pid, employeeId, assignmentId) => client.delete(`/projects/${pid}/employees/${employeeId}/assignments/${assignmentId}`).then((r) => r.data),
+};
+
+export const generalEmployeeAssignmentsApi = {
+  list: (employeeId) => client.get(`/employees/${employeeId}/assignments`).then((r) => r.data),
+  create: (employeeId, data) => client.post(`/employees/${employeeId}/assignments`, data).then((r) => r.data),
+  update: (employeeId, assignmentId, data) => client.put(`/employees/${employeeId}/assignments/${assignmentId}`, data).then((r) => r.data),
+  finalize: (employeeId, assignmentId, data) => client.post(`/employees/${employeeId}/assignments/${assignmentId}/finalize`, data).then((r) => r.data),
+  remove: (employeeId, assignmentId) => client.delete(`/employees/${employeeId}/assignments/${assignmentId}`).then((r) => r.data),
+};
+
 export const employeeContractsApi = {
   contractTypes: () => client.get('/employee-contract-types').then((r) => r.data),
   list: (pid, employeeId) => client.get(`/projects/${pid}/employees/${employeeId}/contracts`).then((r) => r.data),
-  generate: (pid, employeeId) => client.post(`/projects/${pid}/employees/${employeeId}/contracts`).then((r) => r.data),
+  generate: (pid, employeeId, data) => client.post(`/projects/${pid}/employees/${employeeId}/contracts`, data).then((r) => r.data),
   generateOtrosi: (pid, employeeId, contractId, data) => client.post(`/projects/${pid}/employees/${employeeId}/contracts/${contractId}/otrosi`, data).then((r) => r.data),
   remove: (pid, employeeId, contractId) => client.delete(`/projects/${pid}/employees/${employeeId}/contracts/${contractId}`).then((r) => r.data),
   // Envía (o reenvía) el link de firma digital de un documento ya generado — ver
@@ -300,7 +319,7 @@ export const generalPayrollApi = {
 
 export const generalEmployeeContractsApi = {
   list: (employeeId) => client.get(`/employees/${employeeId}/contracts`).then((r) => r.data),
-  generate: (employeeId) => client.post(`/employees/${employeeId}/contracts`).then((r) => r.data),
+  generate: (employeeId, data) => client.post(`/employees/${employeeId}/contracts`, data).then((r) => r.data),
   generateOtrosi: (employeeId, contractId, data) => client.post(`/employees/${employeeId}/contracts/${contractId}/otrosi`, data).then((r) => r.data),
   remove: (employeeId, contractId) => client.delete(`/employees/${employeeId}/contracts/${contractId}`).then((r) => r.data),
   requestSignature: (employeeId, contractId) => client.post(`/employees/${employeeId}/contracts/${contractId}/request-signature`).then((r) => r.data),

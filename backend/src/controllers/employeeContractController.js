@@ -3,7 +3,8 @@
 // un proyecto, "Sección Contractual" — un concepto totalmente distinto).
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { Employee, EmployeeContractDocument, Project } = require('../models');
+const { Employee, EmployeeAssignment, EmployeeContractDocument, Project } = require('../models');
+const { loadScopedEmployee } = require('../utils/employeeProjectAccess');
 const { getLetterheadForProject } = require('../services/letterheadService');
 const { saveGeneratedFile, relativePath } = require('../middleware/upload');
 const { generateContractPdf } = require('../services/pdfService');
@@ -37,19 +38,54 @@ function pdfDocToBuffer(doc) {
 // ser administrativo (employee.projectId null) o de proyecto (se resuelve leyendo el registro, no
 // la URL).
 async function loadEmployee(req) {
-  const where = { id: req.params.id };
-  if (req.params.projectId) where.projectId = req.params.projectId;
-  const employee = await Employee.findOne({ where });
+  const employee = await loadScopedEmployee({ Employee, EmployeeAssignment }, req);
   if (!employee) throw new ApiError(404, 'Empleado no encontrado');
   return employee;
 }
 
 // Prefijo del contrato: 'ADM' para personal administrativo (nunca depende de un proyecto/contrato
 // de cliente), o los primeros 3 dígitos de Project.contractNumber para personal de proyecto — igual
-// que en expenseController.js. A partir de employee.projectId (el dato real del trabajador), nunca
-// de req.params.projectId (no existe en la ruta global).
-async function contractPrefixForEmployee(employee) {
-  return employee.projectId ? contractPrefixForProject(employee.projectId) : 'ADM';
+// que en expenseController.js.
+async function contractPrefixForDocument(projectId) {
+  return projectId ? contractPrefixForProject(projectId) : 'ADM';
+}
+
+// Un trabajador puede tener varias EmployeeAssignment activas a la vez (ver EmployeeAssignment.js)
+// — hay que saber a CUÁL corresponde el documento que se está generando, en vez de asumir
+// employee.projectId (que ahora es solo la asignación "principal", ver ese mismo modelo). Reglas,
+// en orden:
+//  1. Sin ninguna asignación activa (administrativo sin contrato, o dato legado no migrado todavía
+//     — ver el script de migración): se usa employee.projectId tal cual, comportamiento histórico.
+//  2. Ruta anidada en un proyecto (:projectId en la URL) y ese proyecto tiene una asignación activa
+//     para este trabajador: se usa esa, sin pedir nada por body (ya no hay ambigüedad posible).
+//  3. body.assignmentId explícito: se usa esa asignación (debe ser una activa de este trabajador).
+//  4. Exactamente una asignación activa: se usa esa, sin ambigüedad.
+//  5. Dos o más sin ninguna de las anteriores: se rechaza pidiendo elegir (ver
+//     EmployeeDetailPage.jsx, que ya sabe mostrar este selector).
+async function resolveContractAssignment(employee, req) {
+  const activeAssignments = await EmployeeAssignment.findAll({ where: { employeeId: employee.id, status: 'activo' } });
+  if (activeAssignments.length === 0) return { projectId: employee.projectId, assignmentId: null };
+
+  if (req.params.projectId) {
+    const current = activeAssignments.find((a) => a.projectId === req.params.projectId);
+    if (current) return { projectId: current.projectId, assignmentId: current.id };
+  }
+
+  if (req.body.assignmentId) {
+    const chosen = activeAssignments.find((a) => a.id === req.body.assignmentId);
+    if (!chosen) throw new ApiError(400, 'assignmentId no corresponde a una asignación activa de este trabajador.');
+    return { projectId: chosen.projectId, assignmentId: chosen.id };
+  }
+
+  if (activeAssignments.length === 1) return { projectId: activeAssignments[0].projectId, assignmentId: activeAssignments[0].id };
+
+  const projects = await Project.findAll({ where: { id: activeAssignments.map((a) => a.projectId) }, attributes: ['id', 'name', 'contractNumber'] });
+  throw new ApiError(400, 'Este trabajador tiene varias asignaciones activas. Indica a cuál corresponde este documento (assignmentId).', {
+    assignments: activeAssignments.map((a) => ({
+      id: a.id, projectId: a.projectId, position: a.position,
+      project: projects.find((p) => p.id === a.projectId),
+    })),
+  });
 }
 
 const listContractTypes = asyncHandler(async (req, res) => {
@@ -90,12 +126,14 @@ const generate = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Faltan datos obligatorios para generar este contrato.', { missingFields: missing });
   }
 
-  const project = employee.projectId ? await Project.findByPk(employee.projectId) : null;
-  const company = await getLetterheadForProject(employee.projectId);
+  const { projectId } = await resolveContractAssignment(employee, req);
+  const project = projectId ? await Project.findByPk(projectId) : null;
+  const company = await getLetterheadForProject(projectId);
   const sequenceNumber = await EmployeeContractDocument.count({ where: { employeeId: employee.id } });
 
   const doc = await EmployeeContractDocument.create({
     employeeId: employee.id,
+    projectId,
     kind: 'contrato',
     contractType: employee.contractType,
     sequenceNumber,
@@ -104,7 +142,7 @@ const generate = asyncHandler(async (req, res) => {
     valueAtIssue: employee.salaryValue,
     objectAtIssue: employee.contractObject,
     generatedBy: req.user.id,
-    contractPrefix: await contractPrefixForEmployee(employee),
+    contractPrefix: await contractPrefixForDocument(projectId),
   });
 
   const content = buildContractContent({ employee, company, project, doc });
@@ -132,12 +170,20 @@ const generateOtrosi = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Indica al menos un cambio: nuevo objeto, nueva fecha o nuevo valor.');
   }
 
-  const project = employee.projectId ? await Project.findByPk(employee.projectId) : null;
-  const company = await getLetterheadForProject(employee.projectId);
+  // Un otrosí continúa el MISMO contrato que su padre — no vuelve a preguntar a cuál asignación
+  // corresponde (haría pensar que puede "mover" el otrosí a otro contrato, cosa que no tiene
+  // sentido); solo si el padre no tenía projectId guardado (documento previo a este campo) se
+  // resuelve de cero, igual que generate().
+  const { projectId } = parent.projectId !== null && parent.projectId !== undefined
+    ? { projectId: parent.projectId }
+    : await resolveContractAssignment(employee, req);
+  const project = projectId ? await Project.findByPk(projectId) : null;
+  const company = await getLetterheadForProject(projectId);
   const sequenceNumber = await EmployeeContractDocument.count({ where: { employeeId: employee.id } });
 
   const doc = await EmployeeContractDocument.create({
     employeeId: employee.id,
+    projectId,
     parentDocumentId: parent.id,
     kind: 'otrosi',
     contractType: parent.contractType,
@@ -147,7 +193,7 @@ const generateOtrosi = asyncHandler(async (req, res) => {
     valueAtIssue: newSalaryValue !== undefined && newSalaryValue !== '' ? newSalaryValue : parent.valueAtIssue,
     objectAtIssue: newContractObject || parent.objectAtIssue,
     generatedBy: req.user.id,
-    contractPrefix: await contractPrefixForEmployee(employee),
+    contractPrefix: await contractPrefixForDocument(projectId),
   });
 
   const changes = { newContractObject, newEndDate, newSalaryValue };
@@ -206,6 +252,7 @@ const uploadExternal = asyncHandler(async (req, res) => {
   }
   if (!startDate) throw new ApiError(400, 'startDate es obligatorio.');
 
+  const { projectId } = await resolveContractAssignment(employee, req);
   const sequenceNumber = await EmployeeContractDocument.count({ where: { employeeId: employee.id } });
   const { originalFilePath, originalMimeType, pdfFilePath, docxFilePath } = await persistExternalFile({
     companyId: employee.companyId, employeeId: employee.id, kind: 'contrato', sequenceNumber, file: req.file,
@@ -214,6 +261,7 @@ const uploadExternal = asyncHandler(async (req, res) => {
   const isSigned = alreadySigned === 'true' || alreadySigned === true;
   const doc = await EmployeeContractDocument.create({
     employeeId: employee.id,
+    projectId,
     kind: 'contrato',
     source: 'externo',
     contractType,
@@ -223,7 +271,7 @@ const uploadExternal = asyncHandler(async (req, res) => {
     valueAtIssue: salaryValue === undefined || salaryValue === '' ? null : salaryValue,
     notes: notes || null,
     generatedBy: req.user.id,
-    contractPrefix: await contractPrefixForEmployee(employee),
+    contractPrefix: await contractPrefixForDocument(projectId),
     pdfFilePath,
     docxFilePath,
     originalFilePath,
@@ -298,8 +346,10 @@ const removeDocument = asyncHandler(async (req, res) => {
 // para poder copiarlo y mandarlo a mano (mismo respaldo ya usado para "olvidé mi contraseña").
 const sendForSignature = asyncHandler(async (req, res) => {
   const employee = await loadEmployee(req);
+  const doc = await EmployeeContractDocument.findOne({ where: { id: req.params.contractId, employeeId: employee.id } });
+  if (!doc) throw new ApiError(404, 'Documento no encontrado para este trabajador.');
   const result = await requestSignature({
-    employeeId: employee.id, contractId: req.params.contractId, projectId: employee.projectId,
+    employeeId: employee.id, contractId: req.params.contractId, projectId: doc.projectId || employee.projectId,
   });
   res.json({
     doc: result.doc,

@@ -1,6 +1,6 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { sequelize, Employee, Severance, Expense, AdminExpenseCategory } = require('../models');
+const { sequelize, Employee, EmployeeAssignment, Severance, Expense, AdminExpenseCategory } = require('../models');
 const { calculateSeverance } = require('../services/severanceService');
 const { relativePath, saveGeneratedFile } = require('../middleware/upload');
 const { assertCashBoxUsable, overdraftWarning } = require('../services/cashBoxService');
@@ -8,6 +8,7 @@ const { getLetterheadForProject } = require('../services/letterheadService');
 const { generateLaborCalculationPdf } = require('../services/pdfService');
 const { nextExpenseNumber, contractPrefixForProject } = require('../services/numberingService');
 const { SEVERANCE_ELIGIBLE_TYPES } = require('../services/contractTemplates');
+const { loadScopedEmployee } = require('../utils/employeeProjectAccess');
 
 function pdfDocToBuffer(doc) {
   return new Promise((resolve, reject) => {
@@ -18,17 +19,11 @@ function pdfDocToBuffer(doc) {
   });
 }
 
-function scopeWhere(req) {
-  const where = { id: req.params.id };
-  if (req.params.projectId) where.projectId = req.params.projectId;
-  return where;
-}
-
 // Liquidación de prestaciones sociales (cesantías, intereses, prima, vacaciones, indemnización) es
 // exclusiva del contrato de trabajo — ni aprendizaje (Ley 789/2002, no genera estas prestaciones)
 // ni prestación de servicios/subcontratación (civiles) tienen derecho a ella.
 async function loadActiveEmployee(req) {
-  const employee = await Employee.findOne({ where: scopeWhere(req) });
+  const employee = await loadScopedEmployee({ Employee, EmployeeAssignment }, req);
   if (!employee) throw new ApiError(404, 'Empleado no encontrado');
   if (employee.status === 'retirado') throw new ApiError(400, 'El empleado ya fue retirado');
   if (!SEVERANCE_ELIGIBLE_TYPES.includes(employee.contractType)) {
@@ -161,7 +156,7 @@ const confirmRetirement = asyncHandler(async (req, res) => {
 });
 
 const uploadPazYSalvo = asyncHandler(async (req, res) => {
-  const employee = await Employee.findOne({ where: scopeWhere(req) });
+  const employee = await loadScopedEmployee({ Employee, EmployeeAssignment }, req);
   if (!employee) throw new ApiError(404, 'Empleado no encontrado');
   const severance = await Severance.findOne({ where: { employeeId: employee.id } });
   if (!severance) throw new ApiError(400, 'El empleado aún no tiene liquidación registrada');

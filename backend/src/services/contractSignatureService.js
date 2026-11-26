@@ -125,7 +125,11 @@ async function getSignableDocument(rawToken) {
 async function signGeneratedDocument(doc, { signatureDataUrl, signerName, signedAt, ip }) {
   const employee = await adminModels.Employee.findByPk(doc.employeeId, { hooks: false });
   if (!employee) throw new ApiError(404, 'Trabajador no encontrado.');
-  const project = await adminModels.Project.findByPk(employee.projectId, { hooks: false });
+  // doc.projectId es la asignación/contrato para el que se generó ESTE documento (ver
+  // EmployeeContractDocument.js) — no necesariamente la "principal" actual del trabajador, que
+  // puede haber cambiado desde entonces. employee.projectId solo queda como respaldo para
+  // documentos generados antes de que existiera esa columna.
+  const project = await adminModels.Project.findByPk(doc.projectId || employee.projectId, { hooks: false });
   const company = await resolveLetterheadForSigning(doc, project);
 
   let ctxDoc = doc.toJSON();

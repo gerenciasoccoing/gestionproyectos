@@ -1,9 +1,10 @@
 const { Op } = require('sequelize');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
-const { Employee, SocialSecurityDocument, PaymentReceipt, Severance, EmployeeContractDocument, Project } = require('../models');
+const { sequelize, Employee, SocialSecurityDocument, PaymentReceipt, Severance, EmployeeContractDocument, EmployeeAssignment, Project } = require('../models');
 const { relativePath } = require('../middleware/upload');
 const { days360, getEffectiveLaborParameters, computeAuxTransporte } = require('../services/laborCalculations');
+const { loadScopedEmployee } = require('../utils/employeeProjectAccess');
 
 // Estos controladores atienden DOS montajes de ruta: el anidado en proyecto
 // (/projects/:projectId/employees, ver employeeRoutes.js — comportamiento sin cambios) y el global
@@ -12,12 +13,6 @@ const { days360, getEffectiveLaborParameters, computeAuxTransporte } = require('
 // tabla/lógica de negocio en los dos casos (cero duplicación, ver la especificación del cliente):
 // cuando la ruta trae :projectId se usa como filtro estricto (igual que antes); cuando no, se opera
 // sobre toda la empresa. Mismo patrón ya usado en expenseController.js para Gastos.
-
-function scopeWhere(req) {
-  const where = { id: req.params.id };
-  if (req.params.projectId) where.projectId = req.params.projectId;
-  return where;
-}
 
 // Valor del contrato proporcional al rango de días (entryDate -> contractEndDate), con la MISMA
 // convención de días (año comercial de 360, ver laborCalculations.js#days360) que ya usan
@@ -47,7 +42,16 @@ const list = asyncHandler(async (req, res) => {
   const { status, vinculacion, contractType } = req.query; // ?status=retirado para ver histórico
   const where = {};
   if (req.params.projectId) {
-    where.projectId = req.params.projectId;
+    // "Desde cada proyecto: listar solo el personal asignado a ese contrato" (ver la
+    // especificación) — ya NO es solo quien tiene este proyecto como projectId principal, sino
+    // cualquiera con una EmployeeAssignment ACTIVA a este contrato (un administrativo asignado acá
+    // también aparece, sin perder su condición de administrativo — Employee.projectId le sigue
+    // quedando null). El script de migración ya creó la asignación correspondiente para todo el
+    // personal que antes solo tenía projectId seteado, así que esta consulta cubre ambos casos.
+    const activeAssignments = await EmployeeAssignment.findAll({
+      where: { projectId: req.params.projectId, status: 'activo' }, attributes: ['employeeId'],
+    });
+    where.id = activeAssignments.map((a) => a.employeeId);
   } else if (vinculacion === 'administrativo') {
     where.projectId = null;
   } else if (req.query.projectId) {
@@ -70,6 +74,10 @@ const list = asyncHandler(async (req, res) => {
       // ya usa la ficha del trabajador para el otrosí.
       { model: EmployeeContractDocument, as: 'contractDocuments', attributes: ['id', 'kind', 'sequenceNumber', 'signatureStatus'] },
       { model: Project, attributes: ['id', 'name'] },
+      {
+        model: EmployeeAssignment, as: 'assignments',
+        include: [{ model: Project, attributes: ['id', 'name', 'contractNumber'] }],
+      },
     ],
     order: [['entryDate', 'DESC']],
   });
@@ -77,13 +85,17 @@ const list = asyncHandler(async (req, res) => {
 });
 
 const get = asyncHandler(async (req, res) => {
-  const employee = await Employee.findOne({
-    where: scopeWhere(req),
+  const employee = await loadScopedEmployee({ Employee, EmployeeAssignment }, req, {
     include: [
       { model: SocialSecurityDocument, as: 'socialSecurityDocuments' },
       { model: PaymentReceipt, as: 'paymentReceipts' },
       { model: Severance, as: 'severance' },
       { model: Project, attributes: ['id', 'name'] },
+      {
+        model: EmployeeAssignment, as: 'assignments',
+        include: [{ model: Project, attributes: ['id', 'name', 'contractNumber'] }],
+        separate: true, order: [['startDate', 'DESC']],
+      },
     ],
   });
   if (!employee) throw new ApiError(404, 'Empleado no encontrado');
@@ -96,6 +108,7 @@ const get = asyncHandler(async (req, res) => {
 const OPTIONAL_FIELDS = [
   'documentNumber', 'address', 'city', 'phone', 'email', 'contractObject', 'contractEndDate', 'nationality',
   'epsName', 'pensionFundName', 'arlName', 'subcontractorLegalName', 'subcontractorNit', 'subcontractorLegalRep',
+  'emergencyContactPhone', 'emergencyContactRelationship',
 ];
 // ENUMs de Postgres: un '' del formulario no es un valor válido, hay que normalizarlo a null.
 const ENUM_FIELDS = ['documentType', 'contractType'];
@@ -103,6 +116,18 @@ const ENUM_FIELDS = ['documentType', 'contractType'];
 function applyOptionalFields(employee, body) {
   OPTIONAL_FIELDS.forEach((f) => { if (body[f] !== undefined) employee[f] = body[f] === '' ? null : body[f]; });
   ENUM_FIELDS.forEach((f) => { if (body[f] !== undefined) employee[f] = body[f] === '' ? null : body[f]; });
+}
+
+// "único por número de cédula dentro de cada empresa; bloquea duplicados" (ver la especificación)
+// — chequeo explícito para un mensaje claro; el índice único parcial de Employee.js (WHERE
+// documentNumber IS NOT NULL) es el respaldo real contra una carrera entre dos peticiones
+// simultáneas (ver el catch de SequelizeUniqueConstraintError en create/update de abajo).
+async function assertDocumentNumberAvailable(documentNumber, excludeId) {
+  if (!documentNumber) return;
+  const where = { documentNumber };
+  if (excludeId) where.id = { [Op.ne]: excludeId };
+  const existing = await Employee.findOne({ where });
+  if (existing) throw new ApiError(409, `Ya existe un trabajador con el número de documento ${documentNumber} (${existing.name}).`);
 }
 
 const create = asyncHandler(async (req, res) => {
@@ -120,6 +145,8 @@ const create = asyncHandler(async (req, res) => {
     throw new ApiError(403, 'No tiene acceso a este proyecto');
   }
 
+  if (req.body.documentNumber) await assertDocumentNumberAvailable(req.body.documentNumber);
+
   const employee = Employee.build({
     projectId,
     name,
@@ -130,12 +157,33 @@ const create = asyncHandler(async (req, res) => {
     contractFilePath: relativePath(req.file),
   });
   applyOptionalFields(employee, req.body);
-  await employee.save();
+  try {
+    // Si se crea con un contrato/proyecto (projectId, sea por ruta anidada o elegido en el body),
+    // esa primera asignación también queda registrada en EmployeeAssignment — si no, la lista de
+    // personal DEL PROYECTO (ver list()) no lo vería hasta que alguien lo "asignara" aparte.
+    await sequelize.transaction(async (transaction) => {
+      await employee.save({ transaction });
+      if (projectId) {
+        await EmployeeAssignment.create({
+          employeeId: employee.id,
+          projectId,
+          startDate: entryDate,
+          position,
+          status: 'activo',
+        }, { transaction });
+      }
+    });
+  } catch (err) {
+    if (err.name === 'SequelizeUniqueConstraintError') {
+      throw new ApiError(409, `Ya existe un trabajador con el número de documento ${req.body.documentNumber}.`);
+    }
+    throw err;
+  }
   res.status(201).json(employee);
 });
 
 const update = asyncHandler(async (req, res) => {
-  const employee = await Employee.findOne({ where: scopeWhere(req) });
+  const employee = await loadScopedEmployee({ Employee, EmployeeAssignment }, req);
   if (!employee) throw new ApiError(404, 'Empleado no encontrado');
   const { name, position, entryDate, dedicationHours, salaryValue } = req.body;
   if (name !== undefined) employee.name = name;
@@ -148,16 +196,55 @@ const update = asyncHandler(async (req, res) => {
   }
   // La vinculación (administrativo/de proyecto) solo es editable desde la vista general: en la
   // ruta anidada el proyecto queda fijo por la URL, igual que en expenseController.js.
+  let previousProjectId;
+  let projectChanged = false;
   if (!req.params.projectId && req.body.projectId !== undefined) {
     const newProjectId = req.body.projectId || null;
     if (newProjectId && !req.user.isAdmin && !req.user.projectIds.includes(newProjectId)) {
       throw new ApiError(403, 'No tiene acceso a este proyecto');
     }
-    employee.projectId = newProjectId;
+    if (newProjectId !== employee.projectId) {
+      previousProjectId = employee.projectId;
+      projectChanged = true;
+      employee.projectId = newProjectId;
+    }
+  }
+  if (req.body.documentNumber !== undefined && req.body.documentNumber !== employee.documentNumber) {
+    await assertDocumentNumberAvailable(req.body.documentNumber, employee.id);
   }
   applyOptionalFields(employee, req.body);
   if (req.file) employee.contractFilePath = relativePath(req.file);
-  await employee.save();
+  try {
+    await sequelize.transaction(async (transaction) => {
+      await employee.save({ transaction });
+      // Este editor legado de "vinculación" (único cambio de proyecto existente antes del CRUD
+      // dedicado de asignaciones, ver task #27) se refleja también en EmployeeAssignment para que
+      // la asignación principal no quede desincronizada con el historial que ya leen list()/get().
+      if (projectChanged) {
+        const today = new Date().toISOString().slice(0, 10);
+        if (previousProjectId) {
+          await EmployeeAssignment.update(
+            { status: 'finalizado', endDate: today },
+            { where: { employeeId: employee.id, projectId: previousProjectId, status: 'activo' }, transaction },
+          );
+        }
+        if (employee.projectId) {
+          await EmployeeAssignment.create({
+            employeeId: employee.id,
+            projectId: employee.projectId,
+            startDate: today,
+            position: employee.position,
+            status: 'activo',
+          }, { transaction });
+        }
+      }
+    });
+  } catch (err) {
+    if (err.name === 'SequelizeUniqueConstraintError') {
+      throw new ApiError(409, `Ya existe un trabajador con el número de documento ${req.body.documentNumber}.`);
+    }
+    throw err;
+  }
   res.json(employee);
 });
 
@@ -171,7 +258,7 @@ const update = asyncHandler(async (req, res) => {
 // purchaseOrderController.remove bloquea si la orden ya se trasladó a un gasto, acá se bloquea la
 // eliminación completa del trabajador en vez de borrar en cascada un rastro financiero real.
 const remove = asyncHandler(async (req, res) => {
-  const employee = await Employee.findOne({ where: scopeWhere(req) });
+  const employee = await loadScopedEmployee({ Employee, EmployeeAssignment }, req);
   if (!employee) throw new ApiError(404, 'Empleado no encontrado');
 
   const severance = await Severance.findOne({ where: { employeeId: employee.id } });
@@ -182,12 +269,13 @@ const remove = asyncHandler(async (req, res) => {
   await SocialSecurityDocument.destroy({ where: { employeeId: employee.id } });
   await PaymentReceipt.destroy({ where: { employeeId: employee.id } });
   await EmployeeContractDocument.destroy({ where: { employeeId: employee.id } });
+  await EmployeeAssignment.destroy({ where: { employeeId: employee.id } });
   await employee.destroy();
   res.status(204).send();
 });
 
 const uploadCedula = asyncHandler(async (req, res) => {
-  const employee = await Employee.findOne({ where: scopeWhere(req) });
+  const employee = await loadScopedEmployee({ Employee, EmployeeAssignment }, req);
   if (!employee) throw new ApiError(404, 'Empleado no encontrado');
   if (!req.file) throw new ApiError(400, 'Debe adjuntar el archivo de la cédula');
   employee.cedulaFilePath = relativePath(req.file);
@@ -196,7 +284,7 @@ const uploadCedula = asyncHandler(async (req, res) => {
 });
 
 const addSocialSecurityDocument = asyncHandler(async (req, res) => {
-  const employee = await Employee.findOne({ where: scopeWhere(req) });
+  const employee = await loadScopedEmployee({ Employee, EmployeeAssignment }, req);
   if (!employee) throw new ApiError(404, 'Empleado no encontrado');
   const { type, uploadDate } = req.body;
   if (!['salud', 'arl', 'pension'].includes(type)) throw new ApiError(400, 'type debe ser salud, arl o pension');
@@ -212,7 +300,7 @@ const addSocialSecurityDocument = asyncHandler(async (req, res) => {
 });
 
 const addPaymentReceipt = asyncHandler(async (req, res) => {
-  const employee = await Employee.findOne({ where: scopeWhere(req) });
+  const employee = await loadScopedEmployee({ Employee, EmployeeAssignment }, req);
   if (!employee) throw new ApiError(404, 'Empleado no encontrado');
   const { date, periodLabel, amount } = req.body;
   if (!date || !periodLabel || amount === undefined) throw new ApiError(400, 'date, periodLabel y amount son obligatorios');

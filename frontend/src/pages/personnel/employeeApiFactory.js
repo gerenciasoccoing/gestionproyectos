@@ -3,6 +3,7 @@ import {
   employeeContractsApi, generalEmployeeContractsApi,
   employeeLeavesApi, generalEmployeeLeavesApi,
   employeeDeductionsApi, generalEmployeeDeductionsApi,
+  employeeAssignmentsApi, generalEmployeeAssignmentsApi,
 } from '../../api';
 
 // Une los tres módulos de API de Personal (fichas/nómina/contratos) en un solo objeto, sin que cada
@@ -51,7 +52,7 @@ export function buildEmployeeApi(projectId) {
     },
     contracts: isGeneral ? {
       list: (employeeId) => generalEmployeeContractsApi.list(employeeId),
-      generate: (employeeId) => generalEmployeeContractsApi.generate(employeeId),
+      generate: (employeeId, data) => generalEmployeeContractsApi.generate(employeeId, data),
       generateOtrosi: (employeeId, contractId, data) => generalEmployeeContractsApi.generateOtrosi(employeeId, contractId, data),
       remove: (employeeId, contractId) => generalEmployeeContractsApi.remove(employeeId, contractId),
       requestSignature: (employeeId, contractId) => generalEmployeeContractsApi.requestSignature(employeeId, contractId),
@@ -60,7 +61,7 @@ export function buildEmployeeApi(projectId) {
       replaceFile: (employeeId, contractId, formData) => generalEmployeeContractsApi.replaceFile(employeeId, contractId, formData),
     } : {
       list: (employeeId) => employeeContractsApi.list(projectId, employeeId),
-      generate: (employeeId) => employeeContractsApi.generate(projectId, employeeId),
+      generate: (employeeId, data) => employeeContractsApi.generate(projectId, employeeId, data),
       generateOtrosi: (employeeId, contractId, data) => employeeContractsApi.generateOtrosi(projectId, employeeId, contractId, data),
       remove: (employeeId, contractId) => employeeContractsApi.remove(projectId, employeeId, contractId),
       requestSignature: (employeeId, contractId) => employeeContractsApi.requestSignature(projectId, employeeId, contractId),
@@ -89,6 +90,19 @@ export function buildEmployeeApi(projectId) {
       create: (employeeId, formData) => employeeDeductionsApi.create(projectId, employeeId, formData),
       setStatus: (employeeId, deductionId, active) => employeeDeductionsApi.setStatus(projectId, employeeId, deductionId, active),
       remove: (employeeId, deductionId) => employeeDeductionsApi.remove(projectId, employeeId, deductionId),
+    },
+    assignments: isGeneral ? {
+      list: (employeeId) => generalEmployeeAssignmentsApi.list(employeeId),
+      create: (employeeId, data) => generalEmployeeAssignmentsApi.create(employeeId, data),
+      update: (employeeId, assignmentId, data) => generalEmployeeAssignmentsApi.update(employeeId, assignmentId, data),
+      finalize: (employeeId, assignmentId, data) => generalEmployeeAssignmentsApi.finalize(employeeId, assignmentId, data),
+      remove: (employeeId, assignmentId) => generalEmployeeAssignmentsApi.remove(employeeId, assignmentId),
+    } : {
+      list: (employeeId) => employeeAssignmentsApi.list(projectId, employeeId),
+      create: (employeeId, data) => employeeAssignmentsApi.create(projectId, employeeId, data),
+      update: (employeeId, assignmentId, data) => employeeAssignmentsApi.update(projectId, employeeId, assignmentId, data),
+      finalize: (employeeId, assignmentId, data) => employeeAssignmentsApi.finalize(projectId, employeeId, assignmentId, data),
+      remove: (employeeId, assignmentId) => employeeAssignmentsApi.remove(projectId, employeeId, assignmentId),
     },
   };
 }
